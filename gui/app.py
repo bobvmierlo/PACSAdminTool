@@ -13,12 +13,52 @@ import socket
 import csv
 import webbrowser
 from datetime import datetime
+from logging.handlers import TimedRotatingFileHandler
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.manager import load_config, save_config
 from hl7_templates import load_templates as _load_hl7_templates
 
 logger = logging.getLogger(__name__)
+
+_APP_VERSION = "1.0"
+
+
+def _setup_client_logging():
+    """
+    Add a daily-rotating log file handler for the desktop client.
+
+    Uses logs/pacs_admin_client.log so it is separate from the web server's
+    pacs_admin.log and both can run simultaneously without interleaving.
+    The filename starts with 'pacs_admin' so the web server's existing
+    cleanup pattern ('pacs_admin*.log*') covers client logs too.
+    """
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    log_dir  = os.path.join(base_dir, "logs")
+    os.makedirs(log_dir, exist_ok=True)
+
+    root = logging.getLogger()
+    # Don't add a second file handler if one already exists (e.g. running
+    # the web server and the GUI in the same process — unlikely but safe).
+    if any(isinstance(h, TimedRotatingFileHandler) for h in root.handlers):
+        return
+
+    fmt = logging.Formatter(
+        "%(asctime)s  %(levelname)-7s  %(name)-25s  %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    fh = TimedRotatingFileHandler(
+        os.path.join(log_dir, "pacs_admin_client.log"),
+        when="midnight", utc=True, backupCount=7, encoding="utf-8",
+    )
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(fmt)
+
+    if root.level == logging.WARNING or root.level == 0:
+        root.setLevel(logging.INFO)
+    root.addHandler(fh)
+    logging.getLogger(__name__).info("Client log file opened: %s",
+                                     os.path.join(log_dir, "pacs_admin_client.log"))
 
 FONT      = ("Segoe UI", 9)
 FONT_BOLD = ("Segoe UI", 9, "bold")
@@ -223,10 +263,14 @@ class CFindTab(ttk.Frame):
         ctrl = ttk.Frame(top); ctrl.pack(fill="x", pady=(8,0))
         _label(ctrl,"Query Level:").pack(side="left")
         self.level_var = tk.StringVar(value="STUDY")
-        ttk.Combobox(ctrl,textvariable=self.level_var,values=["PATIENT","STUDY","SERIES","IMAGE"],state="readonly",width=10).pack(side="left",padx=(4,12))
+        self._level_cb = ttk.Combobox(ctrl,textvariable=self.level_var,values=["PATIENT","STUDY","SERIES","IMAGE"],state="readonly",width=10)
+        self._level_cb.pack(side="left",padx=(4,12))
+        self._level_cb.bind("<<ComboboxSelected>>", self._on_level_change)
         _label(ctrl,"Model:").pack(side="left")
         self.model_var = tk.StringVar(value="STUDY")
-        ttk.Combobox(ctrl,textvariable=self.model_var,values=["STUDY","PATIENT"],state="readonly",width=10).pack(side="left",padx=4)
+        self._model_cb = ttk.Combobox(ctrl,textvariable=self.model_var,values=["STUDY","PATIENT"],state="readonly",width=10)
+        self._model_cb.pack(side="left",padx=4)
+        self._model_cb.bind("<<ComboboxSelected>>", self._on_model_change)
         _sep(ctrl,"vertical").pack(side="left",fill="y",padx=12,pady=2)
         _btn(ctrl,"C-ECHO (Ping)",self._do_cecho).pack(side="left",padx=2)
         _btn(ctrl,"Run C-FIND",self._do_cfind,style="Primary.TButton").pack(side="left",padx=4)
@@ -235,7 +279,9 @@ class CFindTab(ttk.Frame):
         self.move_dest_var = tk.StringVar(value=self.app.config.get("local_ae",{}).get("ae_title","PACSADMIN"))
         _entry(mf,textvariable=self.move_dest_var,width=16).pack(side="left",padx=4)
         _btn(mf,"C-MOVE Selected Study",self._do_cmove,style="Success.TButton").pack(side="left",padx=4)
-        rf = _lf(self,"Results  (double-click a row to view all DICOM tags)"); rf.pack(fill="both",expand=True,padx=10,pady=6)
+        pw = ttk.PanedWindow(self, orient="vertical")
+        pw.pack(fill="both", expand=True, padx=10, pady=(0,6))
+        rf = _lf(pw,"Results  (double-click a row to view all DICOM tags)")
         cols = ("PatientID","PatientName","StudyDate","Modality","Accession","Description","StudyUID")
         self.tree = ttk.Treeview(rf,columns=cols,show="headings",height=12)
         for c, w in zip(cols,[110,150,90,80,120,200,300]):
@@ -244,7 +290,9 @@ class CFindTab(ttk.Frame):
         self.tree.configure(yscrollcommand=sb.set)
         self.tree.pack(side="left",fill="both",expand=True); sb.pack(side="right",fill="y")
         self.tree.bind("<Double-1>",self._show_detail)
-        lf2, self.log = _log_frame(self,height=5); lf2.pack(fill="x",padx=10,pady=(0,6))
+        pw.add(rf, weight=3)
+        lf2, self.log = _log_frame(pw, height=5)
+        pw.add(lf2, weight=1)
 
     def _show_detail(self,_=None):
         sel = self.tree.selection()
@@ -262,6 +310,32 @@ class CFindTab(ttk.Frame):
                 ok, msg = c_echo(local, ae["host"], ae["port"], ae["ae_title"]); self.log.append(msg)
             except Exception as e: self.log.append(f"Error: {e}", "err")
         threading.Thread(target=run, daemon=True).start()
+
+    def _on_model_change(self, _=None):
+        """
+        Study Root model (STUDY) does not support PATIENT query level.
+        When the user selects STUDY model with PATIENT level, auto-correct
+        the level to STUDY and warn in the activity log.
+        """
+        if self.model_var.get() == "STUDY" and self.level_var.get() == "PATIENT":
+            self.level_var.set("STUDY")
+            self.log.append(
+                "Warning: Study Root model does not support Query Level 'PATIENT'. "
+                "Level changed to 'STUDY'. Use Patient Root model if you need PATIENT level.",
+                "warn")
+
+    def _on_level_change(self, _=None):
+        """
+        PATIENT query level is only valid with the Patient Root model.
+        When the user picks PATIENT level with STUDY model, auto-switch
+        the model to PATIENT and warn in the activity log.
+        """
+        if self.level_var.get() == "PATIENT" and self.model_var.get() == "STUDY":
+            self.model_var.set("PATIENT")
+            self.log.append(
+                "Warning: Query Level 'PATIENT' is only valid with Patient Root model. "
+                "Model switched to 'PATIENT'.",
+                "warn")
 
     def _build_query_ds(self):
         try: from pydicom.dataset import Dataset
@@ -328,12 +402,16 @@ class CStoreTab(ttk.Frame):
         _btn(ctrl,"Clear List",self._clear).pack(side="left",padx=2)
         self.count_lbl = _label(ctrl,"0 files queued",style="Dim.TLabel"); self.count_lbl.pack(side="left",padx=12)
         _btn(ctrl,"Send All (C-STORE)",self._do_cstore,style="Primary.TButton").pack(side="right",padx=2)
-        lf = _lf(self,"Files to Send"); lf.pack(fill="both",expand=True,padx=10,pady=4)
+        pw = ttk.PanedWindow(self, orient="vertical")
+        pw.pack(fill="both", expand=True, padx=10, pady=(0,6))
+        lf = _lf(pw,"Files to Send")
         self.listbox = tk.Listbox(lf,bg="white",fg="#1a1a1a",selectbackground="#dbeafe",selectforeground="#1e3a5f",font=FONT_MONO,bd=1,relief="solid",activestyle="none")
         sb = ttk.Scrollbar(lf,orient="vertical",command=self.listbox.yview)
         self.listbox.configure(yscrollcommand=sb.set)
         self.listbox.pack(side="left",fill="both",expand=True); sb.pack(side="right",fill="y")
-        lf2, self.log = _log_frame(self,height=7); lf2.pack(fill="x",padx=10,pady=(0,6))
+        pw.add(lf, weight=3)
+        lf2, self.log = _log_frame(pw, height=7)
+        pw.add(lf2, weight=1)
 
     def _add_files(self):
         files = filedialog.askopenfilenames(title="Select DICOM files",filetypes=[("DICOM","*.dcm *.DCM"),("All","*.*")])
@@ -385,7 +463,9 @@ class DMWLTab(ttk.Frame):
         _btn(ctrl,"Query Worklist",self._do_dmwl,style="Primary.TButton").pack(side="left",padx=2)
         _btn(ctrl,"Export to CSV...",self._export_csv).pack(side="left",padx=4)
         self.count_lbl = _label(ctrl,"",style="Dim.TLabel"); self.count_lbl.pack(side="left",padx=12)
-        rf = _lf(self,"Worklist Results  (double-click a row to view all DICOM tags)"); rf.pack(fill="both",expand=True,padx=10,pady=6)
+        pw = ttk.PanedWindow(self, orient="vertical")
+        pw.pack(fill="both", expand=True, padx=10, pady=(0,6))
+        rf = _lf(pw,"Worklist Results  (double-click a row to view all DICOM tags)")
         cols = ("PatientID","PatientName","Accession","Modality","ScheduledDate","StationAET","Procedure")
         self.tree = ttk.Treeview(rf,columns=cols,show="headings",height=12)
         for c, w in zip(cols,[100,150,120,75,110,120,200]):
@@ -394,7 +474,9 @@ class DMWLTab(ttk.Frame):
         self.tree.configure(yscrollcommand=sb.set)
         self.tree.pack(side="left",fill="both",expand=True); sb.pack(side="right",fill="y")
         self.tree.bind("<Double-1>",self._show_detail)
-        lf2, self.log = _log_frame(self,height=4); lf2.pack(fill="x",padx=10,pady=(0,6))
+        pw.add(rf, weight=3)
+        lf2, self.log = _log_frame(pw, height=4)
+        pw.add(lf2, weight=1)
 
     def _show_detail(self,_=None):
         sel = self.tree.selection()
@@ -473,12 +555,16 @@ class StorageCommitTab(ttk.Frame):
         _btn(ctrl,"Clear",self._clear_uids).pack(side="left",padx=4)
         self.uid_count = _label(ctrl,"0 UIDs",style="Dim.TLabel"); self.uid_count.pack(side="left",padx=12)
         _btn(ctrl,"Send N-ACTION (Commit)",self._do_commit,style="Primary.TButton").pack(side="right",padx=2)
-        lf = _lf(self,"SOP Instance UIDs"); lf.pack(fill="both",expand=True,padx=10,pady=4)
+        pw = ttk.PanedWindow(self, orient="vertical")
+        pw.pack(fill="both", expand=True, padx=10, pady=(0,6))
+        lf = _lf(pw,"SOP Instance UIDs")
         self.listbox = tk.Listbox(lf,bg="white",fg="#1a1a1a",selectbackground="#dbeafe",selectforeground="#1e3a5f",font=FONT_MONO,bd=1,relief="solid",activestyle="none")
         sb = ttk.Scrollbar(lf,orient="vertical",command=self.listbox.yview)
         self.listbox.configure(yscrollcommand=sb.set)
         self.listbox.pack(side="left",fill="both",expand=True); sb.pack(side="right",fill="y")
-        lf2, self.log = _log_frame(self,height=7); lf2.pack(fill="x",padx=10,pady=(0,6))
+        pw.add(lf, weight=3)
+        lf2, self.log = _log_frame(pw, height=7)
+        pw.add(lf2, weight=1)
 
     def _load_from_files(self):
         files = filedialog.askopenfilenames(title="Select DICOM files",filetypes=[("DICOM","*.dcm *.DCM"),("All","*.*")])
@@ -603,15 +689,19 @@ class HL7Tab(ttk.Frame):
         self.send_debug_var = tk.BooleanVar(value=False)
         dbg_row = ttk.Frame(parent); dbg_row.pack(fill="x",padx=10,pady=(2,0))
         ttk.Checkbutton(dbg_row,text="Show raw MLLP bytes in log",variable=self.send_debug_var).pack(side="left")
-        msg_lf = _lf(parent,"Message to Send  (edit directly)"); msg_lf.pack(fill="both",expand=True,padx=10,pady=(4,4))
+        ctrl = ttk.Frame(parent); ctrl.pack(fill="x",padx=10,pady=4)
+        _btn(ctrl,"Send via MLLP",self._do_hl7_send,style="Primary.TButton").pack(side="left",padx=2)
+        _btn(ctrl,"Clear Message",lambda: self.hl7_msg_text.delete("1.0","end")).pack(side="left",padx=4)
+        pw = ttk.PanedWindow(parent, orient="vertical")
+        pw.pack(fill="both", expand=True, padx=10, pady=(0,6))
+        msg_lf = _lf(pw,"Message to Send  (edit directly)")
         self.hl7_msg_text = tk.Text(msg_lf,bg="white",fg="#1a1a1a",font=FONT_MONO,height=8,wrap="none",bd=1,relief="solid")
         sb_msg = ttk.Scrollbar(msg_lf,orient="vertical",command=self.hl7_msg_text.yview)
         self.hl7_msg_text.configure(yscrollcommand=sb_msg.set)
         self.hl7_msg_text.pack(side="left",fill="both",expand=True); sb_msg.pack(side="right",fill="y")
-        ctrl = ttk.Frame(parent); ctrl.pack(fill="x",padx=10,pady=4)
-        _btn(ctrl,"Send via MLLP",self._do_hl7_send,style="Primary.TButton").pack(side="left",padx=2)
-        _btn(ctrl,"Clear Message",lambda: self.hl7_msg_text.delete("1.0","end")).pack(side="left",padx=4)
-        lf_log, self.hl7_send_log = _log_frame(parent,height=5); lf_log.pack(fill="x",padx=10,pady=(0,6))
+        pw.add(msg_lf, weight=3)
+        lf_log, self.hl7_send_log = _log_frame(pw, height=5)
+        pw.add(lf_log, weight=1)
 
     def _build_receiver(self, parent):
         top = ttk.Frame(parent); top.pack(fill="x",padx=10,pady=8)
@@ -625,7 +715,9 @@ class HL7Tab(ttk.Frame):
         self.recv_btn = _btn(top,">>  Start HL7 Listener",self._toggle_listener,style="Primary.TButton")
         self.recv_btn.pack(fill="x",pady=(8,0))
         self.recv_status = _label(top,"Listener not running",style="Dim.TLabel"); self.recv_status.pack(anchor="w",pady=(4,0))
-        msg_lf = _lf(parent,"Received Messages"); msg_lf.pack(fill="both",expand=True,padx=10,pady=(4,4))
+        pw = ttk.PanedWindow(parent, orient="vertical")
+        pw.pack(fill="both", expand=True, padx=10, pady=(0,6))
+        msg_lf = _lf(pw,"Received Messages")
         ctrl_row = ttk.Frame(msg_lf); ctrl_row.pack(fill="x",pady=(0,4))
         _btn(ctrl_row,"Clear",self._clear_received).pack(side="right")
         self.recv_count_lbl = _label(ctrl_row,"0 messages received",style="Dim.TLabel"); self.recv_count_lbl.pack(side="left")
@@ -635,7 +727,9 @@ class HL7Tab(ttk.Frame):
         sb_rh = ttk.Scrollbar(msg_lf,orient="horizontal",command=self.hl7_recv_text.xview)
         self.hl7_recv_text.configure(yscrollcommand=sb_rv.set,xscrollcommand=sb_rh.set)
         sb_rh.pack(side="bottom",fill="x"); self.hl7_recv_text.pack(side="left",fill="both",expand=True); sb_rv.pack(side="right",fill="y")
-        lf_log, self.hl7_recv_log = _log_frame(parent,height=4); lf_log.pack(fill="x",padx=10,pady=(0,6))
+        pw.add(msg_lf, weight=3)
+        lf_log, self.hl7_recv_log = _log_frame(pw, height=4)
+        pw.add(lf_log, weight=1)
 
     def _on_tmpl_selected(self, _=None):
         """Update the description label when the user picks a different template."""
@@ -791,7 +885,9 @@ class SCPListenerTab(ttk.Frame):
         self.scp_btn = _btn(top,">>  Start DICOM Storage Listener",self._toggle_scp,style="Primary.TButton")
         self.scp_btn.pack(fill="x",pady=(10,0))
         self.scp_status = _label(top,"Listener not running",style="Dim.TLabel"); self.scp_status.pack(anchor="w",pady=(4,0))
-        lf = _lf(self,"Received DICOM Files"); lf.pack(fill="both",expand=True,padx=10,pady=(8,4))
+        pw = ttk.PanedWindow(self, orient="vertical")
+        pw.pack(fill="both", expand=True, padx=10, pady=(0,6))
+        lf = _lf(pw,"Received DICOM Files")
         ctrl = ttk.Frame(lf); ctrl.pack(fill="x",pady=(0,4))
         _btn(ctrl,"Clear List",self._clear_list).pack(side="right")
         self.recv_file_count = _label(ctrl,"0 files received",style="Dim.TLabel"); self.recv_file_count.pack(side="left")
@@ -800,7 +896,9 @@ class SCPListenerTab(ttk.Frame):
         sb = ttk.Scrollbar(lf,orient="vertical",command=self.recv_listbox.yview)
         self.recv_listbox.configure(yscrollcommand=sb.set)
         self.recv_listbox.pack(side="left",fill="both",expand=True); sb.pack(side="right",fill="y")
-        lf2, self.log = _log_frame(self,height=6); lf2.pack(fill="x",padx=10,pady=(0,6))
+        pw.add(lf, weight=3)
+        lf2, self.log = _log_frame(pw, height=6)
+        pw.add(lf2, weight=1)
 
     def _browse_save_dir(self):
         d = filedialog.askdirectory(title="Select folder to save received DICOM files")
@@ -912,22 +1010,153 @@ class SettingsTab(ttk.Frame):
 class HelpTab(ttk.Frame):
     SECTIONS = [
         ("C-FIND / Query-Retrieve",
-         "Query a remote PACS for patients and studies.\n\nC-ECHO (Ping) - tests connectivity.\nRun C-FIND - searches using any combination of Patient ID, Name, Accession, Date, Modality, or Study UID.\nDouble-click a result row to see all DICOM tags.\nC-MOVE - instructs the PACS to push the study to a destination AE.",
-         [("DICOM PS3.4 §C – Query/Retrieve Service Class (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_C")]),
+         "Query a remote PACS for patients and studies using the DICOM Query/Retrieve service.\n\n"
+         "─── Buttons ───────────────────────────────────────────────\n"
+         "C-ECHO (Ping)      Verifies the remote AE is reachable and responding.\n"
+         "                   Always run this first to confirm connectivity before a C-FIND.\n"
+         "Run C-FIND         Sends a query using any combination of the filter fields.\n"
+         "                   Leave all fields blank to retrieve everything (use with care).\n"
+         "C-MOVE             Instructs the remote PACS to push the selected study to the\n"
+         "                   Destination AE you specify. That AE must have a Storage SCP\n"
+         "                   running and be known to the source PACS.\n\n"
+         "─── Query Level ────────────────────────────────────────────\n"
+         "The Query Level determines how granular the results are:\n\n"
+         "  PATIENT  Returns one row per patient. Works only with the Patient Root model.\n"
+         "           Useful for patient-level lookups (e.g. find all studies for a patient).\n\n"
+         "  STUDY    Returns one row per study. The most commonly used level.\n"
+         "           Works with both Study Root and Patient Root models.\n\n"
+         "  SERIES   Returns one row per series within a study.\n"
+         "           Requires a Study Instance UID to narrow results.\n\n"
+         "  IMAGE    Returns one row per SOP instance (individual DICOM file).\n"
+         "           Requires a Series Instance UID. Use sparingly — very verbose.\n\n"
+         "─── Model (Information Model) ──────────────────────────────\n"
+         "The Information Model defines the DICOM service class used for the query.\n"
+         "Most PACS systems support both, but not all do.\n\n"
+         "  STUDY  (Study Root Q/R — recommended for most use cases)\n"
+         "         Hierarchy: STUDY → SERIES → IMAGE\n"
+         "         Valid levels: STUDY, SERIES, IMAGE\n"
+         "         ✗  PATIENT level is NOT supported in this model.\n"
+         "         Use this when you already have an Accession, Date, or Study UID.\n\n"
+         "  PATIENT  (Patient Root Q/R)\n"
+         "           Hierarchy: PATIENT → STUDY → SERIES → IMAGE\n"
+         "           Valid levels: PATIENT, STUDY, SERIES, IMAGE\n"
+         "           Use this when searching by Patient ID or Patient Name without\n"
+         "           a specific study context, or when the PACS requires it.\n\n"
+         "─── Valid Combinations ─────────────────────────────────────\n"
+         "  Model     │  Supported Query Levels\n"
+         "  ──────────┼───────────────────────────────────────\n"
+         "  STUDY     │  STUDY  ·  SERIES  ·  IMAGE\n"
+         "  PATIENT   │  PATIENT  ·  STUDY  ·  SERIES  ·  IMAGE\n\n"
+         "The tool will warn you and auto-correct incompatible combinations.\n\n"
+         "─── Date Format ────────────────────────────────────────────\n"
+         "Study Date accepts DICOM date format: YYYYMMDD or a range YYYYMMDD-YYYYMMDD\n"
+         "Example: 20240101-20241231 returns all studies from 2024.\n\n"
+         "─── Tips ───────────────────────────────────────────────────\n"
+         "• Patient Name supports wildcards: SMITH* or *SMITH* (DICOM wildcard is *)\n"
+         "• Double-click any result row to inspect all returned DICOM tags.\n"
+         "• If C-FIND returns 0 results, try relaxing filters or check the Query Level.",
+         [("DICOM PS3.4 §C – Query/Retrieve Service Class (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_C"),
+          ("PS3.4 Table C.6-1 – Study Root Attributes", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#table_C.6-1"),
+          ("PS3.4 Table C.6-2 – Patient Root Attributes", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#table_C.6-2")]),
+
         ("C-STORE (Send Files)",
-         "Send DICOM files from disk to a remote Storage SCP.\nAdd Files or Add Folder, then Send All.",
+         "Send DICOM files from disk to a remote Storage SCP using the C-STORE service.\n\n"
+         "─── Workflow ───────────────────────────────────────────────\n"
+         "1. Set the destination AE Title, Host, and Port.\n"
+         "2. Add Files — pick individual .dcm files, or\n"
+         "   Add Folder — recursively adds all files in a directory tree.\n"
+         "3. Review the queued file list.\n"
+         "4. Click Send All (C-STORE) to transfer.\n\n"
+         "─── Notes ──────────────────────────────────────────────────\n"
+         "• Each file is sent as a separate C-STORE request within the same association.\n"
+         "• The SCP must accept the SOP Class of each file (e.g. CT Image Storage).\n"
+         "• Transfer Syntax negotiation is handled automatically by pynetdicom.\n"
+         "• Use the DICOM Receiver tab to run a local SCP that accepts incoming files.",
          [("DICOM PS3.4 §B – Storage Service Class (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_B")]),
+
         ("DMWL - Modality Worklist",
-         "Query a Worklist SCP for scheduled procedures.\n\nStation AET - used as the CALLING AE title when set.\nSome PACS (e.g. Sectra) only return items for the modality AE that polls the worklist,\nso set Station AET to the modality's own AE title.\n\nDouble-click a row to see all DICOM tags including nested SPS sequences.",
+         "Query a Modality Worklist SCP for scheduled procedures.\n\n"
+         "─── What is a Modality Worklist? ───────────────────────────\n"
+         "The Modality Worklist (DMWL) service allows a modality (e.g. CT scanner) to\n"
+         "retrieve its scheduled procedure list from the RIS/HIS via the PACS.\n"
+         "This is how scanners auto-populate patient demographics and accession numbers.\n\n"
+         "─── Station AET field ──────────────────────────────────────\n"
+         "When set, the Station AET value is used as the CALLING AE title for the query.\n"
+         "This impersonates a specific modality's AE title, which is necessary on\n"
+         "systems (e.g. Sectra IDS7, Agfa IMPAX) that filter the worklist by calling AET.\n"
+         "Leave blank to use the local AE configured in Settings.\n\n"
+         "─── Date field ─────────────────────────────────────────────\n"
+         "Filters by ScheduledProcedureStepStartDate.\n"
+         "Use today's date (YYYYMMDD) to see today's worklist.\n"
+         "Leave blank to return all scheduled items (can be very large).\n\n"
+         "─── Tips ───────────────────────────────────────────────────\n"
+         "• Double-click a row to view the full SPS sequence with all nested DICOM tags.\n"
+         "• Export to CSV saves the visible columns for reporting or troubleshooting.\n"
+         "• If you get 0 results but expect items, check the Station AET filter.",
          [("DICOM PS3.4 §K – Modality Worklist Management (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_K")]),
+
         ("Storage Commitment",
-         "Verify that a PACS has permanently stored instances.\nLoad UIDs from DICOM files, then Send N-ACTION.\nThe PACS returns committed vs failed counts.",
+         "Verify that a remote PACS has permanently and safely stored a set of DICOM instances.\n\n"
+         "─── How it works ───────────────────────────────────────────\n"
+         "1. Load SOP Instance UIDs from DICOM files on disk.\n"
+         "2. Send N-ACTION — this sends a Storage Commitment Push Model request.\n"
+         "3. The PACS responds asynchronously with N-EVENT-REPORT:\n"
+         "     • Referenced SOP Sequence — successfully committed instances\n"
+         "     • Failed SOP Sequence      — instances the PACS could not commit\n\n"
+         "─── When to use it ─────────────────────────────────────────\n"
+         "• After C-STORE: confirm the PACS persisted the objects before deleting local copies.\n"
+         "• Audit workflows: verify no data loss after migration or archive restores.\n"
+         "• Troubleshooting: identify which specific instances a PACS claims to have stored.\n\n"
+         "─── Note ───────────────────────────────────────────────────\n"
+         "Storage Commitment requires the PACS to have an N-EVENT-REPORT callback path back\n"
+         "to this tool. Some PACS systems send it synchronously; others queue it and send\n"
+         "the event minutes later or on a different port.",
          [("DICOM PS3.4 §J – Storage Commitment Service Class (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_J")]),
+
         ("IOCM - Instance Availability",
-         "Send an Instance Availability Notification (N-CREATE).\nUsed for deletion or availability-change workflows.\nFollows DICOM PS 3.4 Annex KK.",
+         "Send an Instance Availability Notification (N-CREATE) to a remote SCP.\n\n"
+         "─── What is IOCM? ──────────────────────────────────────────\n"
+         "IOCM (Instance Order Change Management) is used in deletion and\n"
+         "availability-change workflows. When a study is deleted or made unavailable,\n"
+         "an N-CREATE is sent so downstream systems (viewers, archives) can update their\n"
+         "references accordingly.\n\n"
+         "─── Fields ─────────────────────────────────────────────────\n"
+         "  Study UID       Instance UID of the study being affected.\n"
+         "  Series UID      Series within that study (optional for study-level events).\n"
+         "  SOP Class UID   DICOM SOP Class of the affected instances.\n"
+         "  SOP Inst UID    Specific instance being reported on.\n"
+         "  Availability    ONLINE | NEARLINE | OFFLINE | UNAVAILABLE\n\n"
+         "─── Caution ────────────────────────────────────────────────\n"
+         "This operation instructs a PACS that objects have been deleted or are no\n"
+         "longer available. Use carefully — sending incorrect notifications can cause\n"
+         "a PACS to remove valid index entries.",
          [("DICOM PS3.4 §KK – Instance Availability Notification (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_KK")]),
+
         ("HL7 - Send",
-         "Send HL7 v2 messages over MLLP.\n\nTemplates:\n  ORM^O01  - Radiology order (MSH/PID/PV1/ORC/OBR/ZDS)\n  ORU^R01  - Radiology report with OBX findings\n  ADT^A04  - Patient registration (EVN/PID/PV1/PV2)\n  ADT^A08  - Update patient information\n  ADT^A23  - Delete patient visit\n  SIU^S12  - Schedule appointment (SCH/AIS/AIP/AIL)\n  SIU^S15  - Cancel appointment\n  QBP^Q22  - IHE PDQ patient demographics query\n  OML^O21  - Lab order with SPM specimen segment\n\nShow raw MLLP bytes - logs every byte including 0x0B and 0x1C 0x0D framing.",
+         "Send HL7 v2 messages to a remote MLLP listener.\n\n"
+         "─── Workflow ───────────────────────────────────────────────\n"
+         "1. Set Host and Port of the destination MLLP server.\n"
+         "2. Select a Template and fill in the patient/procedure fields.\n"
+         "3. Click Load Template — the editor is populated with the filled message.\n"
+         "4. Review or edit the message directly in the editor.\n"
+         "5. Click Send via MLLP.\n\n"
+         "─── Available Templates ─────────────────────────────────────\n"
+         "  ORM^O01   Radiology order (MSH/PID/PV1/ORC/OBR/ZDS)\n"
+         "  ORU^R01   Radiology report with OBX observation/findings\n"
+         "  ADT^A04   Register new patient (EVN/PID/PV1/PV2)\n"
+         "  ADT^A08   Update existing patient demographics\n"
+         "  ADT^A23   Delete a patient visit\n"
+         "  SIU^S12   Schedule an appointment (SCH/AIS/AIP/AIL)\n"
+         "  SIU^S15   Cancel a scheduled appointment\n"
+         "  QBP^Q22   IHE PDQ patient demographics query\n"
+         "  OML^O21   Lab order with SPM specimen segment\n\n"
+         "─── MLLP Framing ────────────────────────────────────────────\n"
+         "HL7 v2 over MLLP wraps each message with:\n"
+         "  Start Block:  0x0B  (vertical tab)\n"
+         "  End Block:    0x1C 0x0D  (file separator + carriage return)\n"
+         "Segments are separated by carriage return (\\r, 0x0D).\n\n"
+         "Enable 'Show raw MLLP bytes' to log the full TCP payload including framing.\n"
+         "When log level is set to DEBUG, raw bytes are always captured.",
          [("ORM^O01 – Radiology Order (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ORM_O01"),
           ("ORU^R01 – Radiology Report (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ORU_R01"),
           ("ADT^A04 – Register Patient (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ADT_A04"),
@@ -937,14 +1166,66 @@ class HelpTab(ttk.Frame):
           ("SIU^S15 – Cancel Appointment (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/SIU_S15"),
           ("QBP^Q22 – Patient Demographics Query (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/QBP_Q22"),
           ("OML^O21 – Lab Order (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/OML_O21")]),
+
         ("HL7 - Receive",
-         "Run an MLLP listener.\nAutomatic AA ACK sent for every message received.\nShow raw MLLP bytes - logs full raw packets.",
-         [("HL7 v2.4 Message Definitions (Caristix)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents")]),
+         "Run a minimal MLLP listener that accepts incoming HL7 v2 messages.\n\n"
+         "─── What it does ───────────────────────────────────────────\n"
+         "Listens on the specified TCP port for MLLP connections.\n"
+         "For every message received it:\n"
+         "  • Displays the message in the Received Messages box.\n"
+         "  • Sends an automatic AA (Application Accept) ACK back to the sender.\n"
+         "  • Logs the sender's IP address and port.\n\n"
+         "─── Use cases ──────────────────────────────────────────────\n"
+         "• Test that a RIS/HIS or other HL7 source is sending correctly.\n"
+         "• Capture sample messages for template building or troubleshooting.\n"
+         "• Verify MLLP connectivity and framing before pointing at a real receiver.\n\n"
+         "─── Notes ──────────────────────────────────────────────────\n"
+         "• Windows Firewall may block the listen port — add an inbound rule if needed.\n"
+         "• Only one listener can run per port. Stop before changing the port.\n"
+         "• Enable 'Show raw MLLP bytes' or set log level to DEBUG to capture framing bytes.",
+         [("HL7 v2.4 Message Definitions (Caristix)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents"),
+          ("MLLP Transport Specification (HL7 TN)", "https://www.hl7.org/documentcenter/public/wg/inm/mllp_transport_specification.PDF")]),
+
         ("DICOM Storage Listener",
-         "Runs a C-STORE SCP that accepts incoming DICOM objects and saves them to disk.\nAE Title and Port must match the sending device's configuration.\nAccepts all SOP classes including CT, MR, DX, XA, SR, PR, KO, RT, PDF.",
+         "Runs a C-STORE SCP that accepts incoming DICOM objects and saves them to disk.\n\n"
+         "─── Configuration ───────────────────────────────────────────\n"
+         "  AE Title    What this listener calls itself. Must match the sending device's\n"
+         "              Called AE Title configuration. Default: your local AE from Settings.\n"
+         "  Port        TCP port to listen on. Default: 11112 (standard DICOM port).\n"
+         "  Save to     Directory where received .dcm files are written. Created if absent.\n\n"
+         "─── Accepted SOP Classes ────────────────────────────────────\n"
+         "Accepts all standard Storage SOP Classes including:\n"
+         "CT, MR, PT, NM, DX, CR, XA, US, MG, SC, SR, PR, KO, RT, PDF, Seg, Reg, PS, OPT\n\n"
+         "─── How it works ────────────────────────────────────────────\n"
+         "Each received file is saved as <SOPInstanceUID>.dcm in the save directory.\n"
+         "The file list on screen updates live as files arrive.\n\n"
+         "─── Tips ───────────────────────────────────────────────────\n"
+         "• Make sure no other process (PACS client, other SCP) is already using the port.\n"
+         "• The sending device must have this AE Title in its routing table.\n"
+         "• Use C-STORE tab to test-send files back to confirm round-trip storage.",
          [("DICOM PS3.4 §B – Storage Service Class (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_B")]),
+
         ("Settings",
-         "Local AE Title / Port - how this tool identifies itself.\nRemote AE Presets - saved AEs available in all tab dropdowns.\nHL7 Listen Port - default port for the HL7 Receiver.\nSettings saved to: %USERPROFILE%\\.pacs_admin_tool\\config.json",
+         "Configure how this tool identifies itself on the network.\n\n"
+         "─── Local AE Configuration ──────────────────────────────────\n"
+         "  AE Title    The Application Entity title this tool uses when connecting to\n"
+         "              remote DICOM systems. Must be ≤16 characters, uppercase, no spaces.\n"
+         "              The remote PACS must whitelist this AE Title.\n"
+         "  Port        The port this tool listens on when acting as an SCP.\n"
+         "              Default: 11112. Change if another process uses that port.\n\n"
+         "─── Remote AE Presets ───────────────────────────────────────\n"
+         "Saved presets appear in the AE selector dropdown on every tab.\n"
+         "Add a preset once here; use it everywhere without re-typing host/port.\n\n"
+         "─── HL7 Settings ────────────────────────────────────────────\n"
+         "  Default HL7 Listen Port   Pre-fills the port in the HL7 Receive tab.\n\n"
+         "─── Config file location ────────────────────────────────────\n"
+         "Settings are saved to:\n"
+         "  Windows:  %USERPROFILE%\\.pacs_admin_tool\\config.json\n"
+         "  Linux:    ~/.pacs_admin_tool/config.json\n\n"
+         "─── Log files ───────────────────────────────────────────────\n"
+         "The desktop client writes to:  logs/pacs_admin_client.log\n"
+         "The web server writes to:      logs/pacs_admin.log\n"
+         "Both rotate at UTC midnight and are kept for 7 days.",
          []),
     ]
 
@@ -987,10 +1268,72 @@ class HelpTab(ttk.Frame):
 
 
 # ---------------------------------------------------------------------------
+#  About Tab
+# ---------------------------------------------------------------------------
+class AboutTab(ttk.Frame):
+    def __init__(self, parent, app):
+        super().__init__(parent); self.app = app; self._build()
+
+    def _build(self):
+        outer = ttk.Frame(self); outer.pack(expand=True, anchor="center", pady=40, padx=60)
+
+        # App title and version
+        _label(outer, "PACS Admin Tool", style="H1.TLabel").pack(pady=(0, 4))
+        _label(outer, f"Version {_APP_VERSION}", style="Dim.TLabel").pack()
+        _sep(outer).pack(fill="x", pady=20)
+
+        # Description
+        desc = (
+            "A portable DICOM & HL7 administration utility for PACS engineers,\n"
+            "radiologists, and healthcare IT professionals.\n\n"
+            "Supports: C-ECHO · C-FIND · C-STORE · C-MOVE · DMWL · Storage Commitment\n"
+            "          IOCM · HL7 v2 (MLLP) Send & Receive · DICOM Storage SCP"
+        )
+        _label(outer, desc, style="Dim.TLabel", justify="center").pack()
+        _sep(outer).pack(fill="x", pady=20)
+
+        # Credits
+        credit_frame = ttk.Frame(outer); credit_frame.pack()
+        _label(credit_frame, "Created by", style="Dim.TLabel").grid(row=0, column=0, sticky="e", padx=(0, 8))
+        _label(credit_frame, "Bob van Mierlo", style="TLabel").grid(row=0, column=1, sticky="w")
+
+        _label(credit_frame, "Built with", style="Dim.TLabel").grid(row=1, column=0, sticky="e", padx=(0, 8), pady=(8, 0))
+        claude_lbl = _label(credit_frame, "Claude by Anthropic  ↗", style="TLabel")
+        claude_lbl.grid(row=1, column=1, sticky="w", pady=(8, 0))
+        claude_url = "https://www.anthropic.com/claude"
+        claude_lbl.configure(foreground="#2b6cb0", cursor="hand2")
+        claude_lbl.bind("<Button-1>", lambda e: webbrowser.open(claude_url))
+        _label(credit_frame,
+               "This entire application was designed and built with the assistance of Claude,\n"
+               "Anthropic's AI assistant — from the DICOM/HL7 protocol logic to the UI.",
+               style="Dim.TLabel", justify="left").grid(
+            row=2, column=0, columnspan=2, sticky="w", pady=(4, 0))
+
+        _sep(outer).pack(fill="x", pady=20)
+
+        # Tech stack
+        _label(outer, "Built with Python · pynetdicom · pydicom · hl7 · Tkinter · Flask · Flask-SocketIO",
+               style="Dim.TLabel").pack()
+
+        # Links row
+        links_frame = ttk.Frame(outer); links_frame.pack(pady=(16, 0))
+        for text, url in [
+            ("GitHub Repository  ↗", "https://github.com/bobvmierlo/PACSAdminTool"),
+            ("DICOM Standard (NEMA)  ↗", "https://dicom.nema.org/medical/dicom/current/output/html/"),
+            ("HL7 v2 Reference  ↗", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents"),
+        ]:
+            lbl = _label(links_frame, text, style="TLabel")
+            lbl.pack(side="left", padx=12)
+            lbl.configure(foreground="#2b6cb0", cursor="hand2")
+            lbl.bind("<Button-1>", lambda e, u=url: webbrowser.open(u))
+
+
+# ---------------------------------------------------------------------------
 #  Main Application  -  this is the class that main.py imports
 # ---------------------------------------------------------------------------
 class PACSAdminApp:
     def __init__(self):
+        _setup_client_logging()
         self.config = load_config()
         self.root = tk.Tk()
         self.root.title("PACS Admin Tool")
@@ -1019,7 +1362,7 @@ class PACSAdminApp:
             ("  Worklist (DMWL)  ", DMWLTab), ("  Storage Commit  ", StorageCommitTab),
             ("  IOCM  ", IOCMTab), ("  HL7  ", HL7Tab),
             ("  DICOM Receiver  ", SCPListenerTab), ("  Settings  ", SettingsTab),
-            ("  Help  ", HelpTab),
+            ("  Help  ", HelpTab), ("  About  ", AboutTab),
         ]:
             nb.add(cls(nb, self), text=label)
         sb = tk.Frame(self.root,bg="#e8e8e8",height=24)
