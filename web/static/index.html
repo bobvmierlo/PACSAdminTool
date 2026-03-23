@@ -623,6 +623,24 @@
         <div class="field" style="max-width:150px"><label>Default HL7 Listen Port</label><input id="set-hl7-port" value="2575"></div>
       </div>
     </div>
+    <div class="card">
+      <h3>Logging</h3>
+      <div class="field-grid">
+        <div class="field" style="max-width:160px">
+          <label>Log Level</label>
+          <select id="set-log-level">
+            <option value="DEBUG">DEBUG</option>
+            <option value="INFO" selected>INFO</option>
+            <option value="WARNING">WARNING</option>
+            <option value="ERROR">ERROR</option>
+            <option value="CRITICAL">CRITICAL</option>
+          </select>
+        </div>
+      </div>
+      <p style="font-size:12px; color:#888; margin:6px 0 0">
+        Logs are written to <code>logs/pacs_admin.log</code> and rotated daily (7-day retention).
+      </p>
+    </div>
     <div class="btn-row" style="margin-top:4px; padding:0 0 20px 0">
       <button class="btn primary" onclick="saveSettings()">Save Settings</button>
       <span id="save-status" style="color:#888; font-size:13px"></span>
@@ -771,7 +789,8 @@ async function loadConfig() {
   const lae = appConfig.local_ae || {};
   document.getElementById("set-ae-title").value = lae.ae_title || "PACSADMIN";
   document.getElementById("set-ae-port").value  = lae.port     || 11112;
-  document.getElementById("set-hl7-port").value = (appConfig.hl7 || {}).listen_port || 2575;
+  document.getElementById("set-hl7-port").value  = (appConfig.hl7 || {}).listen_port || 2575;
+  document.getElementById("set-log-level").value = appConfig.log_level || "INFO";
 
   // Set SCP / HL7 listener defaults from config
   document.getElementById("scp-ae").value          = lae.ae_title || "PACSADMIN";
@@ -827,6 +846,7 @@ async function saveSettings() {
     ...appConfig.hl7,
     listen_port: parseInt(document.getElementById("set-hl7-port").value) || 2575,
   };
+  appConfig.log_level = document.getElementById("set-log-level").value;
   await fetch("/api/config", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
