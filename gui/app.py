@@ -564,10 +564,10 @@ class HL7Tab(ttk.Frame):
             logger.warning(f"Could not load HL7 templates from disk: {e}")
             return []
 
-        def _build(self):
-            nb = ttk.Notebook(self); nb.pack(fill="both",expand=True,padx=8,pady=8)
-            send_tab = ttk.Frame(nb); nb.add(send_tab,text="  Send HL7  "); self._build_sender(send_tab)
-            recv_tab = ttk.Frame(nb); nb.add(recv_tab,text="  Receive HL7  "); self._build_receiver(recv_tab)
+    def _build(self):
+        nb = ttk.Notebook(self); nb.pack(fill="both",expand=True,padx=8,pady=8)
+        send_tab = ttk.Frame(nb); nb.add(send_tab,text="  Send HL7  "); self._build_sender(send_tab)
+        recv_tab = ttk.Frame(nb); nb.add(recv_tab,text="  Receive HL7  "); self._build_receiver(recv_tab)
 
     def _build_sender(self, parent):
         top = ttk.Frame(parent); top.pack(fill="x",padx=10,pady=8)
