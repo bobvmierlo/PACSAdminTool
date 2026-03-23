@@ -281,6 +281,28 @@
       margin-bottom: 6px;
     }
     #help-links a:hover { text-decoration: underline; }
+
+    /* ── About tab ────────────────────────────────────────────────── */
+    #about-layout {
+      max-width: 640px;
+      margin: 40px auto;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      padding: 40px 48px;
+    }
+    #about-app-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .about-sep { border: none; border-top: 1px solid #e0e0e0; margin: 20px 0; }
+    .about-desc { font-size: 13px; line-height: 1.8; color: #444; }
+    .about-dim  { font-size: 12px; color: #888; line-height: 1.7; }
+    .about-credits { border-collapse: collapse; margin: 8px 0; }
+    .about-credits td { padding: 6px 0; vertical-align: top; font-size: 13px; }
+    .about-credit-label { color: #888; padding-right: 24px; white-space: nowrap; }
+    .about-credits a { color: #2b6cb0; text-decoration: none; }
+    .about-credits a:hover { text-decoration: underline; }
+    .about-links { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; }
+    .about-links a { color: #2b6cb0; font-size: 13px; text-decoration: none; }
+    .about-links a:hover { text-decoration: underline; }
   </style>
 </head>
 
@@ -308,6 +330,7 @@
   <button class="tab-btn" onclick="showTab('scp')">DICOM Receiver</button>
   <button class="tab-btn" onclick="showTab('settings')">Settings</button>
   <button class="tab-btn" onclick="showTab('help')">Help</button>
+  <button class="tab-btn" onclick="showTab('about')">About</button>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════
@@ -657,6 +680,43 @@
         <h2 id="help-title"></h2>
         <pre id="help-body"></pre>
         <div id="help-links"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── About ───────────────────────────────────────────────────── -->
+  <div id="tab-about" class="tab-panel">
+    <div id="about-layout">
+      <h2 id="about-app-title">PACS Admin Tool</h2>
+      <p id="about-version" class="about-dim">Version 1.0</p>
+      <hr class="about-sep">
+      <p class="about-desc">
+        A portable DICOM &amp; HL7 administration utility for PACS engineers,<br>
+        radiologists, and healthcare IT professionals.<br><br>
+        Supports: C-ECHO &middot; C-FIND &middot; C-STORE &middot; C-MOVE &middot; DMWL &middot; Storage Commitment<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IOCM &middot; HL7 v2 (MLLP) Send &amp; Receive &middot; DICOM Storage SCP
+      </p>
+      <hr class="about-sep">
+      <table class="about-credits">
+        <tr>
+          <td class="about-credit-label">Created by</td>
+          <td>Bob van Mierlo</td>
+        </tr>
+        <tr>
+          <td class="about-credit-label">Built with</td>
+          <td>
+            <a href="https://www.anthropic.com/claude" target="_blank" rel="noopener noreferrer">Claude by Anthropic ↗</a><br>
+            <span class="about-dim">This entire application was designed and built with the assistance of Claude,<br>
+            Anthropic's AI assistant — from the DICOM/HL7 protocol logic to the UI.</span>
+          </td>
+        </tr>
+      </table>
+      <hr class="about-sep">
+      <p class="about-dim">Built with Python &middot; pynetdicom &middot; pydicom &middot; hl7 &middot; Flask &middot; Flask-SocketIO</p>
+      <div class="about-links">
+        <a href="https://github.com/bobvmierlo/PACSAdminTool" target="_blank" rel="noopener noreferrer">GitHub Repository ↗</a>
+        <a href="https://dicom.nema.org/medical/dicom/current/output/html/" target="_blank" rel="noopener noreferrer">DICOM Standard (NEMA) ↗</a>
+        <a href="https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents" target="_blank" rel="noopener noreferrer">HL7 v2 Reference ↗</a>
       </div>
     </div>
   </div>
@@ -1430,77 +1490,187 @@ function renderTagTable(rows) {
 // ─────────────────────────────────────────────────────────────────
 
 const HELP_SECTIONS = [
-  ["C-FIND / Query-Retrieve", `Query a remote PACS or archive for patients and studies.
+  ["C-FIND / Query-Retrieve", `Query a remote PACS for patients and studies using the DICOM Query/Retrieve service.
 
-  C-ECHO (Ping)       Tests the network connection to the remote AE.
-                      Use this first to confirm the PACS is reachable.
+─── Buttons ───────────────────────────────────────────────
+C-ECHO (Ping)      Verifies the remote AE is reachable and responding.
+                   Always run this first to confirm connectivity before a C-FIND.
+Run C-FIND         Sends a query using any combination of the filter fields.
+                   Leave all fields blank to retrieve everything (use with care).
+C-MOVE             Instructs the remote PACS to push the selected study to the
+                   Destination AE you specify. That AE must have a Storage SCP
+                   running and be known to the source PACS.
 
-  Run C-FIND          Searches for matching studies. Fill in any combination of
-                      Patient ID, Patient Name, Accession Number, Study Date
-                      (YYYYMMDD or YYYYMMDD-YYYYMMDD range), Modality, or
-                      Study UID. Leave blank to match all.
+─── Query Level ────────────────────────────────────────────
+The Query Level determines how granular the results are:
 
-  Click a row         Opens a popup showing every DICOM tag returned by the
-                      remote server for that result.
+  PATIENT  Returns one row per patient. Works only with the Patient Root model.
+           Useful for patient-level lookups (e.g. find all studies for a patient).
 
-  C-MOVE              Instructs the remote PACS to push the selected study to
-                      another AE (the "Move Destination" you specify).`,
+  STUDY    Returns one row per study. The most commonly used level.
+           Works with both Study Root and Patient Root models.
+
+  SERIES   Returns one row per series within a study.
+           Requires a Study Instance UID to narrow results.
+
+  IMAGE    Returns one row per SOP instance (individual DICOM file).
+           Requires a Series Instance UID. Use sparingly — very verbose.
+
+─── Model (Information Model) ──────────────────────────────
+The Information Model defines the DICOM service class used for the query.
+Most PACS systems support both, but not all do.
+
+  STUDY  (Study Root Q/R — recommended for most use cases)
+         Hierarchy: STUDY → SERIES → IMAGE
+         Valid levels: STUDY, SERIES, IMAGE
+         ✗  PATIENT level is NOT supported in this model.
+         Use this when you already have an Accession, Date, or Study UID.
+
+  PATIENT  (Patient Root Q/R)
+           Hierarchy: PATIENT → STUDY → SERIES → IMAGE
+           Valid levels: PATIENT, STUDY, SERIES, IMAGE
+           Use this when searching by Patient ID or Name without a specific
+           study context, or when the PACS requires it.
+
+─── Valid Combinations ─────────────────────────────────────
+  Model     │  Supported Query Levels
+  ──────────┼───────────────────────────────────────
+  STUDY     │  STUDY  ·  SERIES  ·  IMAGE
+  PATIENT   │  PATIENT  ·  STUDY  ·  SERIES  ·  IMAGE
+
+The tool will warn you and auto-correct incompatible combinations.
+
+─── Date Format ────────────────────────────────────────────
+Study Date accepts DICOM date format: YYYYMMDD or a range YYYYMMDD-YYYYMMDD
+Example: 20240101-20241231 returns all studies from 2024.
+
+─── Tips ───────────────────────────────────────────────────
+• Patient Name supports wildcards: SMITH* or *SMITH* (DICOM wildcard is *)
+• Click any result row to inspect all returned DICOM tags.
+• If C-FIND returns 0 results, try relaxing filters or check the Query Level.`,
   [
     {label: "DICOM PS3.4 §C – Query/Retrieve Service Class (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_C"},
+    {label: "PS3.4 Table C.6-1 – Study Root Attributes", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#table_C.6-1"},
+    {label: "PS3.4 Table C.6-2 – Patient Root Attributes", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#table_C.6-2"},
   ]],
 
   ["C-STORE", `Send DICOM files from your computer to a remote Storage SCP.
 
-  Add Files           Select one or more .dcm files from your computer.
-                      They are uploaded to the server which then performs
-                      the C-STORE on your behalf.
+─── Workflow ───────────────────────────────────────────────
+1. Set the destination AE Title, Host, and Port.
+2. Click Add Files — select one or more .dcm files from your computer.
+   Files are uploaded to the server which performs C-STORE on your behalf.
+3. Click Send All (C-STORE) to transfer.
+   Progress appears in the Activity Log in real time.
 
-  Send All            Sends every selected file in a single association.
-                      Progress appears in the Activity Log in real time.`,
+─── Notes ──────────────────────────────────────────────────
+• Each file is sent as a separate C-STORE request within the same association.
+• The SCP must accept the SOP Class of each file (e.g. CT Image Storage).
+• Transfer Syntax negotiation is handled automatically by pynetdicom.
+• Use the DICOM Receiver tab to run a local SCP that accepts incoming files.`,
   [
     {label: "DICOM PS3.4 §B – Storage Service Class (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_B"},
   ]],
 
   ["Worklist (DMWL)", `Query a Modality Worklist SCP for scheduled procedures.
 
-  Leave all filters blank to retrieve all scheduled items, or narrow down
-  by Patient ID, Name, Date, Modality, Accession, or Station AET.
+─── What is a Modality Worklist? ───────────────────────────
+The Modality Worklist (DMWL) service allows a modality (e.g. CT scanner) to
+retrieve its scheduled procedure list from the RIS/HIS via the PACS.
+This is how scanners auto-populate patient demographics and accession numbers.
 
-  Click a row         Opens a popup with every DICOM tag the SCP returned,
-                      including expanded sequence items (SPS).
+─── Station AET field ──────────────────────────────────────
+When set, the Station AET value is used as the CALLING AE title for the query.
+This impersonates a specific modality's AE title, which is necessary on
+systems (e.g. Sectra IDS7, Agfa IMPAX) that filter the worklist by calling AET.
+Leave blank to use the local AE configured in Settings.
 
-  Export CSV          Saves the summary columns to a CSV file
-                      (downloaded by your browser).`,
+─── Date field ─────────────────────────────────────────────
+Filters by ScheduledProcedureStepStartDate.
+Use today's date (YYYYMMDD) to see today's worklist.
+Leave blank to return all scheduled items (can be very large).
+
+─── Tips ───────────────────────────────────────────────────
+• Click a row to view the full SPS sequence with all nested DICOM tags.
+• Export CSV saves the visible columns for reporting or troubleshooting.
+• If you get 0 results but expect items, check the Station AET filter.`,
   [
     {label: "DICOM PS3.4 §K – Modality Worklist Management (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_K"},
   ]],
 
-  ["Storage Commitment", `Verify that a PACS has permanently stored a set of instances.
+  ["Storage Commitment", `Verify that a remote PACS has permanently and safely stored a set of DICOM instances.
 
-  Paste SOP Instance UIDs (one per line) into the text area and click
-  Send N-ACTION. The PACS checks whether it holds those instances and
-  returns an N-EVENT-REPORT. The result appears in the log.`,
+─── How it works ───────────────────────────────────────────
+1. Paste SOP Instance UIDs (one per line) into the text area.
+2. Click Send N-ACTION — this sends a Storage Commitment Push Model request.
+3. The PACS responds asynchronously with N-EVENT-REPORT:
+     • Referenced SOP Sequence — successfully committed instances
+     • Failed SOP Sequence      — instances the PACS could not commit
+
+─── When to use it ─────────────────────────────────────────
+• After C-STORE: confirm the PACS persisted the objects before deleting local copies.
+• Audit workflows: verify no data loss after migration or archive restores.
+• Troubleshooting: identify which specific instances a PACS claims to have stored.
+
+─── Note ───────────────────────────────────────────────────
+Storage Commitment requires the PACS to have an N-EVENT-REPORT callback path back
+to this tool. Some PACS systems send it synchronously; others queue it and send
+the event minutes later or on a different port.`,
   [
     {label: "DICOM PS3.4 §J – Storage Commitment Service Class (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_J"},
   ]],
 
-  ["IOCM", `Send an Instance Availability Notification (IAN).
+  ["IOCM", `Send an Instance Availability Notification (N-CREATE) to a remote SCP.
 
-  Used to inform a PACS or broker that instances have been deleted or
-  changed availability. Fill in the Study UID, Series UID, SOP UIDs,
-  and the desired availability code (ONLINE, NEARLINE, OFFLINE,
-  UNAVAILABLE).`,
+─── What is IOCM? ──────────────────────────────────────────
+IOCM (Instance Order Change Management) is used in deletion and
+availability-change workflows. When a study is deleted or made unavailable,
+an N-CREATE is sent so downstream systems (viewers, archives) can update their
+references accordingly.
+
+─── Fields ─────────────────────────────────────────────────
+  Study UID       Instance UID of the study being affected.
+  Series UID      Series within that study (optional for study-level events).
+  SOP Class UID   DICOM SOP Class of the affected instances.
+  SOP Inst UID    Specific instance being reported on.
+  Availability    ONLINE | NEARLINE | OFFLINE | UNAVAILABLE
+
+─── Caution ────────────────────────────────────────────────
+This operation instructs a PACS that objects have been deleted or are no
+longer available. Use carefully — sending incorrect notifications can cause
+a PACS to remove valid index entries.`,
   [
     {label: "DICOM PS3.4 §KK – Instance Availability Notification (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_KK"},
   ]],
 
-  ["HL7 – Send", `Send HL7 v2 messages over MLLP to a remote system.
+  ["HL7 – Send", `Send HL7 v2 messages to a remote MLLP listener.
 
-  Choose a template, fill in the patient/procedure fields, then click
-  Load Template to populate the message editor. You can then edit the
-  message freely before sending.
+─── Workflow ───────────────────────────────────────────────
+1. Set Host and Port of the destination MLLP server.
+2. Select a Template and fill in the patient/procedure fields.
+3. Click Load Template — the editor is populated with the filled message.
+4. Review or edit the message directly in the editor.
+5. Click Send via MLLP.
 
-  The ACK response from the remote system is shown in the log.`,
+─── Available Templates ─────────────────────────────────────
+  ORM^O01   Radiology order (MSH/PID/PV1/ORC/OBR/ZDS)
+  ORU^R01   Radiology report with OBX observation/findings
+  ADT^A04   Register new patient (EVN/PID/PV1/PV2)
+  ADT^A08   Update existing patient demographics
+  ADT^A23   Delete a patient visit
+  SIU^S12   Schedule an appointment (SCH/AIS/AIP/AIL)
+  SIU^S15   Cancel a scheduled appointment
+  QBP^Q22   IHE PDQ patient demographics query
+  OML^O21   Lab order with SPM specimen segment
+
+─── MLLP Framing ────────────────────────────────────────────
+HL7 v2 over MLLP wraps each message with:
+  Start Block:  0x0B  (vertical tab)
+  End Block:    0x1C 0x0D  (file separator + carriage return)
+Segments are separated by carriage return (\\r, 0x0D).
+
+Enable "Show raw MLLP bytes" to log the full TCP payload including framing.
+When log level is set to DEBUG, raw bytes are always captured.`,
   [
     {label: "ORM^O01 – Radiology Order (Caristix HL7 v2.4)", url: "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ORM_O01"},
     {label: "ORU^R01 – Radiology Report (Caristix HL7 v2.4)", url: "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ORU_R01"},
@@ -1513,35 +1683,75 @@ const HELP_SECTIONS = [
     {label: "OML^O21 – Lab Order (Caristix HL7 v2.4)", url: "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/OML_O21"},
   ]],
 
-  ["HL7 – Receive", `Run an MLLP listener that accepts incoming HL7 messages.
+  ["HL7 – Receive", `Run a minimal MLLP listener that accepts incoming HL7 v2 messages.
 
-  Click Start HL7 Listener to open the port. Each message that arrives
-  is displayed in full with its timestamp and sender address. An AA
-  acknowledgement is sent back automatically.`,
+─── What it does ───────────────────────────────────────────
+Listens on the specified TCP port for MLLP connections.
+For every message received it:
+  • Displays the message in full with its timestamp and sender address.
+  • Sends an automatic AA (Application Accept) ACK back to the sender.
+  • Logs the sender's IP address and port.
+
+─── Use cases ──────────────────────────────────────────────
+• Test that a RIS/HIS or other HL7 source is sending correctly.
+• Capture sample messages for template building or troubleshooting.
+• Verify MLLP connectivity and framing before pointing at a real receiver.
+
+─── Notes ──────────────────────────────────────────────────
+• The server's firewall may block the listen port — open it if needed.
+• Only one listener can run per port. Stop before changing the port.
+• Enable "Show raw MLLP bytes" or set log level to DEBUG to capture framing bytes.`,
   [
     {label: "HL7 v2.4 Message Definitions (Caristix)", url: "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents"},
+    {label: "MLLP Transport Specification (HL7 TN)", url: "https://www.hl7.org/documentcenter/public/wg/inm/mllp_transport_specification.PDF"},
   ]],
 
-  ["DICOM Receiver", `Runs a DICOM C-STORE SCP that accepts incoming DICOM files
-  from any modality or PACS and saves them to disk on the server.
+  ["DICOM Receiver", `Runs a C-STORE SCP that accepts incoming DICOM objects and saves them to disk.
 
-  Set the AE Title, port, and destination folder, then click Start.
-  Any device configured to send to this AE Title and port can push
-  images directly to this tool.`,
+─── Configuration ───────────────────────────────────────────
+  AE Title    What this listener calls itself. Must match the sending device's
+              Called AE Title configuration. Default: your local AE from Settings.
+  Port        TCP port to listen on. Default: 11112 (standard DICOM port).
+  Save to     Directory on the server where received .dcm files are written.
+
+─── Accepted SOP Classes ────────────────────────────────────
+Accepts all standard Storage SOP Classes including:
+CT, MR, PT, NM, DX, CR, XA, US, MG, SC, SR, PR, KO, RT, PDF, Seg, Reg, PS, OPT
+
+─── How it works ────────────────────────────────────────────
+Each received file is saved as <SOPInstanceUID>.dcm in the save directory.
+
+─── Tips ───────────────────────────────────────────────────
+• Make sure no other process is already using the port.
+• The sending device must have this AE Title in its routing table.
+• Use C-STORE tab to test-send files back to confirm round-trip storage.`,
   [
     {label: "DICOM PS3.4 §B – Storage Service Class (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_B"},
   ]],
 
-  ["Settings", `Local AE Title / Port  – What this tool calls itself when connecting
-                           to remote DICOM systems.
+  ["Settings", `Configure how this tool identifies itself on the network.
 
-  Remote AE Presets      – Saved AE configurations. Once added here, they
-                           appear in the Preset dropdown on every tab so you
-                           don't have to re-enter details each time.
+─── Local AE Configuration ──────────────────────────────────
+  AE Title    The Application Entity title this tool uses when connecting to
+              remote DICOM systems. Must be ≤16 characters, uppercase, no spaces.
+              The remote PACS must whitelist this AE Title.
+  Port        The port this tool listens on when acting as an SCP.
+              Default: 11112. Change if another process uses that port.
 
-  HL7 Listen Port        – Default port for the HL7 receiver.
+─── Remote AE Presets ───────────────────────────────────────
+Saved presets appear in the AE selector dropdown on every tab.
+Add a preset once here; use it everywhere without re-typing host/port.
 
-  Save Settings          – Writes config to disk on the server.`,
+─── HL7 Settings ────────────────────────────────────────────
+  Default HL7 Listen Port   Pre-fills the port in the HL7 Receive tab.
+
+─── Config file location ────────────────────────────────────
+Settings are saved to config.json on the server.
+
+─── Log files ───────────────────────────────────────────────
+The web server writes to:      logs/pacs_admin.log
+The desktop client writes to:  logs/pacs_admin_client.log
+Both rotate at UTC midnight and are kept for 7 days.`,
   []],
 ];
 
@@ -1652,6 +1862,32 @@ function downloadText(filename, content, mimeType = "text/plain") {
 
   // Build the help topic list
   buildHelp();
+
+  // ── C-FIND model/level validation ─────────────────────────────────
+  // Study Root model (STUDY) does not support PATIENT query level.
+  // Auto-correct incompatible combinations and warn in the log.
+  const cfindLevel = document.getElementById("cfind-level");
+  const cfindModel = document.getElementById("cfind-model");
+
+  cfindModel.addEventListener("change", () => {
+    if (cfindModel.value === "STUDY" && cfindLevel.value === "PATIENT") {
+      cfindLevel.value = "STUDY";
+      appendLog("log-cfind", now(),
+        "Warning: Study Root model does not support Query Level 'PATIENT'. " +
+        "Level changed to 'STUDY'. Use Patient Root model if you need PATIENT level.",
+        "warn");
+    }
+  });
+
+  cfindLevel.addEventListener("change", () => {
+    if (cfindLevel.value === "PATIENT" && cfindModel.value === "STUDY") {
+      cfindModel.value = "PATIENT";
+      appendLog("log-cfind", now(),
+        "Warning: Query Level 'PATIENT' is only valid with Patient Root model. " +
+        "Model switched to 'PATIENT'.",
+        "warn");
+    }
+  });
 })();
 
 </script>
