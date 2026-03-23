@@ -11,6 +11,7 @@ import os
 import sys
 import socket
 import csv
+import webbrowser
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -914,15 +915,41 @@ class SettingsTab(ttk.Frame):
 
 class HelpTab(ttk.Frame):
     SECTIONS = [
-        ("C-FIND / Query-Retrieve", "Query a remote PACS for patients and studies.\n\nC-ECHO (Ping) - tests connectivity.\nRun C-FIND - searches using any combination of Patient ID, Name, Accession, Date, Modality, or Study UID.\nDouble-click a result row to see all DICOM tags.\nC-MOVE - instructs the PACS to push the study to a destination AE."),
-        ("C-STORE (Send Files)", "Send DICOM files from disk to a remote Storage SCP.\nAdd Files or Add Folder, then Send All."),
-        ("DMWL - Modality Worklist", "Query a Worklist SCP for scheduled procedures.\n\nStation AET - used as the CALLING AE title when set.\nSome PACS (e.g. Sectra) only return items for the modality AE that polls the worklist,\nso set Station AET to the modality's own AE title.\n\nDouble-click a row to see all DICOM tags including nested SPS sequences."),
-        ("Storage Commitment", "Verify that a PACS has permanently stored instances.\nLoad UIDs from DICOM files, then Send N-ACTION.\nThe PACS returns committed vs failed counts."),
-        ("IOCM - Instance Availability", "Send an Instance Availability Notification (N-CREATE).\nUsed for deletion or availability-change workflows.\nFollows DICOM PS 3.4 Annex KK."),
-        ("HL7 - Send", "Send HL7 v2 messages over MLLP.\n\nTemplates:\n  ORM^O01  - Radiology order (MSH/PID/PV1/ORC/OBR/ZDS)\n  ORU^R01  - Radiology report with OBX findings\n  ADT^A04  - Patient registration (EVN/PID/PV1/PV2)\n  ADT^A08  - Update patient information\n  ADT^A23  - Delete patient visit\n  SIU^S12  - Schedule appointment (SCH/AIS/AIP/AIL)\n  SIU^S15  - Cancel appointment\n  QBP^Q22  - IHE PDQ patient demographics query\n  OML^O21  - Lab order with SPM specimen segment\n\nShow raw MLLP bytes - logs every byte including 0x0B and 0x1C 0x0D framing."),
-        ("HL7 - Receive", "Run an MLLP listener.\nAutomatic AA ACK sent for every message received.\nShow raw MLLP bytes - logs full raw packets."),
-        ("DICOM Storage Listener", "Runs a C-STORE SCP that accepts incoming DICOM objects and saves them to disk.\nAE Title and Port must match the sending device's configuration.\nAccepts all SOP classes including CT, MR, DX, XA, SR, PR, KO, RT, PDF."),
-        ("Settings", "Local AE Title / Port - how this tool identifies itself.\nRemote AE Presets - saved AEs available in all tab dropdowns.\nHL7 Listen Port - default port for the HL7 Receiver.\nSettings saved to: %USERPROFILE%\\.pacs_admin_tool\\config.json"),
+        ("C-FIND / Query-Retrieve",
+         "Query a remote PACS for patients and studies.\n\nC-ECHO (Ping) - tests connectivity.\nRun C-FIND - searches using any combination of Patient ID, Name, Accession, Date, Modality, or Study UID.\nDouble-click a result row to see all DICOM tags.\nC-MOVE - instructs the PACS to push the study to a destination AE.",
+         [("DICOM PS3.4 §C – Query/Retrieve Service Class (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_C")]),
+        ("C-STORE (Send Files)",
+         "Send DICOM files from disk to a remote Storage SCP.\nAdd Files or Add Folder, then Send All.",
+         [("DICOM PS3.4 §B – Storage Service Class (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_B")]),
+        ("DMWL - Modality Worklist",
+         "Query a Worklist SCP for scheduled procedures.\n\nStation AET - used as the CALLING AE title when set.\nSome PACS (e.g. Sectra) only return items for the modality AE that polls the worklist,\nso set Station AET to the modality's own AE title.\n\nDouble-click a row to see all DICOM tags including nested SPS sequences.",
+         [("DICOM PS3.4 §K – Modality Worklist Management (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_K")]),
+        ("Storage Commitment",
+         "Verify that a PACS has permanently stored instances.\nLoad UIDs from DICOM files, then Send N-ACTION.\nThe PACS returns committed vs failed counts.",
+         [("DICOM PS3.4 §J – Storage Commitment Service Class (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_J")]),
+        ("IOCM - Instance Availability",
+         "Send an Instance Availability Notification (N-CREATE).\nUsed for deletion or availability-change workflows.\nFollows DICOM PS 3.4 Annex KK.",
+         [("DICOM PS3.4 §KK – Instance Availability Notification (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_KK")]),
+        ("HL7 - Send",
+         "Send HL7 v2 messages over MLLP.\n\nTemplates:\n  ORM^O01  - Radiology order (MSH/PID/PV1/ORC/OBR/ZDS)\n  ORU^R01  - Radiology report with OBX findings\n  ADT^A04  - Patient registration (EVN/PID/PV1/PV2)\n  ADT^A08  - Update patient information\n  ADT^A23  - Delete patient visit\n  SIU^S12  - Schedule appointment (SCH/AIS/AIP/AIL)\n  SIU^S15  - Cancel appointment\n  QBP^Q22  - IHE PDQ patient demographics query\n  OML^O21  - Lab order with SPM specimen segment\n\nShow raw MLLP bytes - logs every byte including 0x0B and 0x1C 0x0D framing.",
+         [("ORM^O01 – Radiology Order (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ORM_O01"),
+          ("ORU^R01 – Radiology Report (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ORU_R01"),
+          ("ADT^A04 – Register Patient (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ADT_A04"),
+          ("ADT^A08 – Update Patient (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ADT_A08"),
+          ("ADT^A23 – Delete Visit (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ADT_A23"),
+          ("SIU^S12 – Schedule Appointment (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/SIU_S12"),
+          ("SIU^S15 – Cancel Appointment (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/SIU_S15"),
+          ("QBP^Q22 – Patient Demographics Query (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/QBP_Q22"),
+          ("OML^O21 – Lab Order (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/OML_O21")]),
+        ("HL7 - Receive",
+         "Run an MLLP listener.\nAutomatic AA ACK sent for every message received.\nShow raw MLLP bytes - logs full raw packets.",
+         [("HL7 v2.4 Message Definitions (Caristix)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents")]),
+        ("DICOM Storage Listener",
+         "Runs a C-STORE SCP that accepts incoming DICOM objects and saves them to disk.\nAE Title and Port must match the sending device's configuration.\nAccepts all SOP classes including CT, MR, DX, XA, SR, PR, KO, RT, PDF.",
+         [("DICOM PS3.4 §B – Storage Service Class (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_B")]),
+        ("Settings",
+         "Local AE Title / Port - how this tool identifies itself.\nRemote AE Presets - saved AEs available in all tab dropdowns.\nHL7 Listen Port - default port for the HL7 Receiver.\nSettings saved to: %USERPROFILE%\\.pacs_admin_tool\\config.json",
+         []),
     ]
 
     def __init__(self, parent, app):
@@ -933,13 +960,15 @@ class HelpTab(ttk.Frame):
         left = ttk.Frame(outer); left.pack(side="left",fill="y",padx=(0,10))
         _label(left,"Topics",style="H1.TLabel").pack(anchor="w",pady=(0,6))
         self.topic_lb = tk.Listbox(left,bg="white",fg="#1a1a1a",selectbackground="#dbeafe",selectforeground="#1e3a5f",font=FONT,relief="solid",bd=1,activestyle="none",width=28)
-        for title, _ in self.SECTIONS: self.topic_lb.insert("end","  "+title)
+        for title, *_ in self.SECTIONS: self.topic_lb.insert("end","  "+title)
         self.topic_lb.pack(fill="y",expand=True)
         self.topic_lb.bind("<<ListboxSelect>>",self._show_section); self.topic_lb.selection_set(0)
         right = ttk.Frame(outer); right.pack(side="left",fill="both",expand=True)
         self.title_lbl = _label(right,self.SECTIONS[0][0],style="H1.TLabel"); self.title_lbl.pack(anchor="w",pady=(0,8))
         _sep(right).pack(fill="x",pady=(0,8))
         self.text = tk.Text(right,bg="white",fg="#1a1a1a",font=FONT,wrap="word",relief="solid",bd=1,state="disabled",padx=10,pady=8,spacing1=2,spacing2=2)
+        self.text.tag_configure("refs_label", foreground="#555555", font=(FONT[0], FONT[1], "bold"))
+        self.text.tag_configure("link", foreground="#2b6cb0", underline=True)
         sb = ttk.Scrollbar(right,orient="vertical",command=self.text.yview)
         self.text.configure(yscrollcommand=sb.set)
         self.text.pack(side="left",fill="both",expand=True); sb.pack(side="right",fill="y")
@@ -947,9 +976,18 @@ class HelpTab(ttk.Frame):
 
     def _show_section(self,_=None):
         sel = self.topic_lb.curselection(); idx = sel[0] if sel else 0
-        title, content = self.SECTIONS[idx]; self.title_lbl.configure(text=title)
+        title, content, links = self.SECTIONS[idx]; self.title_lbl.configure(text=title)
         self.text.configure(state="normal"); self.text.delete("1.0","end")
-        self.text.insert("1.0",content.strip()); self.text.configure(state="disabled")
+        self.text.insert("1.0", content.strip())
+        if links:
+            self.text.insert("end", "\n\nOfficial Documentation:\n", "refs_label")
+            for label, url in links:
+                tag = f"link_{url}"
+                self.text.insert("end", f"  \u2197 {label}\n", ("link", tag))
+                self.text.tag_bind(tag, "<Button-1>", lambda e, u=url: webbrowser.open(u))
+                self.text.tag_bind(tag, "<Enter>", lambda e: self.text.configure(cursor="hand2"))
+                self.text.tag_bind(tag, "<Leave>", lambda e: self.text.configure(cursor=""))
+        self.text.configure(state="disabled")
 
 
 # ---------------------------------------------------------------------------
