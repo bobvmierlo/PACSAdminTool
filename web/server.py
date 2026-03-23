@@ -28,7 +28,10 @@ import os
 import sys
 import threading
 import logging
-from datetime import datetime
+import glob
+import time
+from datetime import datetime, timedelta, timezone
+from logging.handlers import TimedRotatingFileHandler
 
 # ── Make sure our project root is on the Python path so we can import
 #    config, dicom, and hl7_module regardless of where we launch from.
@@ -40,10 +43,88 @@ from flask_socketio import SocketIO, emit
 
 from config.manager import load_config, save_config
 
-# ── Set up basic logging so we can see what's happening in the terminal
-logging.basicConfig(level=logging.INFO,
-    format="%(asctime)s  %(levelname)-7s  %(message)s")
+# ── Logging setup: console + daily rotating file in logs/, 7-day retention
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+
+
+def _cleanup_old_logs():
+    """Delete log files in logs/ whose modification time is older than 7 days."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    for path in glob.glob(os.path.join(LOG_DIR, "pacs_admin*.log*")):
+        try:
+            mtime = datetime.fromtimestamp(os.path.getmtime(path), tz=timezone.utc)
+            if mtime < cutoff:
+                os.remove(path)
+                # Can't use logger here yet — print is safe
+                print(f"[log-cleanup] Removed old log: {os.path.basename(path)}")
+        except OSError:
+            pass
+
+
+def _setup_logging():
+    """
+    Configure the root logger with:
+      - StreamHandler  (console, INFO+)
+      - TimedRotatingFileHandler  (logs/pacs_admin.log, rotates at UTC midnight,
+                                   keeps 7 days of backups, DEBUG+)
+    Runs a startup cleanup so stale files are removed even when the server
+    was not running at midnight.
+    """
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+
+    fmt_console = logging.Formatter("%(asctime)s  %(levelname)-7s  %(message)s")
+    fmt_file    = logging.Formatter(
+        "%(asctime)s  %(levelname)-7s  %(name)-25s  %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    console_h = logging.StreamHandler()
+    console_h.setLevel(logging.INFO)
+    console_h.setFormatter(fmt_console)
+
+    log_file = os.path.join(LOG_DIR, "pacs_admin.log")
+    file_h = TimedRotatingFileHandler(
+        log_file,
+        when="midnight",
+        utc=True,
+        backupCount=7,       # keep 7 rotated files → 8 days total; we also
+        encoding="utf-8",    # enforce 7-day mtime cutoff in _cleanup_old_logs
+    )
+    file_h.setLevel(logging.DEBUG)
+    file_h.setFormatter(fmt_file)
+
+    root.handlers.clear()
+    root.addHandler(console_h)
+    root.addHandler(file_h)
+
+    # Startup cleanup: removes logs older than 7 days left from previous runs
+    _cleanup_old_logs()
+
+
+_setup_logging()
 logger = logging.getLogger(__name__)
+
+
+def _cleanup_scheduler():
+    """
+    Background daemon thread.
+    Waits until the next 02:00 UTC, deletes logs older than 7 days, then
+    repeats every 24 hours.  Covers the 24/7 running case; startup cleanup
+    (called from _setup_logging) covers the intermittent-startup case.
+    """
+    while True:
+        now      = datetime.now(timezone.utc)
+        next_run = now.replace(hour=2, minute=0, second=0, microsecond=0)
+        if next_run <= now:
+            next_run += timedelta(days=1)
+        time.sleep((next_run - now).total_seconds())
+        logger.info("[log-cleanup] Running scheduled log cleanup")
+        _cleanup_old_logs()
+
+
+threading.Thread(target=_cleanup_scheduler, daemon=True, name="log-cleanup").start()
 
 # ── Create the Flask app.
 #    static_folder tells Flask where to look for static files (our HTML page).
@@ -69,9 +150,18 @@ _scp_listener = None          # SCPListener instance or None
 # Helper: emit a log line to all connected browsers
 # ===========================================================================
 
+_LEVEL_MAP = {
+    "ok":   logging.INFO,
+    "info": logging.INFO,
+    "warn": logging.WARNING,
+    "err":  logging.ERROR,
+}
+
+
 def _log(room, message, level="info"):
     """
-    Send a log message to the browser via WebSocket.
+    Send a log message to the browser via WebSocket AND write it to the
+    rotating log file.
 
     room    - a string identifying which tab/channel this log belongs to
               (e.g. "cfind", "cstore", "hl7_recv"). The frontend subscribes
@@ -88,6 +178,8 @@ def _log(room, message, level="info"):
         "message": message,
         "level":   level,
     })
+    # Mirror to the file log so nothing is lost if the browser is closed
+    logger.log(_LEVEL_MAP.get(level, logging.INFO), "[%s] %s", room, message)
 
 
 # ===========================================================================

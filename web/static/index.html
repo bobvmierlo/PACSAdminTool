@@ -270,6 +270,17 @@
       border-radius: 3px;
       padding: 16px;
     }
+    #help-links { margin-top: 14px; }
+    #help-links .help-links-label { font-size: 12px; font-weight: 600; color: #555; margin-bottom: 8px; }
+    #help-links a {
+      display: inline-block;
+      color: #2b6cb0;
+      font-size: 12px;
+      text-decoration: none;
+      margin-right: 16px;
+      margin-bottom: 6px;
+    }
+    #help-links a:hover { text-decoration: underline; }
   </style>
 </head>
 
@@ -627,6 +638,7 @@
       <div id="help-content">
         <h2 id="help-title"></h2>
         <pre id="help-body"></pre>
+        <div id="help-links"></div>
       </div>
     </div>
   </div>
@@ -1412,7 +1424,10 @@ const HELP_SECTIONS = [
                       remote server for that result.
 
   C-MOVE              Instructs the remote PACS to push the selected study to
-                      another AE (the "Move Destination" you specify).`],
+                      another AE (the "Move Destination" you specify).`,
+  [
+    {label: "DICOM PS3.4 §C – Query/Retrieve Service Class (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_C"},
+  ]],
 
   ["C-STORE", `Send DICOM files from your computer to a remote Storage SCP.
 
@@ -1421,7 +1436,10 @@ const HELP_SECTIONS = [
                       the C-STORE on your behalf.
 
   Send All            Sends every selected file in a single association.
-                      Progress appears in the Activity Log in real time.`],
+                      Progress appears in the Activity Log in real time.`,
+  [
+    {label: "DICOM PS3.4 §B – Storage Service Class (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_B"},
+  ]],
 
   ["Worklist (DMWL)", `Query a Modality Worklist SCP for scheduled procedures.
 
@@ -1432,20 +1450,29 @@ const HELP_SECTIONS = [
                       including expanded sequence items (SPS).
 
   Export CSV          Saves the summary columns to a CSV file
-                      (downloaded by your browser).`],
+                      (downloaded by your browser).`,
+  [
+    {label: "DICOM PS3.4 §K – Modality Worklist Management (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_K"},
+  ]],
 
   ["Storage Commitment", `Verify that a PACS has permanently stored a set of instances.
 
   Paste SOP Instance UIDs (one per line) into the text area and click
   Send N-ACTION. The PACS checks whether it holds those instances and
-  returns an N-EVENT-REPORT. The result appears in the log.`],
+  returns an N-EVENT-REPORT. The result appears in the log.`,
+  [
+    {label: "DICOM PS3.4 §J – Storage Commitment Service Class (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_J"},
+  ]],
 
   ["IOCM", `Send an Instance Availability Notification (IAN).
 
   Used to inform a PACS or broker that instances have been deleted or
   changed availability. Fill in the Study UID, Series UID, SOP UIDs,
   and the desired availability code (ONLINE, NEARLINE, OFFLINE,
-  UNAVAILABLE).`],
+  UNAVAILABLE).`,
+  [
+    {label: "DICOM PS3.4 §KK – Instance Availability Notification (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_KK"},
+  ]],
 
   ["HL7 – Send", `Send HL7 v2 messages over MLLP to a remote system.
 
@@ -1453,20 +1480,37 @@ const HELP_SECTIONS = [
   Load Template to populate the message editor. You can then edit the
   message freely before sending.
 
-  The ACK response from the remote system is shown in the log.`],
+  The ACK response from the remote system is shown in the log.`,
+  [
+    {label: "ORM^O01 – Radiology Order (Caristix HL7 v2.4)", url: "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ORM_O01"},
+    {label: "ORU^R01 – Radiology Report (Caristix HL7 v2.4)", url: "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ORU_R01"},
+    {label: "ADT^A04 – Register Patient (Caristix HL7 v2.4)", url: "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ADT_A04"},
+    {label: "ADT^A08 – Update Patient (Caristix HL7 v2.4)", url: "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ADT_A08"},
+    {label: "ADT^A23 – Delete Visit (Caristix HL7 v2.4)", url: "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ADT_A23"},
+    {label: "SIU^S12 – Schedule Appointment (Caristix HL7 v2.4)", url: "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/SIU_S12"},
+    {label: "SIU^S15 – Cancel Appointment (Caristix HL7 v2.4)", url: "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/SIU_S15"},
+    {label: "QBP^Q22 – Patient Demographics Query (Caristix HL7 v2.4)", url: "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/QBP_Q22"},
+    {label: "OML^O21 – Lab Order (Caristix HL7 v2.4)", url: "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/OML_O21"},
+  ]],
 
   ["HL7 – Receive", `Run an MLLP listener that accepts incoming HL7 messages.
 
   Click Start HL7 Listener to open the port. Each message that arrives
   is displayed in full with its timestamp and sender address. An AA
-  acknowledgement is sent back automatically.`],
+  acknowledgement is sent back automatically.`,
+  [
+    {label: "HL7 v2.4 Message Definitions (Caristix)", url: "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents"},
+  ]],
 
   ["DICOM Receiver", `Runs a DICOM C-STORE SCP that accepts incoming DICOM files
   from any modality or PACS and saves them to disk on the server.
 
   Set the AE Title, port, and destination folder, then click Start.
   Any device configured to send to this AE Title and port can push
-  images directly to this tool.`],
+  images directly to this tool.`,
+  [
+    {label: "DICOM PS3.4 §B – Storage Service Class (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_B"},
+  ]],
 
   ["Settings", `Local AE Title / Port  – What this tool calls itself when connecting
                            to remote DICOM systems.
@@ -1477,7 +1521,8 @@ const HELP_SECTIONS = [
 
   HL7 Listen Port        – Default port for the HL7 receiver.
 
-  Save Settings          – Writes config to disk on the server.`],
+  Save Settings          – Writes config to disk on the server.`,
+  []],
 ];
 
 function buildHelp() {
@@ -1493,9 +1538,26 @@ function buildHelp() {
 }
 
 function showHelp(idx) {
-  const [title, body] = HELP_SECTIONS[idx];
+  const [title, body, links] = HELP_SECTIONS[idx];
   document.getElementById("help-title").textContent = title;
   document.getElementById("help-body").textContent  = body;
+  const linksDiv = document.getElementById("help-links");
+  linksDiv.innerHTML = "";
+  if (links && links.length) {
+    const lbl = document.createElement("p");
+    lbl.className = "help-links-label";
+    lbl.textContent = "Official Documentation";
+    linksDiv.appendChild(lbl);
+    links.forEach(({label, url}) => {
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = "↗ " + label;
+      linksDiv.appendChild(a);
+      linksDiv.appendChild(document.createElement("br"));
+    });
+  }
   document.querySelectorAll("#help-topic-list li").forEach((li, i) =>
     li.classList.toggle("active", i === idx));
 }
