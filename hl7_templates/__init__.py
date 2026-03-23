@@ -15,6 +15,7 @@ This module is imported by:
   - gui/app.py  (desktop GUI)
   - web/server.py  (web backend — exposes templates via REST API)
 """
+from __future__ import annotations
 
 import os
 import glob

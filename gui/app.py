@@ -16,6 +16,7 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.manager import load_config, save_config
+from hl7_templates import load_templates as _load_hl7_templates
 
 logger = logging.getLogger(__name__)
 
@@ -554,12 +555,7 @@ class HL7Tab(ttk.Frame):
         Sorted alphabetically by filename for a predictable dropdown order.
         """
         try:
-            import sys, os
-            # Find the project root (two levels up from gui/app.py)
-            root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            sys.path.insert(0, root)
-            from hl7_templates import load_templates
-            return load_templates()
+            return _load_hl7_templates()
         except Exception as e:
             logger.warning(f"Could not load HL7 templates from disk: {e}")
             return []
