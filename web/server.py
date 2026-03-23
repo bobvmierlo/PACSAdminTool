@@ -158,14 +158,30 @@ _scp_listener = None          # SCPListener instance or None
 
 
 # ===========================================================================
+# HTTP request / response logging (DEBUG level)
+# ===========================================================================
+
+@app.before_request
+def _log_incoming_request():
+    logger.debug("→ %s %s", request.method, request.path)
+
+
+@app.after_request
+def _log_outgoing_response(response):
+    logger.debug("← %s %s  HTTP %s", request.method, request.path, response.status_code)
+    return response
+
+
+# ===========================================================================
 # Helper: emit a log line to all connected browsers
 # ===========================================================================
 
 _LEVEL_MAP = {
-    "ok":   logging.INFO,
-    "info": logging.INFO,
-    "warn": logging.WARNING,
-    "err":  logging.ERROR,
+    "debug": logging.DEBUG,
+    "ok":    logging.INFO,
+    "info":  logging.INFO,
+    "warn":  logging.WARNING,
+    "err":   logging.ERROR,
 }
 
 
@@ -232,6 +248,7 @@ def save_config_route():
     and persist it to disk.
     """
     data = request.get_json()
+    logger.debug("Config update keys: %s", list(data.keys()))
     # Update only the keys the browser sent – don't wipe anything it didn't.
     config.update(data)
     save_config(config)
@@ -253,13 +270,15 @@ def dicom_echo():
     We return:         { ok, message }
     """
     d = request.get_json()
-    # Import here (not at top) so the server still starts if pynetdicom
-    # isn't installed – the error will only appear when you actually use it.
+    logger.debug("C-ECHO  local=%s  remote=%s@%s:%s",
+                 _local_ae(), d.get("ae_title"), d.get("host"), d.get("port"))
     from dicom.operations import c_echo
     try:
         ok, msg = c_echo(_local_ae(), d["host"], int(d["port"]), d["ae_title"])
+        logger.debug("C-ECHO result: ok=%s  msg=%s", ok, msg)
         return jsonify({"ok": ok, "message": msg})
     except Exception as e:
+        logger.exception("C-ECHO exception")
         return jsonify({"ok": False, "message": str(e)})
 
 
@@ -281,6 +300,12 @@ def dicom_find():
     directly, so we convert them field by field).
     """
     d = request.get_json()
+    logger.debug("C-FIND  local=%s  remote=%s@%s:%s  level=%s  model=%s  "
+                 "PatID=%r  PatName=%r  Acc=%r  Date=%r  Mod=%r  UID=%r",
+                 _local_ae(), d.get("ae_title"), d.get("host"), d.get("port"),
+                 d.get("query_level"), d.get("query_model"),
+                 d.get("patient_id"), d.get("patient_name"), d.get("accession"),
+                 d.get("study_date"), d.get("modality"), d.get("study_uid"))
     try:
         from dicom.operations import c_find
         from pydicom.dataset import Dataset
@@ -301,6 +326,7 @@ def dicom_find():
         ok, results, msg = c_find(
             _local_ae(), d["host"], int(d["port"]), d["ae_title"],
             ds, d.get("query_model", "STUDY"))
+        logger.debug("C-FIND result: ok=%s  count=%d  msg=%s", ok, len(results), msg)
 
         # Convert pydicom Datasets to plain JSON-serialisable dicts.
         # _safe_str() (defined at module level) handles MultiValue, PersonName, etc.
@@ -334,6 +360,9 @@ def dicom_move():
     Progress log lines are pushed over WebSocket as they happen.
     """
     d = request.get_json()
+    logger.debug("C-MOVE  local=%s  remote=%s@%s:%s  dest=%s  uid=%s  model=%s",
+                 _local_ae(), d.get("ae_title"), d.get("host"), d.get("port"),
+                 d.get("move_dest"), d.get("study_uid"), d.get("query_model"))
     try:
         from dicom.operations import c_move
         from pydicom.dataset import Dataset
@@ -373,6 +402,8 @@ def dicom_store():
     host     = request.form.get("host", "")
     port     = int(request.form.get("port", 104))
     files    = request.files.getlist("files[]")
+    logger.debug("C-STORE  local=%s  remote=%s@%s:%s  files=%d",
+                 _local_ae(), ae_title, host, port, len(files))
 
     if not files:
         return jsonify({"ok": False, "message": "No files uploaded"})
@@ -385,6 +416,7 @@ def dicom_store():
         path = os.path.join(tmp_dir, f.filename or "upload.dcm")
         f.save(path)
         paths.append(path)
+        logger.debug("C-STORE  staged file: %s", f.filename)
 
     def run():
         try:
@@ -416,6 +448,11 @@ def dicom_dmwl():
     Returns: { ok, message, results: [ { ... tags ... }, ... ] }
     """
     d = request.get_json()
+    logger.debug("DMWL  local=%s  remote=%s@%s:%s  PatID=%r  PatName=%r  "
+                 "Date=%r  Mod=%r  Acc=%r  StationAET=%r",
+                 _local_ae(), d.get("ae_title"), d.get("host"), d.get("port"),
+                 d.get("patient_id"), d.get("patient_name"), d.get("study_date"),
+                 d.get("modality"), d.get("accession"), d.get("station_aet"))
     try:
         from dicom.operations import dmwl_find
         from pydicom.dataset import Dataset
@@ -463,6 +500,7 @@ def dicom_dmwl():
         ok, results, msg = dmwl_find(
             calling_ae, d["host"], int(d["port"]), d["ae_title"], ds,
             log_callback=lambda m: _log("dmwl", m))
+        logger.debug("DMWL result: ok=%s  count=%d  msg=%s", ok, len(results), msg)
 
         rows = []
         for r in results:
@@ -497,6 +535,9 @@ def dicom_commit():
     """
     d = request.get_json()
     uids = d.get("uids", [])
+    logger.debug("Storage Commitment  remote=%s@%s:%s  uids=%d: %s",
+                 d.get("ae_title"), d.get("host"), d.get("port"),
+                 len(uids), uids)
     if not uids:
         return jsonify({"ok": False, "message": "No UIDs provided"})
     try:
@@ -533,6 +574,10 @@ def dicom_iocm():
                      sop_class_uid, sop_inst_uid, availability }
     """
     d = request.get_json()
+    logger.debug("IOCM  remote=%s@%s:%s  study=%s  sop_class=%s  sop_inst=%s  avail=%s",
+                 d.get("ae_title"), d.get("host"), d.get("port"),
+                 d.get("study_uid"), d.get("sop_class_uid"), d.get("sop_inst_uid"),
+                 d.get("availability"))
     try:
         from dicom.operations import iocm_send_delete_notification
         sop_instances = [(d.get("sop_class_uid", ""), d.get("sop_inst_uid", ""))]
@@ -602,16 +647,22 @@ def hl7_send():
     """
     d = request.get_json()
     debug = bool(d.get("debug", False))
+    logger.debug("HL7 Send  remote=%s:%s  debug=%s  msg_len=%d",
+                 d.get("host"), d.get("port"), debug,
+                 len(d.get("message", "")))
     try:
         from hl7_module.messaging import send_mllp
 
-        # debug_callback pushes raw-byte lines to the hl7_send log box
-        dbg = (lambda m: _log("hl7_send", m, "info")) if debug else None
+        # debug_callback pushes raw-byte lines to the hl7_send log box;
+        # also enable it automatically when the logger is at DEBUG level
+        debug_active = debug or logger.isEnabledFor(logging.DEBUG)
+        dbg = (lambda m: _log("hl7_send", m, "debug")) if debug_active else None
 
         ok, response = send_mllp(
             d["host"], int(d["port"]),
             d["message"].replace("\n", "\r"),
             debug_callback=dbg)
+        logger.debug("HL7 Send result: ok=%s  response_len=%d", ok, len(response))
         _log("hl7_send", f"{'ACK received' if ok else 'FAILED'}: {response[:200]}",
              "ok" if ok else "err")
         return jsonify({"ok": ok, "response": response})
@@ -630,6 +681,7 @@ def hl7_listener_start():
     d     = request.get_json() or {}
     port  = int(d.get("port", config.get("hl7", {}).get("listen_port", 2575)))
     debug = bool(d.get("debug", False))
+    logger.debug("HL7 Listener start  port=%d  debug=%s", port, debug)
 
     if _hl7_listener and _hl7_listener.running:
         return jsonify({"ok": False, "message": "Listener already running"})
@@ -645,15 +697,19 @@ def hl7_listener_start():
         })
         _log("hl7_recv", f"Message received from {addr[0]}:{addr[1]}", "ok")
 
-    # debug_callback pushes raw-byte lines to the hl7_recv log box
-    dbg = (lambda m: _log("hl7_recv", m, "info")) if debug else None
+    # debug_callback pushes raw-byte lines to the hl7_recv log box;
+    # also enable it automatically when the logger is at DEBUG level
+    debug_active = debug or logger.isEnabledFor(logging.DEBUG)
+    dbg = (lambda m: _log("hl7_recv", m, "debug")) if debug_active else None
 
     _hl7_listener = HL7Listener(port=port, callback=on_message,
                                 debug_callback=dbg)
     try:
         _hl7_listener.start()
+        logger.debug("HL7 Listener started on port %d", port)
         return jsonify({"ok": True, "message": f"HL7 listener started on port {port}"})
     except Exception as e:
+        logger.exception("HL7 Listener start failed")
         return jsonify({"ok": False, "message": str(e)})
 
 
@@ -662,6 +718,7 @@ def hl7_listener_stop():
     """Stop the HL7 MLLP listener."""
     global _hl7_listener
     if _hl7_listener:
+        logger.debug("HL7 Listener stopping")
         _hl7_listener.stop()
         _hl7_listener = None
     return jsonify({"ok": True, "message": "HL7 listener stopped"})
@@ -691,6 +748,7 @@ def scp_start():
     save_dir = os.path.expanduser(
         d.get("save_dir", "~/DICOM_Received")
     )
+    logger.debug("SCP start  ae=%s  port=%d  save_dir=%s", ae_title, port, save_dir)
 
     if _scp_listener and _scp_listener.running:
         return jsonify({"ok": False, "message": "SCP already running"})
@@ -704,8 +762,10 @@ def scp_start():
                                 storage_dir=save_dir, log_callback=on_log)
     try:
         _scp_listener.start()
+        logger.debug("SCP started as %s on port %d, saving to %s", ae_title, port, save_dir)
         return jsonify({"ok": True, "message": f"SCP started as {ae_title} on port {port}"})
     except Exception as e:
+        logger.exception("SCP start failed")
         return jsonify({"ok": False, "message": str(e)})
 
 
@@ -739,8 +799,11 @@ def on_connect():
     We send it the current listener states so it can show the right buttons.
     """
     logger.info("Browser connected via WebSocket")
-    emit("scp_status",  {"running": bool(_scp_listener  and _scp_listener.running)})
-    emit("hl7_status",  {"running": bool(_hl7_listener  and _hl7_listener.running)})
+    scp_running = bool(_scp_listener and _scp_listener.running)
+    hl7_running = bool(_hl7_listener and _hl7_listener.running)
+    logger.debug("WebSocket connect: scp_running=%s  hl7_running=%s", scp_running, hl7_running)
+    emit("scp_status",  {"running": scp_running})
+    emit("hl7_status",  {"running": hl7_running})
 
 
 @socketio.on("disconnect")
