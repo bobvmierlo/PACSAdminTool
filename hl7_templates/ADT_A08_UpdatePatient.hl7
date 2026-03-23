@@ -1,0 +1,6 @@
+# name: ADT^A08 - Update Patient Info
+# description: Sent when patient demographic or visit information changes for an existing patient.
+MSH|^~\&|{sending_app}|{sending_fac}|{recv_app}|{recv_fac}|{ts}||ADT^A08|{msgid}|P|2.3
+EVN|A08|{ts}
+PID|1||{pid}^^^{assigning_auth}^MR||{name}||{dob}|{sex}|||123 Main St^^Amsterdam^^1234AB^NL||0612345678
+PV1|1|O|RAD||||999^Smith^John|||RAD||||||||V001

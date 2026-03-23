@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<!--
+  PACS Admin Tool - Web UI
+  ========================
+  This is a single HTML file that contains everything the browser needs:
+    - HTML structure (the page layout)
+    - CSS styles (how it looks)
+    - JavaScript (how it behaves)
+
+  It talks to the Flask server (web/server.py) via:
+    - fetch() calls for regular request/response (REST API)
+    - Socket.IO for real-time messages pushed from the server (logs, HL7 msgs)
+
+  We load two external libraries from a CDN (content delivery network):
+    - Socket.IO client: lets us receive WebSocket events from Flask-SocketIO
+    - No framework needed - plain JS is fine for a tool this size
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PACS Admin Tool</title>
+
+  <!-- Socket.IO client library - must match the server version -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Top header bar ───────────────────────────────────────────── */
+    #header {
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 0 20px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    #header h1 { font-size: 15px; font-weight: 600; }
+    #header span { color: #888; font-size: 13px; }
+
+    /* ── Tab navigation ───────────────────────────────────────────── */
+    #tab-bar {
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      overflow-x: auto;
+      flex-shrink: 0;
+    }
+    .tab-btn {
+      padding: 10px 18px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 13px;
+      color: #555;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      transition: color 0.15s;
+    }
+    .tab-btn:hover  { color: #1a1a1a; background: #f8f8f8; }
+    .tab-btn.active { color: #2b6cb0; border-bottom-color: #2b6cb0; font-weight: 600; }
+
+    /* ── Tab content panels ───────────────────────────────────────── */
+    #tab-content { flex: 1; overflow-y: auto; }
+    .tab-panel { display: none; padding: 20px; max-width: 1200px; }
+    .tab-panel.active { display: block; }
+
+    /* ── Generic layout helpers ───────────────────────────────────── */
+    .card {
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .card h3 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      margin-bottom: 12px;
+    }
+
+    /* A row of label+input pairs */
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 10px;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .field label { font-size: 12px; color: #555; }
+
+    /* ── Form controls ────────────────────────────────────────────── */
+    input, select, textarea {
+      font-family: inherit;
+      font-size: 13px;
+      padding: 6px 8px;
+      border: 1px solid #d0d0d0;
+      border-radius: 3px;
+      background: #fff;
+      color: #1a1a1a;
+      width: 100%;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #2b6cb0;
+    }
+    textarea { font-family: "Consolas", monospace; resize: vertical; }
+
+    /* ── Buttons ──────────────────────────────────────────────────── */
+    .btn {
+      padding: 7px 16px;
+      border: 1px solid #d0d0d0;
+      border-radius: 3px;
+      background: #f0f0f0;
+      color: #1a1a1a;
+      cursor: pointer;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .btn:hover  { background: #e4e4e4; }
+    .btn.primary { background: #2b6cb0; color: #fff; border-color: #2b6cb0; }
+    .btn.primary:hover { background: #245a99; }
+    .btn.danger  { background: #dc2626; color: #fff; border-color: #dc2626; }
+    .btn.danger:hover  { background: #b91c1c; }
+    .btn.success { background: #16a34a; color: #fff; border-color: #16a34a; }
+    .btn.success:hover { background: #15803d; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    /* ── Log box ──────────────────────────────────────────────────── */
+    .log-box {
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 3px;
+      font-family: "Consolas", monospace;
+      font-size: 12px;
+      padding: 8px;
+      height: 140px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    /* Colour-coded log levels */
+    .log-ok   { color: #15803d; }
+    .log-err  { color: #dc2626; }
+    .log-warn { color: #b45309; }
+    .log-info { color: #2b6cb0; }
+    .log-dim  { color: #888; }
+
+    /* ── Result tables ────────────────────────────────────────────── */
+    .result-table-wrap {
+      overflow-x: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 3px;
+    }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    th {
+      background: #f0f0f0;
+      text-align: left;
+      padding: 7px 10px;
+      font-weight: 600;
+      font-size: 12px;
+      color: #555;
+      border-bottom: 1px solid #e0e0e0;
+      white-space: nowrap;
+    }
+    td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #f0f0f0;
+      max-width: 250px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    tr:hover td { background: #f7f9ff; cursor: pointer; }
+    tr:last-child td { border-bottom: none; }
+
+    /* ── Modal (for DICOM tag detail popup) ──────────────────────── */
+    .modal-backdrop {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: #fff;
+      border-radius: 4px;
+      width: 860px;
+      max-width: 95vw;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    .modal-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 600;
+    }
+    .modal-header .close-btn {
+      background: none; border: none; cursor: pointer;
+      font-size: 20px; color: #888; line-height: 1;
+    }
+    .modal-body { padding: 12px 18px; flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+    .modal-body .log-box { height: unset; flex: 1; }
+
+    /* ── Status badge ─────────────────────────────────────────────── */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge.running { background: #dcfce7; color: #15803d; }
+    .badge.stopped { background: #f0f0f0; color: #888; }
+
+    /* ── AE selector widget ───────────────────────────────────────── */
+    .ae-selector { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+    .ae-selector .field { min-width: 120px; }
+    .ae-selector .preset-field { min-width: 180px; }
+
+    /* ── Help tab ─────────────────────────────────────────────────── */
+    #help-layout { display: flex; gap: 20px; }
+    #help-topics { width: 220px; flex-shrink: 0; }
+    #help-topics ul { list-style: none; border: 1px solid #e0e0e0; border-radius: 3px; background: #fff; }
+    #help-topics li {
+      padding: 9px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    #help-topics li:hover  { background: #f5f5f5; }
+    #help-topics li.active { background: #eff6ff; color: #2b6cb0; font-weight: 600; }
+    #help-content { flex: 1; }
+    #help-content h2 { font-size: 16px; margin-bottom: 12px; }
+    #help-content pre {
+      font-family: "Segoe UI", sans-serif;
+      font-size: 13px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 3px;
+      padding: 16px;
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TOP HEADER
+══════════════════════════════════════════════════════════════════ -->
+<div id="header">
+  <h1>PACS Admin Tool</h1>
+  <span>DICOM &amp; HL7 Administration Utility</span>
+  <span id="ws-status" style="margin-left:auto; font-size:12px; color:#aaa">⬤ connecting…</span>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TAB BAR
+══════════════════════════════════════════════════════════════════ -->
+<div id="tab-bar">
+  <button class="tab-btn active" onclick="showTab('cfind')">C-FIND / Q-R</button>
+  <button class="tab-btn" onclick="showTab('cstore')">C-STORE</button>
+  <button class="tab-btn" onclick="showTab('dmwl')">Worklist (DMWL)</button>
+  <button class="tab-btn" onclick="showTab('commit')">Storage Commit</button>
+  <button class="tab-btn" onclick="showTab('iocm')">IOCM</button>
+  <button class="tab-btn" onclick="showTab('hl7')">HL7</button>
+  <button class="tab-btn" onclick="showTab('scp')">DICOM Receiver</button>
+  <button class="tab-btn" onclick="showTab('settings')">Settings</button>
+  <button class="tab-btn" onclick="showTab('help')">Help</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TAB CONTENT
+══════════════════════════════════════════════════════════════════ -->
+<div id="tab-content">
+
+  <!-- ── C-FIND / Query-Retrieve ─────────────────────────────────── -->
+  <div id="tab-cfind" class="tab-panel active">
+    <div class="card">
+      <h3>Remote AE</h3>
+      <div id="ae-cfind"></div><!-- filled by buildAESelector() -->
+    </div>
+    <div class="card">
+      <h3>Query Parameters</h3>
+      <div class="field-grid">
+        <div class="field"><label>Patient ID</label><input id="cfind-pid"></div>
+        <div class="field"><label>Patient Name</label><input id="cfind-pname"></div>
+        <div class="field"><label>Accession #</label><input id="cfind-acc"></div>
+        <div class="field"><label>Study Date (YYYYMMDD)</label><input id="cfind-date"></div>
+        <div class="field"><label>Modality</label><input id="cfind-mod"></div>
+        <div class="field"><label>Study UID</label><input id="cfind-suid"></div>
+      </div>
+      <div class="btn-row" style="margin-top:12px">
+        <div class="field" style="width:130px">
+          <label>Query Level</label>
+          <select id="cfind-level">
+            <option>STUDY</option><option>PATIENT</option>
+            <option>SERIES</option><option>IMAGE</option>
+          </select>
+        </div>
+        <div class="field" style="width:120px">
+          <label>Model</label>
+          <select id="cfind-model"><option>STUDY</option><option>PATIENT</option></select>
+        </div>
+        <button class="btn" onclick="doEcho('cfind')">C-ECHO (Ping)</button>
+        <button class="btn primary" onclick="doCFind()">Run C-FIND</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>C-MOVE</h3>
+      <div class="btn-row">
+        <div class="field" style="width:200px">
+          <label>Move Destination AE</label>
+          <input id="cfind-movedest" value="PACSADMIN">
+        </div>
+        <button class="btn success" onclick="doCMove()" style="margin-top:20px">C-MOVE Selected</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Results &mdash; click a row to see all DICOM tags</h3>
+      <div class="result-table-wrap">
+        <table id="cfind-table">
+          <thead><tr>
+            <th>Patient ID</th><th>Patient Name</th><th>Study Date</th>
+            <th>Modality</th><th>Accession</th><th>Description</th><th>Study UID</th>
+          </tr></thead>
+          <tbody id="cfind-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card"><h3>Log</h3><div class="log-box" id="log-cfind"></div></div>
+  </div>
+
+  <!-- ── C-STORE ─────────────────────────────────────────────────── -->
+  <div id="tab-cstore" class="tab-panel">
+    <div class="card"><h3>Destination AE</h3><div id="ae-cstore"></div></div>
+    <div class="card">
+      <h3>Files to Send</h3>
+      <div class="btn-row">
+        <!-- The file input is hidden; the "Add Files" button triggers it -->
+        <input type="file" id="cstore-files" multiple accept=".dcm" style="display:none"
+               onchange="updateFileList()">
+        <button class="btn" onclick="document.getElementById('cstore-files').click()">Add Files…</button>
+        <button class="btn" onclick="clearStoreFiles()">Clear</button>
+        <span id="cstore-count" style="color:#888; font-size:13px">0 files selected</span>
+        <button class="btn primary" onclick="doCStore()" style="margin-left:auto">Send All (C-STORE)</button>
+      </div>
+      <!-- List of selected file names -->
+      <div id="cstore-filelist"
+           style="margin-top:10px; max-height:140px; overflow-y:auto; font-family:Consolas;
+                  font-size:12px; border:1px solid #e0e0e0; border-radius:3px;
+                  padding:6px; background:#fff; color:#555"></div>
+    </div>
+    <div class="card"><h3>Log</h3><div class="log-box" id="log-cstore"></div></div>
+  </div>
+
+  <!-- ── DMWL ────────────────────────────────────────────────────── -->
+  <div id="tab-dmwl" class="tab-panel">
+    <div class="card"><h3>Worklist SCP</h3><div id="ae-dmwl"></div></div>
+    <div class="card">
+      <h3>Query Filters (leave blank = match all)</h3>
+      <div class="field-grid">
+        <div class="field"><label>Patient ID</label><input id="dmwl-pid"></div>
+        <div class="field"><label>Patient Name</label><input id="dmwl-pname"></div>
+        <div class="field"><label>Scheduled Date</label><input id="dmwl-date"></div>
+        <div class="field"><label>Modality</label><input id="dmwl-mod"></div>
+        <div class="field"><label>Accession #</label><input id="dmwl-acc"></div>
+        <div class="field"><label>Station AET</label><input id="dmwl-aet"></div>
+      </div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn primary" onclick="doDMWL()">Query Worklist</button>
+        <button class="btn" onclick="exportDMWLCsv()">Export CSV</button>
+        <span id="dmwl-count" style="color:#888; font-size:13px"></span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Results &mdash; click a row to see all DICOM tags</h3>
+      <div class="result-table-wrap">
+        <table id="dmwl-table">
+          <thead><tr>
+            <th>Patient ID</th><th>Patient Name</th><th>Accession</th>
+            <th>Modality</th><th>Scheduled Date</th><th>Station AET</th><th>Procedure</th>
+          </tr></thead>
+          <tbody id="dmwl-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card"><h3>Log</h3><div class="log-box" id="log-dmwl"></div></div>
+  </div>
+
+  <!-- ── Storage Commitment ──────────────────────────────────────── -->
+  <div id="tab-commit" class="tab-panel">
+    <div class="card"><h3>Storage Commitment SCP</h3><div id="ae-commit"></div></div>
+    <div class="card">
+      <h3>SOP Instance UIDs (one per line)</h3>
+      <textarea id="commit-uids" rows="6" placeholder="1.2.840.xxxxx&#10;1.2.840.yyyyy"></textarea>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn primary" onclick="doCommit()">Send N-ACTION (Commit)</button>
+      </div>
+    </div>
+    <div class="card"><h3>Log</h3><div class="log-box" id="log-commit"></div></div>
+  </div>
+
+  <!-- ── IOCM ────────────────────────────────────────────────────── -->
+  <div id="tab-iocm" class="tab-panel">
+    <div class="card"><h3>IOCM SCP</h3><div id="ae-iocm"></div></div>
+    <div class="card">
+      <h3>Instance Availability Notification</h3>
+      <div class="field-grid">
+        <div class="field"><label>Study UID</label><input id="iocm-suid"></div>
+        <div class="field"><label>Series UID</label><input id="iocm-seruid"></div>
+        <div class="field"><label>SOP Class UID</label><input id="iocm-sopclass"></div>
+        <div class="field"><label>SOP Instance UID</label><input id="iocm-sopinst"></div>
+        <div class="field"><label>Availability</label>
+          <select id="iocm-avail">
+            <option>ONLINE</option><option>NEARLINE</option>
+            <option>OFFLINE</option><option>UNAVAILABLE</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn danger" onclick="doIOCM()">Send N-CREATE (Delete Notification)</button>
+      </div>
+    </div>
+    <div class="card"><h3>Log</h3><div class="log-box" id="log-iocm"></div></div>
+  </div>
+
+  <!-- ── HL7 ─────────────────────────────────────────────────────── -->
+  <div id="tab-hl7" class="tab-panel">
+    <!-- Sub-tabs within HL7 -->
+    <div style="border-bottom:1px solid #e0e0e0; margin-bottom:16px; display:flex; gap:0">
+      <button class="tab-btn active" id="hl7-send-btn" onclick="showHL7Tab('send')">Send HL7</button>
+      <button class="tab-btn"        id="hl7-recv-btn" onclick="showHL7Tab('recv')">Receive HL7</button>
+    </div>
+
+    <!-- HL7 Send -->
+    <div id="hl7-send-panel">
+      <div class="card">
+        <h3>Destination</h3>
+        <div class="field-grid">
+          <div class="field"><label>Host</label><input id="hl7-host" value="127.0.0.1"></div>
+          <div class="field" style="max-width:100px"><label>Port</label><input id="hl7-port" value="2575"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Message Template</h3>
+        <div class="btn-row">
+          <div class="field" style="min-width:280px">
+            <label>Template</label>
+            <!-- Options are populated dynamically from /api/hl7/templates on page load -->
+            <select id="hl7-template">
+              <option value="">(loading templates...)</option>
+            </select>
+          </div>
+          <button class="btn" onclick="loadHL7Template()" style="margin-top:20px">Load Template</button>
+          <button class="btn" onclick="refreshHL7Templates()" style="margin-top:20px" title="Reload template files from disk">Refresh</button>
+        </div>
+        <div id="hl7-template-desc" style="font-size:12px; color:#888; margin-top:4px; min-height:16px"></div>
+        <div class="field-grid" style="margin-top:10px">
+          <div class="field"><label>Patient ID</label><input id="hl7-pid"></div>
+          <div class="field"><label>Patient Name (LAST^FIRST)</label><input id="hl7-pname"></div>
+          <div class="field"><label>DOB (YYYYMMDD)</label><input id="hl7-dob"></div>
+          <div class="field"><label>Sex (M/F/U)</label><input id="hl7-sex" value="M"></div>
+          <div class="field"><label>Accession #</label><input id="hl7-acc"></div>
+          <div class="field"><label>Procedure Code</label><input id="hl7-code"></div>
+          <div class="field"><label>Procedure Description</label><input id="hl7-desc"></div>
+          <div class="field"><label>Modality</label><input id="hl7-mod" value="CT"></div>
+          <div class="field"><label>Study UID</label><input id="hl7-suid"></div>
+          <div class="field"><label>Sending App</label><input id="hl7-sapp" value="RIS"></div>
+          <div class="field"><label>Sending Facility</label><input id="hl7-sfac" value="HOSPITAL"></div>
+          <div class="field"><label>Receiving App</label><input id="hl7-rapp" value="PACS"></div>
+          <div class="field"><label>Receiving Facility</label><input id="hl7-rfac" value="HOSPITAL"></div>
+          <div class="field"><label>Assigning Authority</label><input id="hl7-auth" value="HOSP"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Message to Send (edit directly)</h3>
+        <textarea id="hl7-message" rows="8" placeholder="MSH|^~\&|..."></textarea>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn primary" onclick="doHL7Send()">Send via MLLP</button>
+          <button class="btn" onclick="document.getElementById('hl7-message').value=''">Clear</button>
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#555; margin-left:8px">
+            <input type="checkbox" id="hl7-send-debug">
+            Show raw MLLP bytes in log
+          </label>
+        </div>
+      </div>
+      <div class="card"><h3>Log</h3><div class="log-box" id="log-hl7-send"></div></div>
+    </div>
+
+    <!-- HL7 Receive -->
+    <div id="hl7-recv-panel" style="display:none">
+      <div class="card">
+        <h3>Listener Configuration</h3>
+        <div class="field-grid">
+          <div class="field" style="max-width:120px"><label>Port</label><input id="hl7-listen-port" value="2575"></div>
+        </div>
+        <div class="btn-row" style="margin-top:12px">
+          <button class="btn primary" id="hl7-listen-btn" onclick="toggleHL7Listener()">▶ Start HL7 Listener</button>
+          <span class="badge stopped" id="hl7-listen-badge">Stopped</span>
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#555; margin-left:8px">
+            <input type="checkbox" id="hl7-recv-debug">
+            Show raw MLLP bytes in log
+          </label>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Received Messages
+          <button class="btn" onclick="clearHL7Received()"
+                  style="font-size:11px; padding:2px 8px; float:right; margin-top:-2px">Clear</button>
+        </h3>
+        <span id="hl7-recv-count" style="font-size:12px; color:#888">0 messages</span>
+        <!-- Each received HL7 message will be appended here as a <pre> block -->
+        <div id="hl7-recv-messages"
+             style="margin-top:8px; max-height:400px; overflow-y:auto; display:flex; flex-direction:column; gap:8px">
+        </div>
+      </div>
+      <div class="card"><h3>Log</h3><div class="log-box" id="log-hl7-recv"></div></div>
+    </div>
+  </div>
+
+  <!-- ── DICOM Receiver (SCP Listener) ───────────────────────────── -->
+  <div id="tab-scp" class="tab-panel">
+    <div class="card">
+      <h3>Listener Configuration</h3>
+      <div class="field-grid">
+        <div class="field"><label>AE Title</label><input id="scp-ae" value="PACSADMIN"></div>
+        <div class="field" style="max-width:120px"><label>Port</label><input id="scp-port" value="11112"></div>
+        <div class="field"><label>Save received files to</label><input id="scp-dir" value=""></div>
+      </div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn primary" id="scp-btn" onclick="toggleSCP()">▶ Start DICOM Storage Listener</button>
+        <span class="badge stopped" id="scp-badge">Stopped</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Received Files
+        <button class="btn" onclick="clearSCPList()"
+                style="font-size:11px; padding:2px 8px; float:right; margin-top:-2px">Clear</button>
+      </h3>
+      <span id="scp-count" style="font-size:12px; color:#888">0 files</span>
+      <div id="scp-filelist"
+           style="margin-top:8px; max-height:200px; overflow-y:auto; font-family:Consolas;
+                  font-size:12px; border:1px solid #e0e0e0; border-radius:3px;
+                  padding:6px; background:#fff; color:#555"></div>
+    </div>
+    <div class="card"><h3>Log</h3><div class="log-box" id="log-scp"></div></div>
+  </div>
+
+  <!-- ── Settings ────────────────────────────────────────────────── -->
+  <div id="tab-settings" class="tab-panel">
+    <div class="card">
+      <h3>Local AE Configuration</h3>
+      <div class="field-grid">
+        <div class="field"><label>Local AE Title</label><input id="set-ae-title" value="PACSADMIN"></div>
+        <div class="field" style="max-width:120px"><label>Default Port</label><input id="set-ae-port" value="11112"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Saved Remote AE Presets</h3>
+      <div class="result-table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>AE Title</th><th>Host</th><th>Port</th><th></th></tr></thead>
+          <tbody id="ae-presets-tbody"></tbody>
+        </table>
+      </div>
+      <div class="field-grid" style="margin-top:12px">
+        <div class="field"><label>Name</label><input id="new-ae-name" placeholder="My PACS"></div>
+        <div class="field"><label>AE Title</label><input id="new-ae-aet" placeholder="PACS_AE"></div>
+        <div class="field"><label>Host</label><input id="new-ae-host" placeholder="192.168.1.10"></div>
+        <div class="field" style="max-width:100px"><label>Port</label><input id="new-ae-port" placeholder="104"></div>
+      </div>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn primary" onclick="addPreset()">+ Add Preset</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>HL7 Settings</h3>
+      <div class="field-grid">
+        <div class="field" style="max-width:150px"><label>Default HL7 Listen Port</label><input id="set-hl7-port" value="2575"></div>
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:4px; padding:0 0 20px 0">
+      <button class="btn primary" onclick="saveSettings()">Save Settings</button>
+      <span id="save-status" style="color:#888; font-size:13px"></span>
+    </div>
+  </div>
+
+  <!-- ── Help ────────────────────────────────────────────────────── -->
+  <div id="tab-help" class="tab-panel">
+    <div id="help-layout">
+      <div id="help-topics">
+        <ul id="help-topic-list"></ul>
+      </div>
+      <div id="help-content">
+        <h2 id="help-title"></h2>
+        <pre id="help-body"></pre>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end #tab-content -->
+
+
+<!-- ══════════════════════════════════════════════════════════════════
+     DICOM TAG DETAIL MODAL
+══════════════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="tag-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span id="tag-modal-title">DICOM Tags</span>
+      <button class="close-btn" onclick="closeTagModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="text" id="tag-filter" placeholder="Filter by tag, keyword, or value…"
+             oninput="filterTags()" style="width:100%">
+      <div style="font-size:12px; color:#888" id="tag-count"></div>
+      <div class="result-table-wrap" style="flex:1; overflow:auto">
+        <table>
+          <thead><tr><th>Tag</th><th>Keyword</th><th>VR</th><th>Value</th></tr></thead>
+          <tbody id="tag-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════════════ -->
+<script>
+
+// ─────────────────────────────────────────────────────────────────
+// 1. WebSocket / Socket.IO setup
+// ─────────────────────────────────────────────────────────────────
+
+// Connect to the Socket.IO server running on the same host/port as the page.
+// Socket.IO handles reconnection automatically.
+const socket = io();
+
+socket.on("connect", () => {
+  document.getElementById("ws-status").textContent = "⬤ connected";
+  document.getElementById("ws-status").style.color = "#15803d";
+});
+
+socket.on("disconnect", () => {
+  document.getElementById("ws-status").textContent = "⬤ disconnected";
+  document.getElementById("ws-status").style.color = "#dc2626";
+});
+
+// "log" events come from server._log() calls in server.py.
+// We route them to the correct log box based on the "room" field.
+socket.on("log", data => {
+  const boxId = {
+    cfind:    "log-cfind",
+    cstore:   "log-cstore",
+    dmwl:     "log-dmwl",
+    commit:   "log-commit",
+    iocm:     "log-iocm",
+    hl7_send: "log-hl7-send",
+    hl7_recv: "log-hl7-recv",
+    scp:      "log-scp",
+  }[data.room];
+  if (boxId) appendLog(boxId, data.ts, data.message, data.level);
+});
+
+// "hl7_message" events fire when an HL7 message arrives at the listener.
+socket.on("hl7_message", data => {
+  const container = document.getElementById("hl7-recv-messages");
+  const count = container.children.length + 1;
+
+  // Build a nicely formatted block for this message
+  const block = document.createElement("div");
+  block.style.cssText = "border:1px solid #e0e0e0; border-radius:3px; background:#fff; padding:10px; font-size:12px";
+  block.innerHTML =
+    `<div style="color:#888; margin-bottom:4px; font-size:11px">[${data.ts}] From ${data.from}</div>` +
+    `<pre style="font-family:Consolas; white-space:pre-wrap; color:#1a1a1a">${escapeHtml(data.message)}</pre>`;
+  container.appendChild(block);
+  container.scrollTop = container.scrollHeight;
+
+  document.getElementById("hl7-recv-count").textContent = `${count} message(s)`;
+});
+
+// Server pushes SCP/HL7 status on first connect so buttons show correctly.
+socket.on("scp_status", data => updateSCPButton(data.running));
+socket.on("hl7_status", data => updateHL7Button(data.running));
+
+// ─────────────────────────────────────────────────────────────────
+// 2. Tab navigation
+// ─────────────────────────────────────────────────────────────────
+
+function showTab(name) {
+  // Hide all panels and deactivate all buttons
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+
+  // Show the chosen panel and mark its button active
+  document.getElementById("tab-" + name).classList.add("active");
+
+  // Find the button that triggered this tab and mark it active
+  // (We match by onclick attribute content)
+  document.querySelectorAll(".tab-btn").forEach(b => {
+    if (b.getAttribute("onclick") === `showTab('${name}')`) b.classList.add("active");
+  });
+}
+
+function showHL7Tab(sub) {
+  document.getElementById("hl7-send-panel").style.display = sub === "send" ? "block" : "none";
+  document.getElementById("hl7-recv-panel").style.display = sub === "recv" ? "block" : "none";
+  document.getElementById("hl7-send-btn").classList.toggle("active", sub === "send");
+  document.getElementById("hl7-recv-btn").classList.toggle("active", sub === "recv");
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 3. Config / Settings
+// ─────────────────────────────────────────────────────────────────
+
+let appConfig = {};  // holds the full config from the server
+
+// Called once on page load to populate all forms with saved settings
+async function loadConfig() {
+  const res  = await fetch("/api/config");
+  appConfig  = await res.json();
+
+  // Populate settings tab
+  const lae = appConfig.local_ae || {};
+  document.getElementById("set-ae-title").value = lae.ae_title || "PACSADMIN";
+  document.getElementById("set-ae-port").value  = lae.port     || 11112;
+  document.getElementById("set-hl7-port").value = (appConfig.hl7 || {}).listen_port || 2575;
+
+  // Set SCP / HL7 listener defaults from config
+  document.getElementById("scp-ae").value          = lae.ae_title || "PACSADMIN";
+  document.getElementById("scp-port").value         = lae.port     || 11112;
+  document.getElementById("hl7-listen-port").value  = (appConfig.hl7 || {}).listen_port || 2575;
+
+  // Pre-fill Move Destination with local AE title
+  document.getElementById("cfind-movedest").value = lae.ae_title || "PACSADMIN";
+
+  renderPresetTable();
+  refreshAllPresetDropdowns();
+}
+
+function renderPresetTable() {
+  const tbody = document.getElementById("ae-presets-tbody");
+  tbody.innerHTML = "";
+  (appConfig.remote_aes || []).forEach((ae, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td>${ae.name}</td><td>${ae.ae_title}</td><td>${ae.host}</td><td>${ae.port}</td>` +
+      `<td><button class="btn danger" style="padding:2px 8px; font-size:11px"
+          onclick="deletePreset(${i})">Delete</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function addPreset() {
+  const name = document.getElementById("new-ae-name").value.trim();
+  const aet  = document.getElementById("new-ae-aet").value.trim();
+  const host = document.getElementById("new-ae-host").value.trim();
+  const port = parseInt(document.getElementById("new-ae-port").value) || 104;
+  if (!name) { alert("Name is required"); return; }
+  if (!appConfig.remote_aes) appConfig.remote_aes = [];
+  appConfig.remote_aes.push({ name, ae_title: aet, host, port });
+  renderPresetTable();
+  refreshAllPresetDropdowns();
+  ["new-ae-name","new-ae-aet","new-ae-host","new-ae-port"].forEach(id =>
+    document.getElementById(id).value = "");
+}
+
+function deletePreset(i) {
+  appConfig.remote_aes.splice(i, 1);
+  renderPresetTable();
+  refreshAllPresetDropdowns();
+}
+
+async function saveSettings() {
+  appConfig.local_ae = {
+    ae_title: document.getElementById("set-ae-title").value.trim(),
+    port:     parseInt(document.getElementById("set-ae-port").value) || 11112,
+  };
+  appConfig.hl7 = {
+    ...appConfig.hl7,
+    listen_port: parseInt(document.getElementById("set-hl7-port").value) || 2575,
+  };
+  await fetch("/api/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(appConfig),
+  });
+  const s = document.getElementById("save-status");
+  s.textContent = "Saved ✓";
+  setTimeout(() => s.textContent = "", 3000);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 4. AE Selector widget (reused across tabs)
+// ─────────────────────────────────────────────────────────────────
+
+// Each AE selector is a div that gets filled with a preset dropdown
+// and manual AE title / host / port fields.
+// `containerId` is the div to inject into; `prefix` is a unique ID prefix.
+function buildAESelector(containerId, prefix) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = `
+    <div class="ae-selector">
+      <div class="field preset-field">
+        <label>Preset</label>
+        <select id="${prefix}-preset" onchange="loadPreset('${prefix}')">
+          <option value="">(manual)</option>
+        </select>
+      </div>
+      <div class="field"><label>AE Title</label><input id="${prefix}-ae" value="REMOTE_AE"></div>
+      <div class="field"><label>Host</label><input id="${prefix}-host" value="127.0.0.1"></div>
+      <div class="field" style="max-width:90px"><label>Port</label><input id="${prefix}-port" value="104"></div>
+    </div>`;
+}
+
+// Refresh all preset <select> elements with current config
+function refreshAllPresetDropdowns() {
+  const presets = appConfig.remote_aes || [];
+  document.querySelectorAll("[id$='-preset']").forEach(sel => {
+    const current = sel.value;
+    sel.innerHTML = '<option value="">(manual)</option>';
+    presets.forEach(ae => {
+      const opt = document.createElement("option");
+      opt.value = ae.name;
+      opt.textContent = ae.name;
+      sel.appendChild(opt);
+    });
+    sel.value = current;  // restore previous selection if still valid
+  });
+}
+
+function loadPreset(prefix) {
+  const name = document.getElementById(prefix + "-preset").value;
+  const ae   = (appConfig.remote_aes || []).find(a => a.name === name);
+  if (!ae) return;
+  document.getElementById(prefix + "-ae").value   = ae.ae_title;
+  document.getElementById(prefix + "-host").value = ae.host;
+  document.getElementById(prefix + "-port").value = ae.port;
+}
+
+// Read the AE fields for a given prefix into a plain object
+function getAE(prefix) {
+  return {
+    ae_title: document.getElementById(prefix + "-ae").value.trim(),
+    host:     document.getElementById(prefix + "-host").value.trim(),
+    port:     parseInt(document.getElementById(prefix + "-port").value) || 104,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 5. C-ECHO
+// ─────────────────────────────────────────────────────────────────
+
+async function doEcho(prefix) {
+  const ae = getAE(prefix);
+  appendLog(`log-${prefix}`, now(), `C-ECHO → ${ae.ae_title}@${ae.host}:${ae.port}`);
+  const res  = await fetch("/api/dicom/echo", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(ae),
+  });
+  const data = await res.json();
+  appendLog(`log-${prefix}`, now(), data.message, data.ok ? "ok" : "err");
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 6. C-FIND
+// ─────────────────────────────────────────────────────────────────
+
+let cfindResults = [];  // keep results for C-MOVE and detail popup
+
+async function doCFind() {
+  const ae = getAE("cfind");
+  clearTable("cfind-tbody");
+  cfindResults = [];
+  appendLog("log-cfind", now(), `C-FIND → ${ae.ae_title}@${ae.host}:${ae.port}`);
+
+  const res  = await fetch("/api/dicom/find", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...ae,
+      query_level: document.getElementById("cfind-level").value,
+      query_model: document.getElementById("cfind-model").value,
+      patient_id:  document.getElementById("cfind-pid").value,
+      patient_name: document.getElementById("cfind-pname").value,
+      accession:   document.getElementById("cfind-acc").value,
+      study_date:  document.getElementById("cfind-date").value,
+      modality:    document.getElementById("cfind-mod").value,
+      study_uid:   document.getElementById("cfind-suid").value,
+    }),
+  });
+  const data = await res.json();
+  appendLog("log-cfind", now(), data.message, data.ok ? "ok" : "err");
+
+  cfindResults = data.results || [];
+  const tbody  = document.getElementById("cfind-tbody");
+  cfindResults.forEach((r, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${r.PatientID}</td><td>${r.PatientName}</td><td>${r.StudyDate}</td>
+      <td>${r.Modality}</td><td>${r.Accession}</td><td>${r.Description}</td>
+      <td style="font-family:Consolas;font-size:11px">${r.StudyUID}</td>`;
+    tr.onclick = () => showTagModal("C-FIND Result", r.tags);
+    tbody.appendChild(tr);
+  });
+}
+
+async function doCMove() {
+  const sel = document.querySelector("#cfind-tbody tr.selected");
+  // Find selected row index
+  const rows = document.querySelectorAll("#cfind-tbody tr");
+  let idx = -1;
+  rows.forEach((r, i) => { if (r.classList.contains("selected")) idx = i; });
+  if (idx === -1) { alert("Select a result row first (click to select)"); return; }
+
+  const ae   = getAE("cfind");
+  const dest = document.getElementById("cfind-movedest").value.trim();
+  const uid  = cfindResults[idx].StudyUID;
+  appendLog("log-cfind", now(), `C-MOVE → dest=${dest}  study=${uid}`);
+
+  await fetch("/api/dicom/move", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...ae, study_uid: uid, move_dest: dest,
+                           query_model: document.getElementById("cfind-model").value }),
+  });
+}
+
+// Make rows selectable (click once to highlight, click again deselects)
+document.getElementById("cfind-tbody").addEventListener("click", e => {
+  const tr = e.target.closest("tr");
+  if (!tr) return;
+  // Show tag detail on click
+  const idx = [...tr.parentElement.children].indexOf(tr);
+  if (cfindResults[idx]) showTagModal("C-FIND Result", cfindResults[idx].tags);
+  // Toggle selected highlight
+  document.querySelectorAll("#cfind-tbody tr").forEach(r => r.classList.remove("selected"));
+  tr.classList.add("selected");
+  tr.style.background = "#eff6ff";
+});
+
+// ─────────────────────────────────────────────────────────────────
+// 7. C-STORE
+// ─────────────────────────────────────────────────────────────────
+
+function updateFileList() {
+  const input = document.getElementById("cstore-files");
+  const list  = document.getElementById("cstore-filelist");
+  const count = document.getElementById("cstore-count");
+  list.innerHTML = [...input.files].map(f => f.name).join("<br>");
+  count.textContent = `${input.files.length} file(s) selected`;
+}
+
+function clearStoreFiles() {
+  document.getElementById("cstore-files").value = "";
+  document.getElementById("cstore-filelist").innerHTML = "";
+  document.getElementById("cstore-count").textContent = "0 files selected";
+}
+
+async function doCStore() {
+  const ae    = getAE("cstore");
+  const input = document.getElementById("cstore-files");
+  if (!input.files.length) { alert("No files selected"); return; }
+
+  // Build a FormData object (the standard way to upload files via fetch)
+  const form = new FormData();
+  form.append("ae_title", ae.ae_title);
+  form.append("host",     ae.host);
+  form.append("port",     ae.port);
+  [...input.files].forEach(f => form.append("files[]", f));
+
+  appendLog("log-cstore", now(), `Uploading ${input.files.length} file(s) to server…`);
+  const res  = await fetch("/api/dicom/store", { method: "POST", body: form });
+  const data = await res.json();
+  appendLog("log-cstore", now(), data.message, data.ok ? "ok" : "err");
+  // Further progress lines will arrive via WebSocket
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 8. DMWL
+// ─────────────────────────────────────────────────────────────────
+
+let dmwlResults = [];
+
+async function doDMWL() {
+  const ae = getAE("dmwl");
+  clearTable("dmwl-tbody");
+  dmwlResults = [];
+  appendLog("log-dmwl", now(), `DMWL → ${ae.ae_title}@${ae.host}:${ae.port}`);
+
+  const res  = await fetch("/api/dicom/dmwl", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...ae,
+      patient_id:   document.getElementById("dmwl-pid").value,
+      patient_name: document.getElementById("dmwl-pname").value,
+      study_date:   document.getElementById("dmwl-date").value,
+      modality:     document.getElementById("dmwl-mod").value,
+      accession:    document.getElementById("dmwl-acc").value,
+      station_aet:  document.getElementById("dmwl-aet").value,
+    }),
+  });
+  const data = await res.json();
+  appendLog("log-dmwl", now(), data.message, data.ok ? "ok" : "err");
+
+  dmwlResults = data.results || [];
+  document.getElementById("dmwl-count").textContent = `${dmwlResults.length} item(s)`;
+  const tbody = document.getElementById("dmwl-tbody");
+  dmwlResults.forEach((r, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${r.PatientID}</td><td>${r.PatientName}</td><td>${r.Accession}</td>
+      <td>${r.Modality}</td><td>${r.ScheduledDate}</td><td>${r.StationAET}</td><td>${r.Procedure}</td>`;
+    tr.onclick = () => showTagModal(`Worklist: ${r.PatientName} / ${r.PatientID}`, r.tags);
+    tbody.appendChild(tr);
+  });
+}
+
+function exportDMWLCsv() {
+  if (!dmwlResults.length) { alert("No results to export"); return; }
+  const header = "PatientID,PatientName,Accession,Modality,ScheduledDate,StationAET,Procedure\n";
+  const rows   = dmwlResults.map(r =>
+    [r.PatientID, r.PatientName, r.Accession, r.Modality,
+     r.ScheduledDate, r.StationAET, r.Procedure].map(v => `"${v}"`).join(",")
+  ).join("\n");
+  downloadText("worklist.csv", header + rows, "text/csv");
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 9. Storage Commitment
+// ─────────────────────────────────────────────────────────────────
+
+async function doCommit() {
+  const ae   = getAE("commit");
+  const raw  = document.getElementById("commit-uids").value;
+  const uids = raw.split("\n").map(s => s.trim()).filter(Boolean);
+  if (!uids.length) { alert("Enter at least one UID"); return; }
+  appendLog("log-commit", now(), `N-ACTION → ${ae.ae_title} (${uids.length} UIDs)`);
+  const res  = await fetch("/api/dicom/commit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...ae, uids }),
+  });
+  const data = await res.json();
+  appendLog("log-commit", now(), data.message, data.ok ? "ok" : "err");
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 10. IOCM
+// ─────────────────────────────────────────────────────────────────
+
+async function doIOCM() {
+  const ae = getAE("iocm");
+  appendLog("log-iocm", now(), `IOCM → ${ae.ae_title}`);
+  const res  = await fetch("/api/dicom/iocm", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...ae,
+      study_uid:    document.getElementById("iocm-suid").value,
+      series_uid:   document.getElementById("iocm-seruid").value,
+      sop_class_uid: document.getElementById("iocm-sopclass").value,
+      sop_inst_uid:  document.getElementById("iocm-sopinst").value,
+      availability:  document.getElementById("iocm-avail").value,
+    }),
+  });
+  const data = await res.json();
+  appendLog("log-iocm", now(), data.message, data.ok ? "ok" : "err");
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 11. HL7 Templates (loaded from server, not hardcoded)
+// ─────────────────────────────────────────────────────────────────
+
+// In-memory cache of templates fetched from /api/hl7/templates.
+// Format: [ { name, description, filename }, ... ]
+// The body is fetched separately when the user clicks Load Template.
+let hl7TemplateList = [];
+
+async function refreshHL7Templates() {
+  // Fetch the list of available templates from the server.
+  // The server reads these from hl7_templates/*.hl7 on disk, so adding
+  // or editing a file and clicking Refresh is all that's needed.
+  const sel = document.getElementById("hl7-template");
+  const prev = sel.value;   // remember what was selected
+
+  try {
+    const res  = await fetch("/api/hl7/templates");
+    hl7TemplateList = await res.json();
+
+    sel.innerHTML = "";
+    hl7TemplateList.forEach(t => {
+      const opt = document.createElement("option");
+      opt.value       = t.filename;   // use filename as the stable key
+      opt.textContent = t.name;
+      sel.appendChild(opt);
+    });
+
+    // Restore previous selection if it still exists
+    if (prev && [...sel.options].some(o => o.value === prev)) {
+      sel.value = prev;
+    }
+
+    // Show description for currently selected template
+    updateTemplateDesc();
+
+  } catch (e) {
+    sel.innerHTML = '<option value="">(failed to load templates)</option>';
+    appendLog("log-hl7-send", now(), `Could not load templates: ${e}`, "err");
+  }
+}
+
+function updateTemplateDesc() {
+  // Show the description of the selected template below the dropdown
+  const sel      = document.getElementById("hl7-template");
+  const filename = sel.value;
+  const tmpl     = hl7TemplateList.find(t => t.filename === filename);
+  const desc     = tmpl ? tmpl.description : "";
+  document.getElementById("hl7-template-desc").textContent = desc;
+}
+
+// Wire up description update when user changes the dropdown
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("hl7-template")
+    .addEventListener("change", updateTemplateDesc);
+});
+
+async function loadHL7Template() {
+  // Fetch the full body of the selected template from the server,
+  // then substitute placeholders from the quick-fill fields.
+  const filename = document.getElementById("hl7-template").value;
+  if (!filename) { alert("No template selected"); return; }
+
+  let body;
+  try {
+    const res  = await fetch(`/api/hl7/templates/${encodeURIComponent(filename)}`);
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    body = data.body;   // raw template with {placeholders}
+  } catch (e) {
+    alert(`Could not load template: ${e}`); return;
+  }
+
+  // Build substitution values from the quick-fill fields
+  const ts    = new Date().toISOString().replace(/[-:T.]/g, "").slice(0, 14);
+  const msgid = "MSG" + ts;
+  const nm    = document.getElementById("hl7-pname").value || "PATIENT^TEST";
+  const parts = nm.split("^");
+
+  const subs = {
+    ts,
+    msgid,
+    pid:             document.getElementById("hl7-pid").value   || "PID001",
+    name:            nm,
+    name_last:       parts[0] || "PATIENT",
+    name_first:      parts[1] || "TEST",
+    dob:             document.getElementById("hl7-dob").value   || "19800101",
+    sex:             document.getElementById("hl7-sex").value   || "U",
+    acc:             document.getElementById("hl7-acc").value   || "ACC001",
+    proc_code:       document.getElementById("hl7-code").value  || "RADPROC",
+    proc_desc:       document.getElementById("hl7-desc").value  || "Radiology Procedure",
+    modality:        document.getElementById("hl7-mod").value   || "CT",
+    study_uid:       document.getElementById("hl7-suid").value  || "",
+    sending_app:     document.getElementById("hl7-sapp").value  || "RIS",
+    sending_fac:     document.getElementById("hl7-sfac").value  || "HOSPITAL",
+    recv_app:        document.getElementById("hl7-rapp").value  || "PACS",
+    recv_fac:        document.getElementById("hl7-rfac").value  || "HOSPITAL",
+    assigning_auth:  document.getElementById("hl7-auth").value  || "HOSP",
+  };
+
+  // Replace every {placeholder} in the body
+  let filled = body;
+  for (const [key, val] of Object.entries(subs)) {
+    // Use a global regex replace for each key
+    filled = filled.split(`{${key}}`).join(val);
+  }
+
+  // Show \r as newlines so the editor is readable
+  document.getElementById("hl7-message").value = filled.replace(/\r/g, "\n");
+}
+
+async function doHL7Send() {
+  const host = document.getElementById("hl7-host").value.trim();
+  const port = document.getElementById("hl7-port").value.trim();
+  const msg  = document.getElementById("hl7-message").value.trim();
+  if (!msg) { alert("No message to send"); return; }
+  appendLog("log-hl7-send", now(), `Sending to ${host}:${port}`);
+
+  const res  = await fetch("/api/hl7/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      host,
+      port: parseInt(port),
+      message: msg,
+      debug: document.getElementById("hl7-send-debug").checked,
+    }),
+  });
+  const data = await res.json();
+  appendLog("log-hl7-send", now(),
+    data.ok ? `ACK: ${data.response.substring(0,200)}` : `FAILED: ${data.response}`,
+    data.ok ? "ok" : "err");
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 12. HL7 Listener
+// ─────────────────────────────────────────────────────────────────
+
+let hl7ListenerRunning = false;
+
+async function toggleHL7Listener() {
+  if (hl7ListenerRunning) {
+    await fetch("/api/hl7/listener/stop", { method: "POST" });
+    hl7ListenerRunning = false;
+  } else {
+    const port = document.getElementById("hl7-listen-port").value;
+    const res  = await fetch("/api/hl7/listener/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        port: parseInt(port),
+        debug: document.getElementById("hl7-recv-debug").checked,
+      }),
+    });
+    const data = await res.json();
+    hl7ListenerRunning = data.ok;
+    appendLog("log-hl7-recv", now(), data.message, data.ok ? "ok" : "err");
+  }
+  updateHL7Button(hl7ListenerRunning);
+}
+
+function updateHL7Button(running) {
+  hl7ListenerRunning = running;
+  const btn   = document.getElementById("hl7-listen-btn");
+  const badge = document.getElementById("hl7-listen-badge");
+  if (running) {
+    btn.textContent = "■ Stop HL7 Listener";
+    btn.className   = "btn danger";
+    badge.textContent = "Running";
+    badge.className   = "badge running";
+  } else {
+    btn.textContent = "▶ Start HL7 Listener";
+    btn.className   = "btn primary";
+    badge.textContent = "Stopped";
+    badge.className   = "badge stopped";
+  }
+}
+
+function clearHL7Received() {
+  document.getElementById("hl7-recv-messages").innerHTML = "";
+  document.getElementById("hl7-recv-count").textContent = "0 messages";
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 13. DICOM Storage SCP
+// ─────────────────────────────────────────────────────────────────
+
+let scpRunning  = false;
+let scpFileCount = 0;
+
+async function toggleSCP() {
+  if (scpRunning) {
+    await fetch("/api/scp/stop", { method: "POST" });
+    scpRunning = false;
+  } else {
+    const res  = await fetch("/api/scp/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ae_title: document.getElementById("scp-ae").value,
+        port:     parseInt(document.getElementById("scp-port").value),
+        save_dir: document.getElementById("scp-dir").value,
+      }),
+    });
+    const data = await res.json();
+    scpRunning = data.ok;
+    appendLog("log-scp", now(), data.message, data.ok ? "ok" : "err");
+  }
+  updateSCPButton(scpRunning);
+}
+
+// Listen for file-received log messages to update the list
+socket.on("log", data => {
+  if (data.room === "scp" && data.message.startsWith("Stored:")) {
+    scpFileCount++;
+    document.getElementById("scp-count").textContent = `${scpFileCount} file(s)`;
+    const list = document.getElementById("scp-filelist");
+    list.innerHTML += data.message.replace("Stored:", "").trim() + "<br>";
+    list.scrollTop = list.scrollHeight;
+  }
+});
+
+function updateSCPButton(running) {
+  scpRunning = running;
+  const btn   = document.getElementById("scp-btn");
+  const badge = document.getElementById("scp-badge");
+  if (running) {
+    btn.textContent = "■ Stop DICOM Storage Listener";
+    btn.className   = "btn danger";
+    badge.textContent = "Running";
+    badge.className   = "badge running";
+  } else {
+    btn.textContent = "▶ Start DICOM Storage Listener";
+    btn.className   = "btn primary";
+    badge.textContent = "Stopped";
+    badge.className   = "badge stopped";
+  }
+}
+
+function clearSCPList() {
+  document.getElementById("scp-filelist").innerHTML = "";
+  scpFileCount = 0;
+  document.getElementById("scp-count").textContent = "0 files";
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 14. DICOM Tag Detail Modal
+// ─────────────────────────────────────────────────────────────────
+
+let allTags = [];  // full tag list for the currently open modal
+
+function showTagModal(title, tags) {
+  allTags = tags || [];
+  document.getElementById("tag-modal-title").textContent = title;
+  document.getElementById("tag-filter").value = "";
+  renderTagTable(allTags);
+  document.getElementById("tag-modal").classList.add("open");
+}
+
+function closeTagModal() {
+  document.getElementById("tag-modal").classList.remove("open");
+}
+
+// Close modal if user clicks the dark backdrop
+document.getElementById("tag-modal").addEventListener("click", e => {
+  if (e.target === e.currentTarget) closeTagModal();
+});
+
+function filterTags() {
+  const q = document.getElementById("tag-filter").value.toLowerCase();
+  renderTagTable(q
+    ? allTags.filter(r =>
+        Object.values(r).some(v => String(v).toLowerCase().includes(q)))
+    : allTags);
+}
+
+function renderTagTable(rows) {
+  const tbody = document.getElementById("tag-tbody");
+  tbody.innerHTML = "";
+  rows.forEach(r => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td style="font-family:Consolas;font-size:11px">${r.tag}</td>
+      <td>${escapeHtml(r.keyword)}</td>
+      <td>${r.vr}</td>
+      <td style="max-width:400px;white-space:normal;word-break:break-all">${escapeHtml(r.value)}</td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById("tag-count").textContent = `${rows.length} tag(s)`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 15. Help tab
+// ─────────────────────────────────────────────────────────────────
+
+const HELP_SECTIONS = [
+  ["C-FIND / Query-Retrieve", `Query a remote PACS or archive for patients and studies.
+
+  C-ECHO (Ping)       Tests the network connection to the remote AE.
+                      Use this first to confirm the PACS is reachable.
+
+  Run C-FIND          Searches for matching studies. Fill in any combination of
+                      Patient ID, Patient Name, Accession Number, Study Date
+                      (YYYYMMDD or YYYYMMDD-YYYYMMDD range), Modality, or
+                      Study UID. Leave blank to match all.
+
+  Click a row         Opens a popup showing every DICOM tag returned by the
+                      remote server for that result.
+
+  C-MOVE              Instructs the remote PACS to push the selected study to
+                      another AE (the "Move Destination" you specify).`],
+
+  ["C-STORE", `Send DICOM files from your computer to a remote Storage SCP.
+
+  Add Files           Select one or more .dcm files from your computer.
+                      They are uploaded to the server which then performs
+                      the C-STORE on your behalf.
+
+  Send All            Sends every selected file in a single association.
+                      Progress appears in the Activity Log in real time.`],
+
+  ["Worklist (DMWL)", `Query a Modality Worklist SCP for scheduled procedures.
+
+  Leave all filters blank to retrieve all scheduled items, or narrow down
+  by Patient ID, Name, Date, Modality, Accession, or Station AET.
+
+  Click a row         Opens a popup with every DICOM tag the SCP returned,
+                      including expanded sequence items (SPS).
+
+  Export CSV          Saves the summary columns to a CSV file
+                      (downloaded by your browser).`],
+
+  ["Storage Commitment", `Verify that a PACS has permanently stored a set of instances.
+
+  Paste SOP Instance UIDs (one per line) into the text area and click
+  Send N-ACTION. The PACS checks whether it holds those instances and
+  returns an N-EVENT-REPORT. The result appears in the log.`],
+
+  ["IOCM", `Send an Instance Availability Notification (IAN).
+
+  Used to inform a PACS or broker that instances have been deleted or
+  changed availability. Fill in the Study UID, Series UID, SOP UIDs,
+  and the desired availability code (ONLINE, NEARLINE, OFFLINE,
+  UNAVAILABLE).`],
+
+  ["HL7 – Send", `Send HL7 v2 messages over MLLP to a remote system.
+
+  Choose a template, fill in the patient/procedure fields, then click
+  Load Template to populate the message editor. You can then edit the
+  message freely before sending.
+
+  The ACK response from the remote system is shown in the log.`],
+
+  ["HL7 – Receive", `Run an MLLP listener that accepts incoming HL7 messages.
+
+  Click Start HL7 Listener to open the port. Each message that arrives
+  is displayed in full with its timestamp and sender address. An AA
+  acknowledgement is sent back automatically.`],
+
+  ["DICOM Receiver", `Runs a DICOM C-STORE SCP that accepts incoming DICOM files
+  from any modality or PACS and saves them to disk on the server.
+
+  Set the AE Title, port, and destination folder, then click Start.
+  Any device configured to send to this AE Title and port can push
+  images directly to this tool.`],
+
+  ["Settings", `Local AE Title / Port  – What this tool calls itself when connecting
+                           to remote DICOM systems.
+
+  Remote AE Presets      – Saved AE configurations. Once added here, they
+                           appear in the Preset dropdown on every tab so you
+                           don't have to re-enter details each time.
+
+  HL7 Listen Port        – Default port for the HL7 receiver.
+
+  Save Settings          – Writes config to disk on the server.`],
+];
+
+function buildHelp() {
+  const ul = document.getElementById("help-topic-list");
+  HELP_SECTIONS.forEach(([title, _], i) => {
+    const li = document.createElement("li");
+    li.textContent = title;
+    li.onclick = () => showHelp(i);
+    if (i === 0) li.classList.add("active");
+    ul.appendChild(li);
+  });
+  showHelp(0);
+}
+
+function showHelp(idx) {
+  const [title, body] = HELP_SECTIONS[idx];
+  document.getElementById("help-title").textContent = title;
+  document.getElementById("help-body").textContent  = body;
+  document.querySelectorAll("#help-topic-list li").forEach((li, i) =>
+    li.classList.toggle("active", i === idx));
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 16. General utilities
+// ─────────────────────────────────────────────────────────────────
+
+// Append a line to a log box div
+function appendLog(boxId, ts, message, level = "dim") {
+  const box  = document.getElementById(boxId);
+  if (!box) return;
+  const span = document.createElement("span");
+  span.className = "log-" + level;
+  span.textContent = `[${ts}] ${message}\n`;
+  box.appendChild(span);
+  box.scrollTop = box.scrollHeight;
+}
+
+function clearTable(tbodyId) {
+  document.getElementById(tbodyId).innerHTML = "";
+}
+
+// Current time as HH:MM:SS string
+function now() {
+  return new Date().toTimeString().slice(0, 8);
+}
+
+// Escape HTML special characters to prevent XSS when inserting user/server data
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// Trigger a browser download of a text string as a file
+function downloadText(filename, content, mimeType = "text/plain") {
+  const a   = document.createElement("a");
+  a.href    = URL.createObjectURL(new Blob([content], { type: mimeType }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 17. Initialisation – runs when the page first loads
+// ─────────────────────────────────────────────────────────────────
+
+(async function init() {
+  // Build AE selector widgets for every tab that needs one
+  [
+    ["ae-cfind",  "cfind"],
+    ["ae-cstore", "cstore"],
+    ["ae-dmwl",   "dmwl"],
+    ["ae-commit", "commit"],
+    ["ae-iocm",   "iocm"],
+  ].forEach(([containerId, prefix]) => buildAESelector(containerId, prefix));
+
+  // Ask the server for the real expanded default save path.
+  // This ensures Windows users see C:\Users\... rather than ~/DICOM_Received.
+  fetch("/api/scp/default_dir")
+    .then(r => r.json())
+    .then(d => { document.getElementById("scp-dir").value = d.path; })
+    .catch(() => { document.getElementById("scp-dir").value = "~/DICOM_Received"; });
+
+  // Load HL7 templates from server (reads hl7_templates/*.hl7 files)
+  await refreshHL7Templates();
+
+  // Load config from server and populate all fields
+  await loadConfig();
+
+  // Build the help topic list
+  buildHelp();
+})();
+
+</script>
+</body>
+</html>

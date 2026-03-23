@@ -1,0 +1,5 @@
+# name: QBP^Q22 - Patient Demographics Query
+# description: IHE PDQ query - asks a Patient Demographics Supplier to return matching patient records.
+MSH|^~\&|{sending_app}|{sending_fac}|{recv_app}|{recv_fac}|{ts}||QBP^Q22|{msgid}|P|2.5
+QPD|IHE PDQ Query|{msgid}|@PID.3.1^{pid}~@PID.5.1.1^{name_last}~@PID.5.1.2^{name_first}~@PID.7^{dob}~@PID.8^{sex}
+RCP|I|10^RD

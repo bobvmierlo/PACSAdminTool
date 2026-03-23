@@ -1,0 +1,8 @@
+# name: OML^O21 - Lab Order
+# description: Places a laboratory test order, including a specimen segment (SPM).
+MSH|^~\&|{sending_app}|{sending_fac}|{recv_app}|{recv_fac}|{ts}||OML^O21|{msgid}|P|2.5
+PID|1||{pid}^^^{assigning_auth}^MR||{name}||{dob}|{sex}
+PV1|1|O|RAD||||999^Smith^John
+ORC|NW|{acc}|||SC||||{ts}|||999^Smith^John
+OBR|1|{acc}||{proc_code}^{proc_desc}^LN|||{ts}||||||||||{acc}|||F
+SPM|1|{acc}||BLDV^Blood venous^HL70487|||||||P^^HL70369

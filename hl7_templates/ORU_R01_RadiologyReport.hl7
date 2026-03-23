@@ -1,0 +1,9 @@
+# name: ORU^R01 - Radiology Report
+# description: Sent by RIS/PACS to HIS/EMR when a radiology report is finalised. Contains findings in OBX segments.
+MSH|^~\&|{sending_app}|{sending_fac}|{recv_app}|{recv_fac}|{ts}||ORU^R01|{msgid}|P|2.3
+PID|1||{pid}^^^{assigning_auth}^MR||{name}||{dob}|{sex}
+PV1|1|O|RAD||||999^Smith^John
+OBR|1|{acc}|{acc}|{proc_code}^{proc_desc}^LN|||{ts}|||||||See clinical notes|999^Smith^John||{acc}||{study_uid}|||{modality}||||F
+OBX|1|TX|{proc_code}^Report^LN||Technique: {modality} of {proc_desc}.||||||F|||{ts}
+OBX|2|TX|{proc_code}^Report^LN||Findings: No acute abnormality identified.||||||F|||{ts}
+OBX|3|TX|{proc_code}^Report^LN||Impression: Normal study.||||||F|||{ts}

@@ -1,0 +1,8 @@
+# name: ORM^O01 - Radiology Order
+# description: Sent by RIS/HIS to PACS to place a new imaging order. Includes MSH, PID, PV1, ORC, OBR, ZDS segments.
+MSH|^~\&|{sending_app}|{sending_fac}|{recv_app}|{recv_fac}|{ts}||ORM^O01|{msgid}|P|2.3
+PID|1||{pid}^^^{assigning_auth}^MR||{name}||{dob}|{sex}|||123 Main St^^Amsterdam^^1234AB^NL||0612345678
+PV1|1|O|RAD||||999^Smith^John|||RAD||||||||V001
+ORC|NW|{acc}||{acc}|SC||||{ts}|||999^Smith^John
+OBR|1|{acc}||{proc_code}^{proc_desc}^LN|||{ts}|||||||See clinical notes|999^Smith^John||{acc}||{study_uid}|||{modality}|^^^RAD||||R
+ZDS|{study_uid}^1.2.840.10008.1^ISO

@@ -1,0 +1,36 @@
+# ── Python bytecode ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+
+# ── PyInstaller build output ──────────────────────────────────────
+# Keep pacs_tool.spec (it's your build config) but not what it produces
+dist/
+build/
+*.exe
+
+# ── Virtual environments ──────────────────────────────────────────
+.venv/
+venv/
+env/
+
+# ── Runtime logs ─────────────────────────────────────────────────
+logs/
+*.log
+
+# ── Received DICOM files (written at runtime, not source) ────────
+DICOM_Received/
+
+# ── User config (stored outside the repo in ~/ anyway) ───────────
+# Listed here as a reminder — shouldn't end up in the repo
+config.json
+
+# ── OS noise ─────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE / editor files ───────────────────────────────────────────
+.vscode/
+.idea/
+*.swp

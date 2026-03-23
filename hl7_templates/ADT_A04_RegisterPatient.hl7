@@ -1,0 +1,7 @@
+# name: ADT^A04 - Register Patient
+# description: Sent when a patient is registered for an outpatient visit. Includes EVN, PID (with BSN), PV1, PV2.
+MSH|^~\&|{sending_app}|{sending_fac}|{recv_app}|{recv_fac}|{ts}||ADT^A04|{msgid}|P|2.3
+EVN|A04|{ts}
+PID|1||{pid}^^^{assigning_auth}^MR~12345678^^^NL^BSN||{name}||{dob}|{sex}|||123 Main St^^Amsterdam^^1234AB^NL||0612345678^^^test@example.nl|||U||{acc}
+PV1|1|O|RAD^ROOM1^BED1^MAIN||||999^Smith^John|||RAD||||||||V001
+PV2|||Imaging requested

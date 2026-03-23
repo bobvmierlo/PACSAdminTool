@@ -1,0 +1,6 @@
+# name: ADT^A23 - Delete Visit
+# description: Sent to cancel or delete a previously created patient visit record.
+MSH|^~\&|{sending_app}|{sending_fac}|{recv_app}|{recv_fac}|{ts}||ADT^A23|{msgid}|P|2.3
+EVN|A23|{ts}
+PID|1||{pid}^^^{assigning_auth}^MR||{name}||{dob}|{sex}
+PV1|1|O|RAD||||999^Smith^John|||RAD||||||||V001

@@ -1,0 +1,7 @@
+# name: SIU^S15 - Cancel Appointment
+# description: Cancels a previously scheduled appointment.
+MSH|^~\&|{sending_app}|{sending_fac}|{recv_app}|{recv_fac}|{ts}||SIU^S15|{msgid}|P|2.3
+SCH|{acc}||{acc}||{proc_code}^{proc_desc}^LN||{ts}|30|MIN
+PID|1||{pid}^^^{assigning_auth}^MR||{name}||{dob}|{sex}
+RGS|1|D
+AIS|1|D|{proc_code}^{proc_desc}^LN|{ts}

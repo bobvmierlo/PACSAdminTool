@@ -1,0 +1,9 @@
+# name: SIU^S12 - Schedule Appointment
+# description: Sent by a scheduling system to notify downstream systems that a new appointment has been booked.
+MSH|^~\&|{sending_app}|{sending_fac}|{recv_app}|{recv_fac}|{ts}||SIU^S12|{msgid}|P|2.3
+SCH|{acc}||{acc}||{proc_code}^{proc_desc}^LN|{proc_desc}|{ts}|30|MIN|{ts}^^^RAD||999^Smith^John
+PID|1||{pid}^^^{assigning_auth}^MR||{name}||{dob}|{sex}|||123 Main St^^Amsterdam^^1234AB^NL||0612345678
+RGS|1|A
+AIS|1|A|{proc_code}^{proc_desc}^LN|{ts}|0|MIN|30|MIN
+AIP|1|A|999^Smith^John
+AIL|1|A|RAD^ROOM1^^^^^^^MAIN
