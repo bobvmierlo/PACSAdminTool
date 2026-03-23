@@ -102,9 +102,19 @@ def _setup_logging():
     # Startup cleanup: removes logs older than 7 days left from previous runs
     _cleanup_old_logs()
 
+    return file_h   # caller keeps a reference so _apply_log_level can update it
 
-_setup_logging()
+
+_file_handler = _setup_logging()
 logger = logging.getLogger(__name__)
+
+
+def _apply_log_level(level_name: str):
+    """Apply a log level from config to the root logger and file handler."""
+    level = getattr(logging, level_name.upper(), logging.INFO)
+    logging.getLogger().setLevel(level)
+    if _file_handler:
+        _file_handler.setLevel(level)
 
 
 def _cleanup_scheduler():
@@ -139,6 +149,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 # ── Load config once at startup. All routes share this dict.
 config = load_config()
+_apply_log_level(config.get("log_level", "INFO"))
 
 # ── State for long-running background services (HL7 listener, SCP listener).
 #    We keep these as module-level variables so all requests can see them.
@@ -224,6 +235,9 @@ def save_config_route():
     # Update only the keys the browser sent – don't wipe anything it didn't.
     config.update(data)
     save_config(config)
+    if "log_level" in data:
+        _apply_log_level(data["log_level"])
+        logger.info("Log level changed to %s", data["log_level"].upper())
     return jsonify({"ok": True})
 
 
