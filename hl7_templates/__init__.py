@@ -18,11 +18,19 @@ This module is imported by:
 from __future__ import annotations
 
 import os
+import sys
 import glob
 
+
+def _templates_dir() -> str:
+    """Return the hl7_templates directory, handling PyInstaller one-file bundles."""
+    if getattr(sys, "frozen", False):
+        return os.path.join(sys._MEIPASS, "hl7_templates")
+    return os.path.dirname(os.path.abspath(__file__))
+
+
 # The folder that contains all .hl7 template files.
-# __file__ is this __init__.py, so dirname gives us the hl7_templates/ dir.
-TEMPLATES_DIR = os.path.dirname(os.path.abspath(__file__))
+TEMPLATES_DIR = _templates_dir()
 
 
 def load_templates() -> list[dict]:
