@@ -24,7 +24,8 @@ DEFAULT_CONFIG = {
         "query_level": "STUDY",
         "date_range": ""
     },
-    "log_level": "INFO"
+    "log_level": "INFO",
+    "language": "en"
 }
 
 

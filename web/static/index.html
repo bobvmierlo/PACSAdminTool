@@ -15,11 +15,11 @@
     - Socket.IO client: lets us receive WebSocket events from Flask-SocketIO
     - No framework needed - plain JS is fine for a tool this size
 -->
-<html lang="en">
+<html lang="en" id="html-root">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PACS Admin Tool</title>
+  <title data-i18n="app.title">PACS Admin Tool</title>
 
   <!-- Socket.IO client library - must match the server version -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
@@ -312,25 +312,25 @@
      TOP HEADER
 ══════════════════════════════════════════════════════════════════ -->
 <div id="header">
-  <h1>PACS Admin Tool</h1>
-  <span>DICOM &amp; HL7 Administration Utility</span>
-  <span id="ws-status" style="margin-left:auto; font-size:12px; color:#aaa">⬤ connecting…</span>
+  <h1 data-i18n="app.title">PACS Admin Tool</h1>
+  <span data-i18n="app.subtitle">DICOM &amp; HL7 Administration Utility</span>
+  <span id="ws-status" style="margin-left:auto; font-size:12px; color:#aaa" data-i18n="common.connecting">⬤ connecting…</span>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════
      TAB BAR
 ══════════════════════════════════════════════════════════════════ -->
 <div id="tab-bar">
-  <button class="tab-btn active" onclick="showTab('cfind')">C-FIND / Q-R</button>
-  <button class="tab-btn" onclick="showTab('cstore')">C-STORE</button>
-  <button class="tab-btn" onclick="showTab('dmwl')">Worklist (DMWL)</button>
-  <button class="tab-btn" onclick="showTab('commit')">Storage Commit</button>
-  <button class="tab-btn" onclick="showTab('iocm')">IOCM</button>
-  <button class="tab-btn" onclick="showTab('hl7')">HL7</button>
-  <button class="tab-btn" onclick="showTab('scp')">DICOM Receiver</button>
-  <button class="tab-btn" onclick="showTab('settings')">Settings</button>
-  <button class="tab-btn" onclick="showTab('help')">Help</button>
-  <button class="tab-btn" onclick="showTab('about')">About</button>
+  <button class="tab-btn active" onclick="showTab('cfind')" data-i18n="tabs.cfind">C-FIND / Q-R</button>
+  <button class="tab-btn" onclick="showTab('cstore')" data-i18n="tabs.cstore">C-STORE</button>
+  <button class="tab-btn" onclick="showTab('dmwl')" data-i18n="tabs.dmwl">Worklist (DMWL)</button>
+  <button class="tab-btn" onclick="showTab('commit')" data-i18n="tabs.commit">Storage Commit</button>
+  <button class="tab-btn" onclick="showTab('iocm')" data-i18n="tabs.iocm">IOCM</button>
+  <button class="tab-btn" onclick="showTab('hl7')" data-i18n="tabs.hl7">HL7</button>
+  <button class="tab-btn" onclick="showTab('scp')" data-i18n="tabs.scp">DICOM Receiver</button>
+  <button class="tab-btn" onclick="showTab('settings')" data-i18n="tabs.settings">Settings</button>
+  <button class="tab-btn" onclick="showTab('help')" data-i18n="tabs.help">Help</button>
+  <button class="tab-btn" onclick="showTab('about')" data-i18n="tabs.about">About</button>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════
@@ -341,143 +341,141 @@
   <!-- ── C-FIND / Query-Retrieve ─────────────────────────────────── -->
   <div id="tab-cfind" class="tab-panel active">
     <div class="card">
-      <h3>Remote AE</h3>
+      <h3 data-i18n="common.remote_ae">Remote AE</h3>
       <div id="ae-cfind"></div><!-- filled by buildAESelector() -->
     </div>
     <div class="card">
-      <h3>Query Parameters</h3>
+      <h3 data-i18n="cfind.query_params">Query Parameters</h3>
       <div class="field-grid">
-        <div class="field"><label>Patient ID</label><input id="cfind-pid"></div>
-        <div class="field"><label>Patient Name</label><input id="cfind-pname"></div>
-        <div class="field"><label>Accession #</label><input id="cfind-acc"></div>
-        <div class="field"><label>Study Date (YYYYMMDD)</label><input id="cfind-date"></div>
-        <div class="field"><label>Modality</label><input id="cfind-mod"></div>
-        <div class="field"><label>Study UID</label><input id="cfind-suid"></div>
+        <div class="field"><label data-i18n="cfind.patient_id">Patient ID</label><input id="cfind-pid"></div>
+        <div class="field"><label data-i18n="cfind.patient_name">Patient Name</label><input id="cfind-pname"></div>
+        <div class="field"><label data-i18n="cfind.accession">Accession #</label><input id="cfind-acc"></div>
+        <div class="field"><label data-i18n="cfind.study_date_hint">Study Date (YYYYMMDD)</label><input id="cfind-date"></div>
+        <div class="field"><label data-i18n="cfind.modality">Modality</label><input id="cfind-mod"></div>
+        <div class="field"><label data-i18n="cfind.study_uid">Study UID</label><input id="cfind-suid"></div>
       </div>
       <div class="btn-row" style="margin-top:12px">
         <div class="field" style="width:130px">
-          <label>Query Level</label>
+          <label data-i18n="cfind.query_level">Query Level</label>
           <select id="cfind-level">
             <option>STUDY</option><option>PATIENT</option>
             <option>SERIES</option><option>IMAGE</option>
           </select>
         </div>
         <div class="field" style="width:120px">
-          <label>Model</label>
+          <label data-i18n="cfind.model">Model</label>
           <select id="cfind-model"><option>STUDY</option><option>PATIENT</option></select>
         </div>
-        <button class="btn" onclick="doEcho('cfind')">C-ECHO (Ping)</button>
-        <button class="btn primary" onclick="doCFind()">Run C-FIND</button>
+        <button class="btn" onclick="doEcho('cfind')" data-i18n="cfind.cecho">C-ECHO (Ping)</button>
+        <button class="btn primary" onclick="doCFind()" data-i18n="cfind.run">Run C-FIND</button>
       </div>
     </div>
 
     <div class="card">
-      <h3>C-MOVE</h3>
+      <h3 data-i18n="cfind.cmove">C-MOVE</h3>
       <div class="btn-row">
         <div class="field" style="width:200px">
-          <label>Move Destination AE</label>
+          <label data-i18n="cfind.cmove_dest_short">Move Destination AE</label>
           <input id="cfind-movedest" value="PACSADMIN">
         </div>
-        <button class="btn success" onclick="doCMove()" style="margin-top:20px">C-MOVE Selected</button>
+        <button class="btn success" onclick="doCMove()" style="margin-top:20px" data-i18n="cfind.cmove_selected">C-MOVE Selected</button>
       </div>
     </div>
 
     <div class="card">
-      <h3>Results &mdash; click a row to see all DICOM tags</h3>
+      <h3 data-i18n="cfind.results_web">Results &mdash; click a row to see all DICOM tags</h3>
       <div class="result-table-wrap">
         <table id="cfind-table">
           <thead><tr>
-            <th>Patient ID</th><th>Patient Name</th><th>Study Date</th>
-            <th>Modality</th><th>Accession</th><th>Description</th><th>Study UID</th>
+            <th data-i18n="cfind.col_patient_id">Patient ID</th><th data-i18n="cfind.col_patient_name">Patient Name</th><th data-i18n="cfind.col_study_date">Study Date</th>
+            <th data-i18n="cfind.col_modality">Modality</th><th data-i18n="cfind.col_accession">Accession</th><th data-i18n="cfind.col_description">Description</th><th data-i18n="cfind.col_study_uid">Study UID</th>
           </tr></thead>
           <tbody id="cfind-tbody"></tbody>
         </table>
       </div>
     </div>
-    <div class="card"><h3>Log</h3><div class="log-box" id="log-cfind"></div></div>
+    <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-cfind"></div></div>
   </div>
 
   <!-- ── C-STORE ─────────────────────────────────────────────────── -->
   <div id="tab-cstore" class="tab-panel">
-    <div class="card"><h3>Destination AE</h3><div id="ae-cstore"></div></div>
+    <div class="card"><h3 data-i18n="cstore.destination_ae">Destination AE</h3><div id="ae-cstore"></div></div>
     <div class="card">
-      <h3>Files to Send</h3>
+      <h3 data-i18n="cstore.files_to_send">Files to Send</h3>
       <div class="btn-row">
-        <!-- The file input is hidden; the "Add Files" button triggers it -->
         <input type="file" id="cstore-files" multiple accept=".dcm" style="display:none"
                onchange="updateFileList()">
-        <button class="btn" onclick="document.getElementById('cstore-files').click()">Add Files…</button>
-        <button class="btn" onclick="clearStoreFiles()">Clear</button>
+        <button class="btn" onclick="document.getElementById('cstore-files').click()" data-i18n="cstore.add_files">Add Files…</button>
+        <button class="btn" onclick="clearStoreFiles()" data-i18n="common.clear">Clear</button>
         <span id="cstore-count" style="color:#888; font-size:13px">0 files selected</span>
-        <button class="btn primary" onclick="doCStore()" style="margin-left:auto">Send All (C-STORE)</button>
+        <button class="btn primary" onclick="doCStore()" style="margin-left:auto" data-i18n="cstore.send_all">Send All (C-STORE)</button>
       </div>
-      <!-- List of selected file names -->
       <div id="cstore-filelist"
            style="margin-top:10px; max-height:140px; overflow-y:auto; font-family:Consolas;
                   font-size:12px; border:1px solid #e0e0e0; border-radius:3px;
                   padding:6px; background:#fff; color:#555"></div>
     </div>
-    <div class="card"><h3>Log</h3><div class="log-box" id="log-cstore"></div></div>
+    <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-cstore"></div></div>
   </div>
 
   <!-- ── DMWL ────────────────────────────────────────────────────── -->
   <div id="tab-dmwl" class="tab-panel">
-    <div class="card"><h3>Worklist SCP</h3><div id="ae-dmwl"></div></div>
+    <div class="card"><h3 data-i18n="dmwl.worklist_scp">Worklist SCP</h3><div id="ae-dmwl"></div></div>
     <div class="card">
-      <h3>Query Filters (leave blank = match all)</h3>
+      <h3 data-i18n="dmwl.query_filters">Query Filters (leave blank = match all)</h3>
       <div class="field-grid">
-        <div class="field"><label>Patient ID</label><input id="dmwl-pid"></div>
-        <div class="field"><label>Patient Name</label><input id="dmwl-pname"></div>
-        <div class="field"><label>Scheduled Date</label><input id="dmwl-date"></div>
-        <div class="field"><label>Modality</label><input id="dmwl-mod"></div>
-        <div class="field"><label>Accession #</label><input id="dmwl-acc"></div>
-        <div class="field"><label>Station AET</label><input id="dmwl-aet"></div>
+        <div class="field"><label data-i18n="cfind.patient_id">Patient ID</label><input id="dmwl-pid"></div>
+        <div class="field"><label data-i18n="cfind.patient_name">Patient Name</label><input id="dmwl-pname"></div>
+        <div class="field"><label data-i18n="dmwl.sched_date_web">Scheduled Date</label><input id="dmwl-date"></div>
+        <div class="field"><label data-i18n="cfind.modality">Modality</label><input id="dmwl-mod"></div>
+        <div class="field"><label data-i18n="cfind.accession">Accession #</label><input id="dmwl-acc"></div>
+        <div class="field"><label data-i18n="dmwl.station_aet">Station AET</label><input id="dmwl-aet"></div>
       </div>
       <div class="btn-row" style="margin-top:12px">
-        <button class="btn primary" onclick="doDMWL()">Query Worklist</button>
-        <button class="btn" onclick="exportDMWLCsv()">Export CSV</button>
+        <button class="btn primary" onclick="doDMWL()" data-i18n="dmwl.query">Query Worklist</button>
+        <button class="btn" onclick="exportDMWLCsv()" data-i18n="dmwl.export_csv_web">Export CSV</button>
         <span id="dmwl-count" style="color:#888; font-size:13px"></span>
       </div>
     </div>
     <div class="card">
-      <h3>Results &mdash; click a row to see all DICOM tags</h3>
+      <h3 data-i18n="dmwl.results_web">Results &mdash; click a row to see all DICOM tags</h3>
       <div class="result-table-wrap">
         <table id="dmwl-table">
           <thead><tr>
-            <th>Patient ID</th><th>Patient Name</th><th>Accession</th>
-            <th>Modality</th><th>Scheduled Date</th><th>Station AET</th><th>Procedure</th>
+            <th data-i18n="dmwl.col_patient_id">Patient ID</th><th data-i18n="dmwl.col_patient_name">Patient Name</th><th data-i18n="dmwl.col_accession">Accession</th>
+            <th data-i18n="dmwl.col_modality">Modality</th><th data-i18n="dmwl.col_sched_date">Scheduled Date</th><th data-i18n="dmwl.col_station_aet">Station AET</th><th data-i18n="dmwl.col_procedure">Procedure</th>
           </tr></thead>
           <tbody id="dmwl-tbody"></tbody>
         </table>
       </div>
     </div>
-    <div class="card"><h3>Log</h3><div class="log-box" id="log-dmwl"></div></div>
+    <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-dmwl"></div></div>
   </div>
 
   <!-- ── Storage Commitment ──────────────────────────────────────── -->
   <div id="tab-commit" class="tab-panel">
-    <div class="card"><h3>Storage Commitment SCP</h3><div id="ae-commit"></div></div>
+    <div class="card"><h3 data-i18n="commit.commit_scp">Storage Commitment SCP</h3><div id="ae-commit"></div></div>
     <div class="card">
-      <h3>SOP Instance UIDs (one per line)</h3>
+      <h3 data-i18n="commit.sop_uids_web">SOP Instance UIDs (one per line)</h3>
       <textarea id="commit-uids" rows="6" placeholder="1.2.840.xxxxx&#10;1.2.840.yyyyy"></textarea>
       <div class="btn-row" style="margin-top:10px">
-        <button class="btn primary" onclick="doCommit()">Send N-ACTION (Commit)</button>
+        <button class="btn primary" onclick="doCommit()" data-i18n="commit.send">Send N-ACTION (Commit)</button>
       </div>
     </div>
-    <div class="card"><h3>Log</h3><div class="log-box" id="log-commit"></div></div>
+    <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-commit"></div></div>
   </div>
 
   <!-- ── IOCM ────────────────────────────────────────────────────── -->
   <div id="tab-iocm" class="tab-panel">
-    <div class="card"><h3>IOCM SCP</h3><div id="ae-iocm"></div></div>
+    <div class="card"><h3 data-i18n="iocm.iocm_scp">IOCM SCP</h3><div id="ae-iocm"></div></div>
     <div class="card">
-      <h3>Instance Availability Notification</h3>
+      <h3 data-i18n="iocm.notification">Instance Availability Notification</h3>
       <div class="field-grid">
-        <div class="field"><label>Study UID</label><input id="iocm-suid"></div>
-        <div class="field"><label>Series UID</label><input id="iocm-seruid"></div>
-        <div class="field"><label>SOP Class UID</label><input id="iocm-sopclass"></div>
-        <div class="field"><label>SOP Instance UID</label><input id="iocm-sopinst"></div>
-        <div class="field"><label>Availability</label>
+        <div class="field"><label data-i18n="iocm.study_uid">Study UID</label><input id="iocm-suid"></div>
+        <div class="field"><label data-i18n="iocm.series_uid">Series UID</label><input id="iocm-seruid"></div>
+        <div class="field"><label data-i18n="iocm.sop_class">SOP Class UID</label><input id="iocm-sopclass"></div>
+        <div class="field"><label data-i18n="iocm.sop_inst_web">SOP Instance UID</label><input id="iocm-sopinst"></div>
+        <div class="field"><label data-i18n="iocm.availability">Availability</label>
           <select id="iocm-avail">
             <option>ONLINE</option><option>NEARLINE</option>
             <option>OFFLINE</option><option>UNAVAILABLE</option>
@@ -485,124 +483,119 @@
         </div>
       </div>
       <div class="btn-row" style="margin-top:12px">
-        <button class="btn danger" onclick="doIOCM()">Send N-CREATE (Delete Notification)</button>
+        <button class="btn danger" onclick="doIOCM()" data-i18n="iocm.send">Send N-CREATE (Delete Notification)</button>
       </div>
     </div>
-    <div class="card"><h3>Log</h3><div class="log-box" id="log-iocm"></div></div>
+    <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-iocm"></div></div>
   </div>
 
   <!-- ── HL7 ─────────────────────────────────────────────────────── -->
   <div id="tab-hl7" class="tab-panel">
-    <!-- Sub-tabs within HL7 -->
     <div style="border-bottom:1px solid #e0e0e0; margin-bottom:16px; display:flex; gap:0">
-      <button class="tab-btn active" id="hl7-send-btn" onclick="showHL7Tab('send')">Send HL7</button>
-      <button class="tab-btn"        id="hl7-recv-btn" onclick="showHL7Tab('recv')">Receive HL7</button>
+      <button class="tab-btn active" id="hl7-send-btn" onclick="showHL7Tab('send')" data-i18n="hl7.send_tab">Send HL7</button>
+      <button class="tab-btn"        id="hl7-recv-btn" onclick="showHL7Tab('recv')" data-i18n="hl7.recv_tab">Receive HL7</button>
     </div>
 
-    <!-- HL7 Send -->
     <div id="hl7-send-panel">
       <div class="card">
-        <h3>Destination</h3>
+        <h3 data-i18n="hl7.destination">Destination</h3>
         <div class="field-grid">
-          <div class="field"><label>Host</label><input id="hl7-host" value="127.0.0.1"></div>
-          <div class="field" style="max-width:100px"><label>Port</label><input id="hl7-port" value="2575"></div>
+          <div class="field"><label data-i18n="hl7.host">Host</label><input id="hl7-host" value="127.0.0.1"></div>
+          <div class="field" style="max-width:100px"><label data-i18n="hl7.port">Port</label><input id="hl7-port" value="2575"></div>
         </div>
       </div>
       <div class="card">
-        <h3>Message Template</h3>
+        <h3 data-i18n="hl7.template_section">Message Template</h3>
         <div class="btn-row">
           <div class="field" style="min-width:280px">
-            <label>Template</label>
-            <!-- Options are populated dynamically from /api/hl7/templates on page load -->
+            <label data-i18n="hl7.template">Template</label>
             <select id="hl7-template">
-              <option value="">(loading templates...)</option>
+              <option value="" data-i18n="hl7.loading_templates">(loading templates...)</option>
             </select>
           </div>
-          <button class="btn" onclick="loadHL7Template()" style="margin-top:20px">Load Template</button>
-          <button class="btn" onclick="refreshHL7Templates()" style="margin-top:20px" title="Reload template files from disk">Refresh</button>
+          <button class="btn" onclick="loadHL7Template()" style="margin-top:20px" data-i18n="hl7.load_template">Load Template</button>
+          <button class="btn" onclick="refreshHL7Templates()" style="margin-top:20px" data-i18n="common.refresh">Refresh</button>
         </div>
         <div id="hl7-template-desc" style="font-size:12px; color:#888; margin-top:4px; min-height:16px"></div>
         <div class="field-grid" style="margin-top:10px">
-          <div class="field"><label>Patient ID</label><input id="hl7-pid"></div>
-          <div class="field"><label>Patient Name (LAST^FIRST)</label><input id="hl7-pname"></div>
-          <div class="field"><label>DOB (YYYYMMDD)</label><input id="hl7-dob"></div>
-          <div class="field"><label>Sex (M/F/U)</label><input id="hl7-sex" value="M"></div>
-          <div class="field"><label>Accession #</label><input id="hl7-acc"></div>
-          <div class="field"><label>Procedure Code</label><input id="hl7-code"></div>
-          <div class="field"><label>Procedure Description</label><input id="hl7-desc"></div>
-          <div class="field"><label>Modality</label><input id="hl7-mod" value="CT"></div>
-          <div class="field"><label>Study UID</label><input id="hl7-suid"></div>
-          <div class="field"><label>Sending App</label><input id="hl7-sapp" value="RIS"></div>
-          <div class="field"><label>Sending Facility</label><input id="hl7-sfac" value="HOSPITAL"></div>
-          <div class="field"><label>Receiving App</label><input id="hl7-rapp" value="PACS"></div>
-          <div class="field"><label>Receiving Facility</label><input id="hl7-rfac" value="HOSPITAL"></div>
-          <div class="field"><label>Assigning Authority</label><input id="hl7-auth" value="HOSP"></div>
+          <div class="field"><label data-i18n="hl7.patient_id">Patient ID</label><input id="hl7-pid"></div>
+          <div class="field"><label data-i18n="hl7.patient_name_web">Patient Name (LAST^FIRST)</label><input id="hl7-pname"></div>
+          <div class="field"><label data-i18n="hl7.dob">DOB (YYYYMMDD)</label><input id="hl7-dob"></div>
+          <div class="field"><label data-i18n="hl7.sex">Sex (M/F/U)</label><input id="hl7-sex" value="M"></div>
+          <div class="field"><label data-i18n="hl7.accession">Accession #</label><input id="hl7-acc"></div>
+          <div class="field"><label data-i18n="hl7.proc_code_web">Procedure Code</label><input id="hl7-code"></div>
+          <div class="field"><label data-i18n="hl7.proc_desc_web">Procedure Description</label><input id="hl7-desc"></div>
+          <div class="field"><label data-i18n="hl7.modality">Modality</label><input id="hl7-mod" value="CT"></div>
+          <div class="field"><label data-i18n="hl7.study_uid">Study UID</label><input id="hl7-suid"></div>
+          <div class="field"><label data-i18n="hl7.sending_app">Sending App</label><input id="hl7-sapp" value="RIS"></div>
+          <div class="field"><label data-i18n="hl7.sending_facility">Sending Facility</label><input id="hl7-sfac" value="HOSPITAL"></div>
+          <div class="field"><label data-i18n="hl7.recv_app">Receiving App</label><input id="hl7-rapp" value="PACS"></div>
+          <div class="field"><label data-i18n="hl7.recv_facility">Receiving Facility</label><input id="hl7-rfac" value="HOSPITAL"></div>
+          <div class="field"><label data-i18n="hl7.assigning_auth">Assigning Authority</label><input id="hl7-auth" value="HOSP"></div>
         </div>
       </div>
       <div class="card">
-        <h3>Message to Send (edit directly)</h3>
+        <h3 data-i18n="hl7.msg_to_send">Message to Send (edit directly)</h3>
         <textarea id="hl7-message" rows="8" placeholder="MSH|^~\&|..."></textarea>
         <div class="btn-row" style="margin-top:10px">
-          <button class="btn primary" onclick="doHL7Send()">Send via MLLP</button>
-          <button class="btn" onclick="document.getElementById('hl7-message').value=''">Clear</button>
+          <button class="btn primary" onclick="doHL7Send()" data-i18n="hl7.send_mllp">Send via MLLP</button>
+          <button class="btn" onclick="document.getElementById('hl7-message').value=''" data-i18n="common.clear">Clear</button>
           <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#555; margin-left:8px">
             <input type="checkbox" id="hl7-send-debug">
-            Show raw MLLP bytes in log
+            <span data-i18n="hl7.show_mllp">Show raw MLLP bytes in log</span>
           </label>
         </div>
       </div>
-      <div class="card"><h3>Log</h3><div class="log-box" id="log-hl7-send"></div></div>
+      <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-hl7-send"></div></div>
     </div>
 
-    <!-- HL7 Receive -->
     <div id="hl7-recv-panel" style="display:none">
       <div class="card">
-        <h3>Listener Configuration</h3>
+        <h3 data-i18n="hl7.listener_config">Listener Configuration</h3>
         <div class="field-grid">
-          <div class="field" style="max-width:120px"><label>Port</label><input id="hl7-listen-port" value="2575"></div>
+          <div class="field" style="max-width:120px"><label data-i18n="hl7.port">Port</label><input id="hl7-listen-port" value="2575"></div>
         </div>
         <div class="btn-row" style="margin-top:12px">
-          <button class="btn primary" id="hl7-listen-btn" onclick="toggleHL7Listener()">▶ Start HL7 Listener</button>
-          <span class="badge stopped" id="hl7-listen-badge">Stopped</span>
+          <button class="btn primary" id="hl7-listen-btn" onclick="toggleHL7Listener()" data-i18n="hl7.start_hl7_web">&#9654; Start HL7 Listener</button>
+          <span class="badge stopped" id="hl7-listen-badge" data-i18n="common.stopped">Stopped</span>
           <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:#555; margin-left:8px">
             <input type="checkbox" id="hl7-recv-debug">
-            Show raw MLLP bytes in log
+            <span data-i18n="hl7.show_mllp">Show raw MLLP bytes in log</span>
           </label>
         </div>
       </div>
       <div class="card">
-        <h3>Received Messages
+        <h3 data-i18n="hl7.received_messages">Received Messages
           <button class="btn" onclick="clearHL7Received()"
-                  style="font-size:11px; padding:2px 8px; float:right; margin-top:-2px">Clear</button>
+                  style="font-size:11px; padding:2px 8px; float:right; margin-top:-2px" data-i18n="common.clear">Clear</button>
         </h3>
         <span id="hl7-recv-count" style="font-size:12px; color:#888">0 messages</span>
-        <!-- Each received HL7 message will be appended here as a <pre> block -->
         <div id="hl7-recv-messages"
              style="margin-top:8px; max-height:400px; overflow-y:auto; display:flex; flex-direction:column; gap:8px">
         </div>
       </div>
-      <div class="card"><h3>Log</h3><div class="log-box" id="log-hl7-recv"></div></div>
+      <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-hl7-recv"></div></div>
     </div>
   </div>
 
   <!-- ── DICOM Receiver (SCP Listener) ───────────────────────────── -->
   <div id="tab-scp" class="tab-panel">
     <div class="card">
-      <h3>Listener Configuration</h3>
+      <h3 data-i18n="scp.listener_config">Listener Configuration</h3>
       <div class="field-grid">
-        <div class="field"><label>AE Title</label><input id="scp-ae" value="PACSADMIN"></div>
-        <div class="field" style="max-width:120px"><label>Port</label><input id="scp-port" value="11112"></div>
-        <div class="field"><label>Save received files to</label><input id="scp-dir" value=""></div>
+        <div class="field"><label data-i18n="scp.ae_title">AE Title</label><input id="scp-ae" value="PACSADMIN"></div>
+        <div class="field" style="max-width:120px"><label data-i18n="scp.port">Port</label><input id="scp-port" value="11112"></div>
+        <div class="field"><label data-i18n="scp.save_to_web">Save received files to</label><input id="scp-dir" value=""></div>
       </div>
       <div class="btn-row" style="margin-top:12px">
-        <button class="btn primary" id="scp-btn" onclick="toggleSCP()">▶ Start DICOM Storage Listener</button>
-        <span class="badge stopped" id="scp-badge">Stopped</span>
+        <button class="btn primary" id="scp-btn" onclick="toggleSCP()" data-i18n="scp.start_scp_web">&#9654; Start DICOM Storage Listener</button>
+        <span class="badge stopped" id="scp-badge" data-i18n="common.stopped">Stopped</span>
       </div>
     </div>
     <div class="card">
-      <h3>Received Files
+      <h3 data-i18n="scp.received_files_web">Received Files
         <button class="btn" onclick="clearSCPList()"
-                style="font-size:11px; padding:2px 8px; float:right; margin-top:-2px">Clear</button>
+                style="font-size:11px; padding:2px 8px; float:right; margin-top:-2px" data-i18n="common.clear">Clear</button>
       </h3>
       <span id="scp-count" style="font-size:12px; color:#888">0 files</span>
       <div id="scp-filelist"
@@ -610,47 +603,59 @@
                   font-size:12px; border:1px solid #e0e0e0; border-radius:3px;
                   padding:6px; background:#fff; color:#555"></div>
     </div>
-    <div class="card"><h3>Log</h3><div class="log-box" id="log-scp"></div></div>
+    <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-scp"></div></div>
   </div>
 
   <!-- ── Settings ────────────────────────────────────────────────── -->
   <div id="tab-settings" class="tab-panel">
     <div class="card">
-      <h3>Local AE Configuration</h3>
+      <h3 data-i18n="settings.local_ae">Local AE Configuration</h3>
       <div class="field-grid">
-        <div class="field"><label>Local AE Title</label><input id="set-ae-title" value="PACSADMIN"></div>
-        <div class="field" style="max-width:120px"><label>Default Port</label><input id="set-ae-port" value="11112"></div>
+        <div class="field"><label data-i18n="settings.ae_title_web">Local AE Title</label><input id="set-ae-title" value="PACSADMIN"></div>
+        <div class="field" style="max-width:120px"><label data-i18n="settings.port_web">Default Port</label><input id="set-ae-port" value="11112"></div>
       </div>
     </div>
     <div class="card">
-      <h3>Saved Remote AE Presets</h3>
+      <h3 data-i18n="settings.remote_presets">Saved Remote AE Presets</h3>
       <div class="result-table-wrap">
         <table>
-          <thead><tr><th>Name</th><th>AE Title</th><th>Host</th><th>Port</th><th></th></tr></thead>
+          <thead><tr><th data-i18n="common.name">Name</th><th data-i18n="common.ae_title">AE Title</th><th data-i18n="common.host">Host</th><th data-i18n="common.port">Port</th><th></th></tr></thead>
           <tbody id="ae-presets-tbody"></tbody>
         </table>
       </div>
       <div class="field-grid" style="margin-top:12px">
-        <div class="field"><label>Name</label><input id="new-ae-name" placeholder="My PACS"></div>
-        <div class="field"><label>AE Title</label><input id="new-ae-aet" placeholder="PACS_AE"></div>
-        <div class="field"><label>Host</label><input id="new-ae-host" placeholder="192.168.1.10"></div>
-        <div class="field" style="max-width:100px"><label>Port</label><input id="new-ae-port" placeholder="104"></div>
+        <div class="field"><label data-i18n="common.name">Name</label><input id="new-ae-name" placeholder="My PACS"></div>
+        <div class="field"><label data-i18n="common.ae_title">AE Title</label><input id="new-ae-aet" placeholder="PACS_AE"></div>
+        <div class="field"><label data-i18n="common.host">Host</label><input id="new-ae-host" placeholder="192.168.1.10"></div>
+        <div class="field" style="max-width:100px"><label data-i18n="common.port">Port</label><input id="new-ae-port" placeholder="104"></div>
       </div>
       <div class="btn-row" style="margin-top:10px">
-        <button class="btn primary" onclick="addPreset()">+ Add Preset</button>
+        <button class="btn primary" onclick="addPreset()" data-i18n="settings.add_preset">+ Add Preset</button>
       </div>
     </div>
     <div class="card">
-      <h3>HL7 Settings</h3>
+      <h3 data-i18n="settings.hl7_settings">HL7 Settings</h3>
       <div class="field-grid">
-        <div class="field" style="max-width:150px"><label>Default HL7 Listen Port</label><input id="set-hl7-port" value="2575"></div>
+        <div class="field" style="max-width:150px"><label data-i18n="settings.hl7_port_web">Default HL7 Listen Port</label><input id="set-hl7-port" value="2575"></div>
       </div>
     </div>
     <div class="card">
-      <h3>Logging</h3>
+      <h3 data-i18n="settings.language">Language</h3>
+      <div class="field-grid">
+        <div class="field" style="max-width:200px">
+          <label data-i18n="settings.language_label">Interface Language</label>
+          <select id="set-language"></select>
+        </div>
+      </div>
+      <p style="font-size:12px; color:#888; margin:6px 0 0" data-i18n="settings.language_note">
+        Changes take effect after page reload.
+      </p>
+    </div>
+    <div class="card">
+      <h3 data-i18n="settings.logging">Logging</h3>
       <div class="field-grid">
         <div class="field" style="max-width:160px">
-          <label>Log Level</label>
+          <label data-i18n="settings.log_level">Log Level</label>
           <select id="set-log-level">
             <option value="DEBUG">DEBUG</option>
             <option value="INFO" selected>INFO</option>
@@ -660,12 +665,12 @@
           </select>
         </div>
       </div>
-      <p style="font-size:12px; color:#888; margin:6px 0 0">
-        Logs are written to <code>logs/pacs_admin.log</code> and rotated daily (7-day retention).
+      <p style="font-size:12px; color:#888; margin:6px 0 0" data-i18n="settings.log_note">
+        Logs are written to logs/pacs_admin.log and rotated daily (7-day retention).
       </p>
     </div>
     <div class="btn-row" style="margin-top:4px; padding:0 0 20px 0">
-      <button class="btn primary" onclick="saveSettings()">Save Settings</button>
+      <button class="btn primary" onclick="saveSettings()" data-i18n="settings.save">Save Settings</button>
       <span id="save-status" style="color:#888; font-size:13px"></span>
     </div>
   </div>
@@ -687,36 +692,38 @@
   <!-- ── About ───────────────────────────────────────────────────── -->
   <div id="tab-about" class="tab-panel">
     <div id="about-layout">
-      <h2 id="about-app-title">PACS Admin Tool</h2>
+      <h2 id="about-app-title" data-i18n="about.title">PACS Admin Tool</h2>
       <p id="about-version" class="about-dim">Version 1.0</p>
       <hr class="about-sep">
-      <p class="about-desc">
+      <p class="about-desc" data-i18n-html="about.description_html">
         A portable DICOM &amp; HL7 administration utility for PACS engineers,<br>
-        radiologists, and healthcare IT professionals.<br><br>
+        radiologists, and healthcare IT professionals.
+      </p>
+      <p class="about-desc" data-i18n-html="about.supports_html" style="margin-top:8px">
         Supports: C-ECHO &middot; C-FIND &middot; C-STORE &middot; C-MOVE &middot; DMWL &middot; Storage Commitment<br>
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IOCM &middot; HL7 v2 (MLLP) Send &amp; Receive &middot; DICOM Storage SCP
       </p>
       <hr class="about-sep">
       <table class="about-credits">
         <tr>
-          <td class="about-credit-label">Created by</td>
+          <td class="about-credit-label" data-i18n="about.created_by">Created by</td>
           <td>Bob van Mierlo</td>
         </tr>
         <tr>
-          <td class="about-credit-label">Built with</td>
+          <td class="about-credit-label" data-i18n="about.built_with">Built with</td>
           <td>
             <a href="https://www.anthropic.com/claude" target="_blank" rel="noopener noreferrer">Claude by Anthropic ↗</a><br>
-            <span class="about-dim">This entire application was designed and built with the assistance of Claude,<br>
+            <span class="about-dim" data-i18n-html="about.claude_credit_html">This entire application was designed and built with the assistance of Claude,<br>
             Anthropic's AI assistant — from the DICOM/HL7 protocol logic to the UI.</span>
           </td>
         </tr>
       </table>
       <hr class="about-sep">
-      <p class="about-dim">Built with Python &middot; pynetdicom &middot; pydicom &middot; hl7 &middot; Flask &middot; Flask-SocketIO</p>
+      <p class="about-dim" data-i18n="about.tech_stack_web">Built with Python &middot; pynetdicom &middot; pydicom &middot; hl7 &middot; Flask &middot; Flask-SocketIO</p>
       <div class="about-links">
-        <a href="https://github.com/bobvmierlo/PACSAdminTool" target="_blank" rel="noopener noreferrer">GitHub Repository ↗</a>
-        <a href="https://dicom.nema.org/medical/dicom/current/output/html/" target="_blank" rel="noopener noreferrer">DICOM Standard (NEMA) ↗</a>
-        <a href="https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents" target="_blank" rel="noopener noreferrer">HL7 v2 Reference ↗</a>
+        <a href="https://github.com/bobvmierlo/PACSAdminTool" target="_blank" rel="noopener noreferrer" data-i18n="about.github">GitHub Repository ↗</a>
+        <a href="https://dicom.nema.org/medical/dicom/current/output/html/" target="_blank" rel="noopener noreferrer" data-i18n="about.dicom_standard">DICOM Standard (NEMA) ↗</a>
+        <a href="https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents" target="_blank" rel="noopener noreferrer" data-i18n="about.hl7_reference">HL7 v2 Reference ↗</a>
       </div>
     </div>
   </div>
@@ -730,16 +737,16 @@
 <div class="modal-backdrop" id="tag-modal">
   <div class="modal">
     <div class="modal-header">
-      <span id="tag-modal-title">DICOM Tags</span>
+      <span id="tag-modal-title" data-i18n="dicom_detail.title">DICOM Tags</span>
       <button class="close-btn" onclick="closeTagModal()">×</button>
     </div>
     <div class="modal-body">
-      <input type="text" id="tag-filter" placeholder="Filter by tag, keyword, or value…"
+      <input type="text" id="tag-filter" data-i18n-placeholder="dicom_detail.filter_placeholder" placeholder="Filter by tag, keyword, or value…"
              oninput="filterTags()" style="width:100%">
       <div style="font-size:12px; color:#888" id="tag-count"></div>
       <div class="result-table-wrap" style="flex:1; overflow:auto">
         <table>
-          <thead><tr><th>Tag</th><th>Keyword</th><th>VR</th><th>Value</th></tr></thead>
+          <thead><tr><th data-i18n="dicom_detail.col_tag">Tag</th><th data-i18n="dicom_detail.col_keyword">Keyword</th><th data-i18n="dicom_detail.col_vr">VR</th><th data-i18n="dicom_detail.col_value">Value</th></tr></thead>
           <tbody id="tag-tbody"></tbody>
         </table>
       </div>
@@ -754,6 +761,84 @@
 <script>
 
 // ─────────────────────────────────────────────────────────────────
+// 0. Internationalisation (i18n)
+// ─────────────────────────────────────────────────────────────────
+
+let _i18n = {};  // full translation dict for the current language
+
+/** Resolve a dot-notation key like "cfind.run" from the _i18n dict. */
+function i18n(key, kwargs) {
+  const parts = key.split(".");
+  let val = _i18n;
+  for (const p of parts) {
+    if (val && typeof val === "object") val = val[p];
+    else return key;
+  }
+  if (typeof val !== "string") return key;
+  if (kwargs) {
+    for (const [k, v] of Object.entries(kwargs)) {
+      val = val.split(`{${k}}`).join(v);
+    }
+  }
+  return val;
+}
+
+/** Apply translations to all elements with data-i18n attributes. */
+function applyTranslations() {
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const key = el.getAttribute("data-i18n");
+    const text = i18n(key);
+    if (text !== key) el.textContent = text;
+  });
+  document.querySelectorAll("[data-i18n-html]").forEach(el => {
+    const key = el.getAttribute("data-i18n-html");
+    const text = i18n(key);
+    if (text !== key) el.innerHTML = text;
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
+    const key = el.getAttribute("data-i18n-placeholder");
+    const text = i18n(key);
+    if (text !== key) el.placeholder = text;
+  });
+  // Update page title
+  const titleKey = document.querySelector("title")?.getAttribute("data-i18n");
+  if (titleKey) document.title = i18n(titleKey);
+}
+
+/** Fetch translations from the server and apply them. */
+async function loadTranslations() {
+  try {
+    const res = await fetch("/api/translations");
+    _i18n = await res.json();
+    applyTranslations();
+  } catch (e) {
+    console.warn("Could not load translations:", e);
+  }
+}
+
+/** Populate the language selector in Settings. */
+async function loadLanguageOptions() {
+  try {
+    const res = await fetch("/api/locale/languages");
+    const langs = await res.json();
+    const sel = document.getElementById("set-language");
+    sel.innerHTML = "";
+    langs.forEach(l => {
+      const opt = document.createElement("option");
+      opt.value = l.code;
+      opt.textContent = l.name;
+      sel.appendChild(opt);
+    });
+    // Set current language
+    const curRes = await fetch("/api/locale/current");
+    const cur = await curRes.json();
+    sel.value = cur.language;
+  } catch (e) {
+    console.warn("Could not load languages:", e);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
 // 1. WebSocket / Socket.IO setup
 // ─────────────────────────────────────────────────────────────────
 
@@ -762,12 +847,12 @@
 const socket = io();
 
 socket.on("connect", () => {
-  document.getElementById("ws-status").textContent = "⬤ connected";
+  document.getElementById("ws-status").textContent = "⬤ " + i18n("common.connected");
   document.getElementById("ws-status").style.color = "#15803d";
 });
 
 socket.on("disconnect", () => {
-  document.getElementById("ws-status").textContent = "⬤ disconnected";
+  document.getElementById("ws-status").textContent = "⬤ " + i18n("common.disconnected");
   document.getElementById("ws-status").style.color = "#dc2626";
 });
 
@@ -851,6 +936,9 @@ async function loadConfig() {
   document.getElementById("set-ae-port").value  = lae.port     || 11112;
   document.getElementById("set-hl7-port").value  = (appConfig.hl7 || {}).listen_port || 2575;
   document.getElementById("set-log-level").value = appConfig.log_level || "INFO";
+  if (appConfig.language) {
+    document.getElementById("set-language").value = appConfig.language;
+  }
 
   // Set SCP / HL7 listener defaults from config
   document.getElementById("scp-ae").value          = lae.ae_title || "PACSADMIN";
@@ -882,7 +970,7 @@ function addPreset() {
   const aet  = document.getElementById("new-ae-aet").value.trim();
   const host = document.getElementById("new-ae-host").value.trim();
   const port = parseInt(document.getElementById("new-ae-port").value) || 104;
-  if (!name) { alert("Name is required"); return; }
+  if (!name) { alert(i18n("settings.name_required")); return; }
   if (!appConfig.remote_aes) appConfig.remote_aes = [];
   appConfig.remote_aes.push({ name, ae_title: aet, host, port });
   renderPresetTable();
@@ -907,14 +995,23 @@ async function saveSettings() {
     listen_port: parseInt(document.getElementById("set-hl7-port").value) || 2575,
   };
   appConfig.log_level = document.getElementById("set-log-level").value;
+  appConfig.language = document.getElementById("set-language").value;
   await fetch("/api/config", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(appConfig),
   });
   const s = document.getElementById("save-status");
-  s.textContent = "Saved ✓";
+  s.textContent = i18n("settings.saved_web");
   setTimeout(() => s.textContent = "", 3000);
+  // Reload translations if language changed
+  if (appConfig.language) {
+    await loadTranslations();
+    // Rebuild AE selectors with new translations
+    [["ae-cfind","cfind"],["ae-cstore","cstore"],["ae-dmwl","dmwl"],["ae-commit","commit"],["ae-iocm","iocm"]]
+      .forEach(([c, p]) => buildAESelector(c, p));
+    refreshAllPresetDropdowns();
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -929,14 +1026,14 @@ function buildAESelector(containerId, prefix) {
   container.innerHTML = `
     <div class="ae-selector">
       <div class="field preset-field">
-        <label>Preset</label>
+        <label>${i18n("common.preset")}</label>
         <select id="${prefix}-preset" onchange="loadPreset('${prefix}')">
-          <option value="">(manual)</option>
+          <option value="">${i18n("common.manual")}</option>
         </select>
       </div>
-      <div class="field"><label>AE Title</label><input id="${prefix}-ae" value="REMOTE_AE"></div>
-      <div class="field"><label>Host</label><input id="${prefix}-host" value="127.0.0.1"></div>
-      <div class="field" style="max-width:90px"><label>Port</label><input id="${prefix}-port" value="104"></div>
+      <div class="field"><label>${i18n("common.ae_title")}</label><input id="${prefix}-ae" value="REMOTE_AE"></div>
+      <div class="field"><label>${i18n("common.host")}</label><input id="${prefix}-host" value="127.0.0.1"></div>
+      <div class="field" style="max-width:90px"><label>${i18n("common.port")}</label><input id="${prefix}-port" value="104"></div>
     </div>`;
 }
 
@@ -945,7 +1042,7 @@ function refreshAllPresetDropdowns() {
   const presets = appConfig.remote_aes || [];
   document.querySelectorAll("[id$='-preset']").forEach(sel => {
     const current = sel.value;
-    sel.innerHTML = '<option value="">(manual)</option>';
+    sel.innerHTML = `<option value="">${i18n("common.manual")}</option>`;
     presets.forEach(ae => {
       const opt = document.createElement("option");
       opt.value = ae.name;
@@ -1038,7 +1135,7 @@ async function doCMove() {
   const rows = document.querySelectorAll("#cfind-tbody tr");
   let idx = -1;
   rows.forEach((r, i) => { if (r.classList.contains("selected")) idx = i; });
-  if (idx === -1) { alert("Select a result row first (click to select)"); return; }
+  if (idx === -1) { alert(i18n("cfind.select_row_first")); return; }
 
   const ae   = getAE("cfind");
   const dest = document.getElementById("cfind-movedest").value.trim();
@@ -1087,7 +1184,7 @@ function clearStoreFiles() {
 async function doCStore() {
   const ae    = getAE("cstore");
   const input = document.getElementById("cstore-files");
-  if (!input.files.length) { alert("No files selected"); return; }
+  if (!input.files.length) { alert(i18n("cstore.no_files")); return; }
 
   // Build a FormData object (the standard way to upload files via fetch)
   const form = new FormData();
@@ -1144,7 +1241,7 @@ async function doDMWL() {
 }
 
 function exportDMWLCsv() {
-  if (!dmwlResults.length) { alert("No results to export"); return; }
+  if (!dmwlResults.length) { alert(i18n("dmwl.no_results")); return; }
   const header = "PatientID,PatientName,Accession,Modality,ScheduledDate,StationAET,Procedure\n";
   const rows   = dmwlResults.map(r =>
     [r.PatientID, r.PatientName, r.Accession, r.Modality,
@@ -1161,7 +1258,7 @@ async function doCommit() {
   const ae   = getAE("commit");
   const raw  = document.getElementById("commit-uids").value;
   const uids = raw.split("\n").map(s => s.trim()).filter(Boolean);
-  if (!uids.length) { alert("Enter at least one UID"); return; }
+  if (!uids.length) { alert(i18n("commit.enter_uid")); return; }
   appendLog("log-commit", now(), `N-ACTION → ${ae.ae_title} (${uids.length} UIDs)`);
   const res  = await fetch("/api/dicom/commit", {
     method: "POST",
@@ -1256,7 +1353,7 @@ async function loadHL7Template() {
   // Fetch the full body of the selected template from the server,
   // then substitute placeholders from the quick-fill fields.
   const filename = document.getElementById("hl7-template").value;
-  if (!filename) { alert("No template selected"); return; }
+  if (!filename) { alert(i18n("hl7.no_template_selected")); return; }
 
   let body;
   try {
@@ -1310,7 +1407,7 @@ async function doHL7Send() {
   const host = document.getElementById("hl7-host").value.trim();
   const port = document.getElementById("hl7-port").value.trim();
   const msg  = document.getElementById("hl7-message").value.trim();
-  if (!msg) { alert("No message to send"); return; }
+  if (!msg) { alert(i18n("hl7.no_message")); return; }
   appendLog("log-hl7-send", now(), `Sending to ${host}:${port}`);
 
   const res  = await fetch("/api/hl7/send", {
@@ -1361,14 +1458,14 @@ function updateHL7Button(running) {
   const btn   = document.getElementById("hl7-listen-btn");
   const badge = document.getElementById("hl7-listen-badge");
   if (running) {
-    btn.textContent = "■ Stop HL7 Listener";
+    btn.textContent = i18n("hl7.stop_hl7_web");
     btn.className   = "btn danger";
-    badge.textContent = "Running";
+    badge.textContent = i18n("common.running");
     badge.className   = "badge running";
   } else {
-    btn.textContent = "▶ Start HL7 Listener";
+    btn.textContent = i18n("hl7.start_hl7_web");
     btn.className   = "btn primary";
-    badge.textContent = "Stopped";
+    badge.textContent = i18n("common.stopped");
     badge.className   = "badge stopped";
   }
 }
@@ -1422,14 +1519,14 @@ function updateSCPButton(running) {
   const btn   = document.getElementById("scp-btn");
   const badge = document.getElementById("scp-badge");
   if (running) {
-    btn.textContent = "■ Stop DICOM Storage Listener";
+    btn.textContent = i18n("scp.stop_scp_web");
     btn.className   = "btn danger";
-    badge.textContent = "Running";
+    badge.textContent = i18n("common.running");
     badge.className   = "badge running";
   } else {
-    btn.textContent = "▶ Start DICOM Storage Listener";
+    btn.textContent = i18n("scp.start_scp_web");
     btn.className   = "btn primary";
-    badge.textContent = "Stopped";
+    badge.textContent = i18n("common.stopped");
     badge.className   = "badge stopped";
   }
 }
@@ -1776,7 +1873,7 @@ function showHelp(idx) {
   if (links && links.length) {
     const lbl = document.createElement("p");
     lbl.className = "help-links-label";
-    lbl.textContent = "Official Documentation";
+    lbl.textContent = i18n("help.official_docs_web");
     linksDiv.appendChild(lbl);
     links.forEach(({label, url}) => {
       const a = document.createElement("a");
@@ -1838,6 +1935,12 @@ function downloadText(filename, content, mimeType = "text/plain") {
 // ─────────────────────────────────────────────────────────────────
 
 (async function init() {
+  // Load translations first so all UI strings are available
+  await loadTranslations();
+
+  // Load language options for the settings dropdown
+  await loadLanguageOptions();
+
   // Build AE selector widgets for every tab that needs one
   [
     ["ae-cfind",  "cfind"],
@@ -1872,20 +1975,14 @@ function downloadText(filename, content, mimeType = "text/plain") {
   cfindModel.addEventListener("change", () => {
     if (cfindModel.value === "STUDY" && cfindLevel.value === "PATIENT") {
       cfindLevel.value = "STUDY";
-      appendLog("log-cfind", now(),
-        "Warning: Study Root model does not support Query Level 'PATIENT'. " +
-        "Level changed to 'STUDY'. Use Patient Root model if you need PATIENT level.",
-        "warn");
+      appendLog("log-cfind", now(), i18n("cfind.warn_study_root"), "warn");
     }
   });
 
   cfindLevel.addEventListener("change", () => {
     if (cfindLevel.value === "PATIENT" && cfindModel.value === "STUDY") {
       cfindModel.value = "PATIENT";
-      appendLog("log-cfind", now(),
-        "Warning: Query Level 'PATIENT' is only valid with Patient Root model. " +
-        "Model switched to 'PATIENT'.",
-        "warn");
+      appendLog("log-cfind", now(), i18n("cfind.warn_patient_level"), "warn");
     }
   });
 })();

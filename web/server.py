@@ -42,6 +42,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
 
 from config.manager import load_config, save_config
+from locales import t as _t, set_language, current_language, available_languages
 
 # ── Logging setup: console + daily rotating file in logs/, 7-day retention
 LOG_DIR = os.path.join(BASE_DIR, "logs")
@@ -150,6 +151,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 # ── Load config once at startup. All routes share this dict.
 config = load_config()
 _apply_log_level(config.get("log_level", "INFO"))
+set_language(config.get("language", "en"))
 
 # ── State for long-running background services (HL7 listener, SCP listener).
 #    We keep these as module-level variables so all requests can see them.
@@ -255,7 +257,46 @@ def save_config_route():
     if "log_level" in data:
         _apply_log_level(data["log_level"])
         logger.info("Log level changed to %s", data["log_level"].upper())
+    if "language" in data:
+        set_language(data["language"])
+        logger.info("Language changed to %s", data["language"])
     return jsonify({"ok": True})
+
+
+# ===========================================================================
+# API: Locale / Translations
+# ===========================================================================
+
+@app.route("/api/locale/current", methods=["GET"])
+def locale_current():
+    """Return the currently active language code."""
+    return jsonify({"language": current_language()})
+
+
+@app.route("/api/locale/languages", methods=["GET"])
+def locale_languages():
+    """Return all available languages as [{code, name}, ...]."""
+    return jsonify([
+        {"code": code, "name": name}
+        for code, name in available_languages()
+    ])
+
+
+@app.route("/api/translations", methods=["GET"])
+def get_translations():
+    """
+    Return the full translation dict for the current language.
+    The browser caches this and uses it for all UI strings.
+    """
+    import json
+    from locales import LOCALES_DIR
+    lang = current_language()
+    path = LOCALES_DIR / f"{lang}.json"
+    if not path.exists():
+        path = LOCALES_DIR / "en.json"
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return jsonify(data)
 
 
 # ===========================================================================
