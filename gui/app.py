@@ -281,6 +281,8 @@ class CFindTab(ttk.Frame):
         _sep(ctrl,"vertical").pack(side="left",fill="y",padx=12,pady=2)
         _btn(ctrl,t("cfind.cecho"),self._do_cecho).pack(side="left",padx=2)
         _btn(ctrl,t("cfind.run"),self._do_cfind,style="Primary.TButton").pack(side="left",padx=4)
+        _btn(ctrl,t("cfind.export_csv"),self._export_csv).pack(side="left",padx=4)
+        self.count_lbl = _label(ctrl,"",style="Dim.TLabel"); self.count_lbl.pack(side="left",padx=12)
         mf = ttk.Frame(top); mf.pack(fill="x", pady=(6,0))
         _label(mf,t("cfind.cmove_dest")).pack(side="left")
         self.move_dest_var = tk.StringVar(value=self.app.config.get("local_ae",{}).get("ae_title","PACSADMIN"))
@@ -354,6 +356,7 @@ class CFindTab(ttk.Frame):
         ds = self._build_query_ds()
         if ds is None: self.log.append(t("cfind.pydicom_missing"),"err"); return
         self.tree.delete(*self.tree.get_children()); self._datasets.clear()
+        self.count_lbl.configure(text="")
         self.log.append(f"C-FIND -> {ae['ae_title']}@{ae['host']}:{ae['port']}")
         def run():
             try:
@@ -367,8 +370,19 @@ class CFindTab(ttk.Frame):
                         str(getattr(r,"StudyDate","")), str(getattr(r,"ModalitiesInStudy","")),
                         str(getattr(r,"AccessionNumber","")), str(getattr(r,"StudyDescription","")),
                         str(getattr(r,"StudyInstanceUID",""))))
+                self.count_lbl.configure(text=t("cfind.results_count", n=len(results)))
             except Exception as e: self.log.append(f"Error: {e}","err")
         threading.Thread(target=run, daemon=True).start()
+
+    def _export_csv(self):
+        if not self._datasets: messagebox.showinfo(t("cfind.export_csv"),t("cfind.no_results")); return
+        path = filedialog.asksaveasfilename(defaultextension=".csv",filetypes=[("CSV","*.csv")])
+        if not path: return
+        with open(path,"w",newline="",encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(["PatientID","PatientName","StudyDate","Modality","Accession","Description","StudyUID"])
+            for item in self.tree.get_children(): w.writerow(self.tree.item(item)["values"])
+        self.log.append(f"Exported to {path}")
 
     def _do_cmove(self):
         sel = self.tree.selection()

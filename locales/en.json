@@ -83,7 +83,10 @@
     "col_modality": "Modality",
     "col_accession": "Accession",
     "col_description": "Description",
-    "col_study_uid": "StudyUID"
+    "col_study_uid": "StudyUID",
+    "export_csv": "Export to CSV...",
+    "no_results": "No results to export.",
+    "results_count": "{n} result(s)"
   },
 
   "cstore": {
