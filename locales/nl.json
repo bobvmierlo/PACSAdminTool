@@ -83,7 +83,10 @@
     "col_modality": "Modaliteit",
     "col_accession": "Accession nr.",
     "col_description": "Beschrijving",
-    "col_study_uid": "OnderzoeksUID"
+    "col_study_uid": "OnderzoeksUID",
+    "export_csv": "Exporteren naar CSV...",
+    "no_results": "Geen resultaten om te exporteren.",
+    "results_count": "{n} resultaat/resultaten"
   },
 
   "cstore": {

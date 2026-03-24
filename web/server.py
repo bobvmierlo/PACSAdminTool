@@ -243,13 +243,91 @@ def get_config():
     return jsonify(config)
 
 
+# ---------------------------------------------------------------------------
+# Config schema: maps each allowed top-level key to its expected Python type.
+# Any key or value that does not match is rejected with HTTP 400.
+# ---------------------------------------------------------------------------
+_CONFIG_SCHEMA = {
+    "local_ae":      dict,
+    "remote_aes":    list,
+    "hl7":           dict,
+    "query_defaults": dict,
+    "log_level":     str,
+    "language":      str,
+}
+
+_LOG_LEVELS    = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+_MAX_AE_TITLE  = 16   # DICOM standard limit for AE titles
+_MAX_HOST_LEN  = 253  # RFC 1035 hostname max length
+
+
+def _validate_config_payload(data: dict) -> str | None:
+    """
+    Validate a config update payload against the allow-list schema.
+    Returns an error message string on failure, or None if valid.
+    """
+    if not isinstance(data, dict):
+        return "Payload must be a JSON object."
+    unknown = set(data.keys()) - set(_CONFIG_SCHEMA.keys())
+    if unknown:
+        return f"Unknown config key(s): {sorted(unknown)}"
+    for key, value in data.items():
+        expected = _CONFIG_SCHEMA[key]
+        if not isinstance(value, expected):
+            return f"'{key}' must be {expected.__name__}, got {type(value).__name__}."
+    # Fine-grained checks on individual fields
+    if "log_level" in data:
+        if data["log_level"].upper() not in _LOG_LEVELS:
+            return f"Invalid log_level '{data['log_level']}'. Must be one of {sorted(_LOG_LEVELS)}."
+    if "local_ae" in data:
+        ae = data["local_ae"]
+        if not isinstance(ae.get("ae_title", ""), str) or len(ae.get("ae_title", "")) > _MAX_AE_TITLE:
+            return f"local_ae.ae_title must be a string of at most {_MAX_AE_TITLE} characters."
+        if "port" in ae and not isinstance(ae["port"], int):
+            return "local_ae.port must be an integer."
+        if "port" in ae and not (1 <= ae["port"] <= 65535):
+            return "local_ae.port must be between 1 and 65535."
+    if "remote_aes" in data:
+        for i, ae in enumerate(data["remote_aes"]):
+            if not isinstance(ae, dict):
+                return f"remote_aes[{i}] must be an object."
+            for field in ("name", "host", "ae_title"):
+                if field in ae and not isinstance(ae[field], str):
+                    return f"remote_aes[{i}].{field} must be a string."
+            if "ae_title" in ae and len(ae["ae_title"]) > _MAX_AE_TITLE:
+                return f"remote_aes[{i}].ae_title exceeds {_MAX_AE_TITLE} characters."
+            if "host" in ae and len(ae["host"]) > _MAX_HOST_LEN:
+                return f"remote_aes[{i}].host exceeds {_MAX_HOST_LEN} characters."
+            if "port" in ae and not isinstance(ae["port"], int):
+                return f"remote_aes[{i}].port must be an integer."
+            if "port" in ae and not (1 <= ae["port"] <= 65535):
+                return f"remote_aes[{i}].port must be between 1 and 65535."
+    if "hl7" in data:
+        hl7 = data["hl7"]
+        for port_key in ("listen_port", "default_port"):
+            if port_key in hl7:
+                if not isinstance(hl7[port_key], int) or not (1 <= hl7[port_key] <= 65535):
+                    return f"hl7.{port_key} must be an integer between 1 and 65535."
+        if "default_host" in hl7 and (
+            not isinstance(hl7["default_host"], str) or len(hl7["default_host"]) > _MAX_HOST_LEN
+        ):
+            return f"hl7.default_host must be a string of at most {_MAX_HOST_LEN} characters."
+    return None
+
+
 @app.route("/api/config", methods=["POST"])
 def save_config_route():
     """
-    Receive updated config from the browser (as JSON in the request body)
-    and persist it to disk.
+    Receive updated config from the browser (as JSON in the request body),
+    validate it against the allow-list schema, and persist it to disk.
     """
-    data = request.get_json()
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({"ok": False, "error": "Request body must be valid JSON."}), 400
+    error = _validate_config_payload(data)
+    if error:
+        logger.warning("Config update rejected: %s", error)
+        return jsonify({"ok": False, "error": error}), 400
     logger.debug("Config update keys: %s", list(data.keys()))
     # Update only the keys the browser sent – don't wipe anything it didn't.
     config.update(data)
