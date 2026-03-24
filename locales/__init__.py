@@ -22,9 +22,18 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 
-LOCALES_DIR = Path(__file__).parent
+
+def _locales_dir() -> Path:
+    """Return the locales directory, handling PyInstaller one-file bundles."""
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS) / "locales"
+    return Path(__file__).parent
+
+
+LOCALES_DIR = _locales_dir()
 _current: dict = {}
 _lang: str = "en"
 

@@ -12,7 +12,12 @@ block_cipher = None
 pynetdicom_datas, pynetdicom_binaries, pynetdicom_hiddenimports = collect_all('pynetdicom')
 pydicom_datas, pydicom_binaries, pydicom_hiddenimports = collect_all('pydicom')
 
-all_datas     = pynetdicom_datas + pydicom_datas
+all_datas = (
+    pynetdicom_datas
+    + pydicom_datas
+    + [('locales/*.json',       'locales')]
+    + [('hl7_templates/*.hl7',  'hl7_templates')]
+)
 all_binaries  = pynetdicom_binaries + pydicom_binaries
 all_hidden    = (
     pynetdicom_hiddenimports
