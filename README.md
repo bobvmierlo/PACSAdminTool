@@ -1,6 +1,6 @@
 # PACS Admin Tool
 
-A portable, self-contained DICOM/HL7 workstation for PACS administrators.  
+A portable, self-contained DICOM/HL7 workstation for PACS administrators.
 **No installation required** — just run `PacsAdminTool.exe`.
 
 ---
@@ -15,7 +15,9 @@ A portable, self-contained DICOM/HL7 workstation for PACS administrators.
 | **Storage Commit** | Send N-ACTION storage commitment requests; receive N-EVENT-REPORT responses |
 | **IOCM** | Send Instance Availability Notifications (delete/change notifications) |
 | **HL7** | Send/receive HL7 v2 messages over MLLP; built-in templates for ORM, ORU, ADT, SIU, QBP |
-| **SCP Listener** | Embedded DICOM SCP — receive C-STORE and C-ECHO; auto-saves received DICOM files |
+| **DICOM Receiver** | Embedded DICOM SCP — receive C-STORE and C-ECHO; auto-saves received DICOM files |
+| **SR Viewer** | Parse and display any DICOM Structured Report in a human-readable format |
+| **KOS Creator** | Build a DICOM Key Object Selection document (XDS-I manifest) from existing DICOM files |
 | **Settings** | Manage local AE title/port, remote AE presets, HL7 defaults |
 
 ---
@@ -90,7 +92,7 @@ chmod +x build.sh
 Settings are saved to `~/.pacs_admin_tool/config.json` automatically.
 
 ### Remote AE Presets
-Add your PACS, RIS, and modality AE entries in the **Settings** tab.  
+Add your PACS, RIS, and modality AE entries in the **Settings** tab.
 They become available as a dropdown in every other tab.
 
 ---
@@ -125,10 +127,47 @@ They become available as a dropdown in every other tab.
 - Marks instances as UNAVAILABLE for delete notifications
 - Per PS3.4 Annex KK
 
-### SCP Listener
+### DICOM Receiver (SCP Listener)
 - Runs a DICOM SCP in the background
 - Accepts C-STORE (all common modalities) and C-ECHO
 - Saves received files to a configurable directory
+
+### SR Viewer
+Reads and displays any DICOM Structured Report in a readable, indented format.
+
+**Supported SR SOP classes:**
+- Basic Text SR, Enhanced SR, Comprehensive SR, Comprehensive 3D SR
+- X-Ray Radiation Dose SR, Patient Radiation Dose SR, Enhanced X-Ray Radiation Dose SR
+- Mammography CAD SR, Chest CAD SR, Colon CAD SR
+- Simplified Adult Echo SR
+- Acquisition Context SR, Implantation Plan SR
+- Key Object Selection (KOS)
+- And any other SR SOP class (generic fallback)
+
+**Supported content item types:** `CONTAINER`, `NUM` (with units), `TEXT`, `CODE`, `IMAGE`, `UIDREF`, `PNAME`, `DATE`, `TIME`, `DATETIME`, `SCOORD`, `SCOORD3D`, `TCOORD`, `COMPOSITE`, `WAVEFORM`
+
+The formatted report shows measurements with their units (mm, HU, mGy, mSv, %, bpm, …), nested containers with indented hierarchy, and referenced image UIDs. A "View Raw DICOM Tags" button opens the full tag list for deeper inspection.
+
+### KOS Creator
+Builds a DICOM **Key Object Selection** document (SOP `1.2.840.10008.5.1.4.1.1.88.59`) that can be used as an **XDS-I manifest** when publishing a study to an IHE XDS domain.
+
+**Workflow:**
+1. Load one or more DICOM files — the tool extracts patient, study, series, and instance metadata automatically.
+2. Review and edit the study/patient fields and the referenced instance list if needed.
+3. Choose a document title (Of Interest, For Referring Provider, XDS-I Manifest, etc.).
+4. Create & Save the KOS as a `.dcm` file, or Create & Send it directly via C-STORE.
+
+**Instance list format** (one line per instance, `#` lines are comments):
+```
+# SeriesUID | SOPClassUID | SOPInstanceUID
+1.2.3.4.5|1.2.840.10008.5.1.4.1.1.2|1.2.3.4.5.6.7
+```
+
+The generated KOS includes:
+- `ContentSequence` with IMAGE items and observer context
+- `CurrentRequestedProcedureEvidenceSequence` (required by DICOM PS3.3 C.17.6)
+- Proper file meta with Explicit VR Little Endian transfer syntax
+- All nine CID 7010 document titles, including `XDS-I Manifest (DCM:113500)`
 
 ---
 
@@ -170,6 +209,7 @@ The compiled `.exe` has **no runtime requirements**.
 |---------|-------------|
 | Local DICOM SCP | 11112 |
 | HL7 MLLP Listener | 2575 |
+| Web UI | 5000 |
 
 Configure in **Settings** tab or `~/.pacs_admin_tool/config.json`.
 
