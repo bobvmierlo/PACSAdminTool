@@ -20,6 +20,8 @@
     "iocm": "IOCM",
     "hl7": "HL7",
     "scp": "DICOM Receiver",
+    "sr_viewer": "SR Viewer",
+    "kos_creator": "KOS Creator",
     "settings": "Settings",
     "help": "Help",
     "about": "About"
@@ -280,6 +282,50 @@
     "github": "GitHub Repository  \u2197",
     "dicom_standard": "DICOM Standard (NEMA)  \u2197",
     "hl7_reference": "HL7 v2 Reference  \u2197"
+  },
+
+  "sr_viewer": {
+    "load_file": "Load DICOM SR File",
+    "select_file": "Select a DICOM Structured Report file",
+    "no_file": "No file selected. Use Browse to pick a DICOM SR file.",
+    "parse_btn": "Parse SR",
+    "view_tags": "View Raw DICOM Tags",
+    "report": "Parsed Report",
+    "parsed_ok": "Parsed successfully  ({n} content items)",
+    "no_parsed": "No parsed SR available. Parse a file first.",
+    "tags_title": "SR - All DICOM Tags"
+  },
+
+  "kos_creator": {
+    "load_files": "Load DICOM Files (extract study info)",
+    "no_files_loaded": "No files loaded.",
+    "files_loaded": "{n} file(s) loaded",
+    "select_files": "Select DICOM files to extract metadata from",
+    "extract_btn": "Extract Metadata",
+    "no_files_loaded_msg": "No DICOM files loaded. Use Browse to select files first.",
+    "extracting": "Extracting study metadata from files\u2026",
+    "extracted_ok": "Extracted: {n_series} series, {n_inst} instance(s)",
+    "study_info": "Study & Patient Information",
+    "study_uid": "Study UID:",
+    "patient_id": "Patient ID:",
+    "patient_name": "Patient Name:",
+    "accession": "Accession #:",
+    "study_date": "Study Date:",
+    "institution": "Institution:",
+    "instances": "Referenced Instances",
+    "instances_hint": "Format per line:  SeriesUID | SOPClassUID | SOPInstanceUID  (lines starting with # are ignored)",
+    "instances_fmt_comment": "# SeriesUID | SOPClassUID | SOPInstanceUID",
+    "options": "KOS Options",
+    "doc_title": "Document Title:",
+    "storage_scp": "Destination AE (for C-STORE Send)",
+    "create_save": "Create KOS & Save\u2026",
+    "create_send": "Create KOS & Send (C-STORE)",
+    "save_as": "Save KOS DICOM file",
+    "creating": "Creating KOS document\u2026",
+    "saved_ok": "KOS saved: {path}",
+    "col_series": "Series UID",
+    "col_sop_class": "SOP Class",
+    "col_sop_inst": "SOP Instance UID"
   },
 
   "dicom_detail": {

@@ -908,6 +908,192 @@ def scp_status():
 
 
 # ===========================================================================
+# API: DICOM SR Viewer  –  parse a DICOM Structured Report
+# ===========================================================================
+
+@app.route("/api/dicom/sr/read", methods=["POST"])
+def sr_read():
+    """
+    Accept a multipart-uploaded DICOM file, parse its SR content, and return
+    a JSON response containing the readable report text plus the flat content
+    item list and header metadata.
+
+    The browser can then display the report text directly and optionally render
+    the flat item list as a table.
+    """
+    if "file" not in request.files:
+        return jsonify({"ok": False, "error": "No file uploaded"}), 400
+
+    f = request.files["file"]
+    if not f.filename:
+        return jsonify({"ok": False, "error": "Empty filename"}), 400
+
+    try:
+        import pydicom
+        import io
+        from dicom.sr_reader import parse_sr, sr_to_text
+
+        data = f.read()
+        ds   = pydicom.dcmread(io.BytesIO(data))
+
+        parsed      = parse_sr(ds)
+        report_text = sr_to_text(parsed)
+
+        # Strip the dataset reference before returning (not JSON-serialisable)
+        return jsonify({
+            "ok":     True,
+            "meta":   parsed["meta"],
+            "title":  parsed["title"],
+            "flat":   parsed["flat"],
+            "text":   report_text,
+            "errors": parsed["errors"],
+        })
+    except Exception as e:
+        logger.exception("SR read error")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ===========================================================================
+# API: DICOM KOS Creator  –  create a Key Object Selection document
+# ===========================================================================
+
+@app.route("/api/dicom/kos/extract", methods=["POST"])
+def kos_extract():
+    """
+    Accept one or more uploaded DICOM files and extract the study / series /
+    instance information needed to fill the KOS creation form.
+    """
+    files = request.files.getlist("files")
+    if not files:
+        return jsonify({"ok": False, "error": "No files uploaded"}), 400
+
+    try:
+        import pydicom
+        import io
+        from dicom.kos_creator import extract_study_info_from_dicom
+
+        # Write uploaded bytes to BytesIO objects so pydicom can read them
+        # without touching the filesystem.
+        info: dict = {
+            "study_instance_uid": "",
+            "patient_id":         "",
+            "patient_name":       "",
+            "accession_number":   "",
+            "study_date":         "",
+            "study_description":  "",
+            "institution_name":   "",
+            "series":             {},
+            "errors":             [],
+        }
+
+        for f in files:
+            try:
+                ds = pydicom.dcmread(io.BytesIO(f.read()))
+                if not info["study_instance_uid"]:
+                    info["study_instance_uid"] = _safe_str(getattr(ds, "StudyInstanceUID", ""))
+                    info["patient_id"]         = _safe_str(getattr(ds, "PatientID", ""))
+                    info["patient_name"]       = _safe_str(getattr(ds, "PatientName", ""))
+                    info["accession_number"]   = _safe_str(getattr(ds, "AccessionNumber", ""))
+                    info["study_date"]         = _safe_str(getattr(ds, "StudyDate", ""))
+                    info["study_description"]  = _safe_str(getattr(ds, "StudyDescription", ""))
+                    info["institution_name"]   = _safe_str(getattr(ds, "InstitutionName", ""))
+                series_uid    = _safe_str(getattr(ds, "SeriesInstanceUID", ""))
+                sop_inst_uid  = _safe_str(getattr(ds, "SOPInstanceUID", ""))
+                sop_class_uid = _safe_str(getattr(ds, "SOPClassUID", ""))
+                if series_uid and sop_inst_uid:
+                    if series_uid not in info["series"]:
+                        info["series"][series_uid] = {"instances": []}
+                    info["series"][series_uid]["instances"].append(
+                        {"sop_instance_uid": sop_inst_uid, "sop_class_uid": sop_class_uid}
+                    )
+            except Exception as e:
+                info["errors"].append(f"{f.filename}: {e}")
+
+        return jsonify({"ok": True, **info})
+    except Exception as e:
+        logger.exception("KOS extract error")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/dicom/kos/create", methods=["POST"])
+def kos_create():
+    """
+    Build a KOS DICOM object from the posted JSON parameters and return it
+    as a downloadable .dcm file.
+
+    Expected JSON body::
+
+        {
+          "study_instance_uid": "…",
+          "patient_id":         "…",
+          "patient_name":       "…",
+          "accession_number":   "…",
+          "study_date":         "…",
+          "study_description":  "…",
+          "institution_name":   "…",
+          "doc_title_key":      "of_interest",   // key from KO_DOCUMENT_TITLES
+          "referenced_series": [
+            {
+              "series_uid": "…",
+              "instances":  [{"sop_instance_uid": "…", "sop_class_uid": "…"}, …]
+            }
+          ]
+        }
+    """
+    import io
+    from flask import send_file
+
+    body = request.get_json(force=True) or {}
+
+    study_uid    = body.get("study_instance_uid", "").strip()
+    patient_id   = body.get("patient_id", "").strip()
+    patient_name = body.get("patient_name", "").strip()
+    accession    = body.get("accession_number", "").strip()
+    study_date   = body.get("study_date", "").strip()
+    refs         = body.get("referenced_series", [])
+    doc_key      = body.get("doc_title_key", "of_interest")
+
+    if not study_uid:
+        return jsonify({"ok": False, "error": "study_instance_uid is required"}), 400
+    if not refs:
+        return jsonify({"ok": False, "error": "referenced_series must not be empty"}), 400
+
+    try:
+        from dicom.kos_creator import create_kos
+
+        ds = create_kos(
+            study_instance_uid = study_uid,
+            patient_id         = patient_id,
+            patient_name       = patient_name,
+            accession_number   = accession,
+            study_date         = study_date,
+            referenced_series  = refs,
+            study_description  = body.get("study_description", ""),
+            institution_name   = body.get("institution_name", ""),
+            doc_title_key      = doc_key,
+            local_ae_title     = _local_ae(),
+        )
+
+        buf = io.BytesIO()
+        try:
+            ds.save_as(buf, enforce_file_format=True)
+        except TypeError:
+            ds.save_as(buf, write_like_original=False)
+        buf.seek(0)
+
+        filename = f"KOS_{study_uid[-12:].replace('.', '_')}.dcm"
+        return send_file(
+            buf,
+            mimetype="application/octet-stream",
+            as_attachment=True,
+            download_name=filename,
+        )
+    except Exception as e:
+        logger.exception("KOS create error")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ===========================================================================
 # WebSocket events
 # ===========================================================================
 
