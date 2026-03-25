@@ -264,7 +264,18 @@
   "help": {
     "topics": "Topics",
     "official_docs": "Official Documentation:",
-    "official_docs_web": "Official Documentation"
+    "official_docs_web": "Official Documentation",
+    "section_cfind": "C-FIND / Query-Retrieve",
+    "section_cstore": "C-STORE (Send Files)",
+    "section_dmwl": "DMWL - Modality Worklist",
+    "section_commit": "Storage Commitment",
+    "section_iocm": "IOCM - Instance Availability",
+    "section_hl7_send": "HL7 - Send",
+    "section_hl7_recv": "HL7 - Receive",
+    "section_receiver": "DICOM Storage Listener",
+    "section_settings": "Settings",
+    "section_sr_viewer": "SR Viewer",
+    "section_kos_creator": "KOS Creator"
   },
 
   "about": {

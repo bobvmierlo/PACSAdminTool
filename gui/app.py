@@ -1384,7 +1384,7 @@ class SettingsTab(ttk.Frame):
 
 class HelpTab(ttk.Frame):
     SECTIONS = [
-        ("C-FIND / Query-Retrieve",
+        ("help.section_cfind",
          "Query a remote PACS for patients and studies using the DICOM Query/Retrieve service.\n\n"
          "─── Buttons ───────────────────────────────────────────────\n"
          "C-ECHO (Ping)      Verifies the remote AE is reachable and responding.\n"
@@ -1434,7 +1434,7 @@ class HelpTab(ttk.Frame):
           ("PS3.4 Table C.6-1 – Study Root Attributes", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#table_C.6-1"),
           ("PS3.4 Table C.6-2 – Patient Root Attributes", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#table_C.6-2")]),
 
-        ("C-STORE (Send Files)",
+        ("help.section_cstore",
          "Send DICOM files from disk to a remote Storage SCP using the C-STORE service.\n\n"
          "─── Workflow ───────────────────────────────────────────────\n"
          "1. Set the destination AE Title, Host, and Port.\n"
@@ -1449,7 +1449,7 @@ class HelpTab(ttk.Frame):
          "• Use the DICOM Receiver tab to run a local SCP that accepts incoming files.",
          [("DICOM PS3.4 §B – Storage Service Class (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_B")]),
 
-        ("DMWL - Modality Worklist",
+        ("help.section_dmwl",
          "Query a Modality Worklist SCP for scheduled procedures.\n\n"
          "─── What is a Modality Worklist? ───────────────────────────\n"
          "The Modality Worklist (DMWL) service allows a modality (e.g. CT scanner) to\n"
@@ -1470,7 +1470,7 @@ class HelpTab(ttk.Frame):
          "• If you get 0 results but expect items, check the Station AET filter.",
          [("DICOM PS3.4 §K – Modality Worklist Management (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_K")]),
 
-        ("Storage Commitment",
+        ("help.section_commit",
          "Verify that a remote PACS has permanently and safely stored a set of DICOM instances.\n\n"
          "─── How it works ───────────────────────────────────────────\n"
          "1. Load SOP Instance UIDs from DICOM files on disk.\n"
@@ -1488,7 +1488,7 @@ class HelpTab(ttk.Frame):
          "the event minutes later or on a different port.",
          [("DICOM PS3.4 §J – Storage Commitment Service Class (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_J")]),
 
-        ("IOCM - Instance Availability",
+        ("help.section_iocm",
          "Send an Instance Availability Notification (N-CREATE) to a remote SCP.\n\n"
          "─── What is IOCM? ──────────────────────────────────────────\n"
          "IOCM (Instance Order Change Management) is used in deletion and\n"
@@ -1507,7 +1507,7 @@ class HelpTab(ttk.Frame):
          "a PACS to remove valid index entries.",
          [("DICOM PS3.4 §KK – Instance Availability Notification (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_KK")]),
 
-        ("HL7 - Send",
+        ("help.section_hl7_send",
          "Send HL7 v2 messages to a remote MLLP listener.\n\n"
          "─── Workflow ───────────────────────────────────────────────\n"
          "1. Set Host and Port of the destination MLLP server.\n"
@@ -1542,7 +1542,7 @@ class HelpTab(ttk.Frame):
           ("QBP^Q22 – Patient Demographics Query (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/QBP_Q22"),
           ("OML^O21 – Lab Order (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/OML_O21")]),
 
-        ("HL7 - Receive",
+        ("help.section_hl7_recv",
          "Run a minimal MLLP listener that accepts incoming HL7 v2 messages.\n\n"
          "─── What it does ───────────────────────────────────────────\n"
          "Listens on the specified TCP port for MLLP connections.\n"
@@ -1561,7 +1561,7 @@ class HelpTab(ttk.Frame):
          [("HL7 v2.4 Message Definitions (Caristix)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents"),
           ("MLLP Transport Specification (HL7 TN)", "https://www.hl7.org/documentcenter/public/wg/inm/mllp_transport_specification.PDF")]),
 
-        ("DICOM Storage Listener",
+        ("help.section_receiver",
          "Runs a C-STORE SCP that accepts incoming DICOM objects and saves them to disk.\n\n"
          "─── Configuration ───────────────────────────────────────────\n"
          "  AE Title    What this listener calls itself. Must match the sending device's\n"
@@ -1580,7 +1580,7 @@ class HelpTab(ttk.Frame):
          "• Use C-STORE tab to test-send files back to confirm round-trip storage.",
          [("DICOM PS3.4 §B – Storage Service Class (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_B")]),
 
-        ("Settings",
+        ("help.section_settings",
          "Configure how this tool identifies itself on the network.\n\n"
          "─── Local AE Configuration ──────────────────────────────────\n"
          "  AE Title    The Application Entity title this tool uses when connecting to\n"
@@ -1602,6 +1602,56 @@ class HelpTab(ttk.Frame):
          "The web server writes to:      logs/pacs_admin.log\n"
          "Both rotate at UTC midnight and are kept for 7 days.",
          []),
+
+        ("help.section_sr_viewer",
+         "Parse and display DICOM Structured Report (SR) files.\n\n"
+         "─── What is a DICOM SR? ─────────────────────────────────────\n"
+         "A Structured Report is a DICOM object that encodes clinical findings,\n"
+         "measurements, and observations in a standardised hierarchical structure.\n"
+         "Common examples: radiology reports, radiation dose reports, CAD results.\n\n"
+         "─── Workflow ───────────────────────────────────────────────\n"
+         "1. Click Browse — select a .dcm file that contains a Structured Report.\n"
+         "2. Click Parse SR to parse and display the report content.\n"
+         "3. Optionally click View Raw DICOM Tags to inspect all DICOM attributes.\n\n"
+         "─── Supported SR SOP Classes ───────────────────────────────\n"
+         "Basic Text SR · Enhanced SR · Comprehensive SR · Comprehensive 3D SR\n"
+         "X-Ray Radiation Dose SR · Mammography CAD SR · Chest CAD SR · and others.\n\n"
+         "─── Tips ───────────────────────────────────────────────────\n"
+         "• The parsed view renders the SR content tree in human-readable form.\n"
+         "• Supported value types: TEXT, CODE, NUM, DATE, IMAGE, SCOORD, and more.\n"
+         "• Use View Raw DICOM Tags for low-level debugging of the SR dataset.",
+         [("DICOM PS3.3 §C.17 – Structured Reporting IODs (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#chapter_C"),
+          ("DICOM PS3.3 §A.35 – SR Document Storage SOP Classes (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.35")]),
+
+        ("help.section_kos_creator",
+         "Create a DICOM Key Object Selection (KOS) document referencing a set of instances.\n\n"
+         "─── What is a KOS? ─────────────────────────────────────────\n"
+         "A Key Object Selection document is a DICOM SR object that acts as a manifest,\n"
+         "pointing to a chosen subset of images or other instances within a study.\n"
+         "Use cases: teaching files, relevant priors, XDS-I manifests, surgery planning sets.\n\n"
+         "─── Workflow ───────────────────────────────────────────────\n"
+         "1. Click Browse to load one or more DICOM files from the study.\n"
+         "2. Click Extract Metadata to auto-fill the Study & Patient fields.\n"
+         "3. Review or edit the Study fields and the Referenced Instances list.\n"
+         "4. Choose a Document Title from the dropdown.\n"
+         "5. Click Create KOS & Save to write the KOS to a .dcm file, or\n"
+         "   Create KOS & Send (C-STORE) to store it directly on a PACS.\n\n"
+         "─── Referenced Instances format ────────────────────────────\n"
+         "Each line in the instances box must follow this format:\n"
+         "  SeriesUID | SOPClassUID | SOPInstanceUID\n"
+         "Lines starting with # are treated as comments and ignored.\n\n"
+         "─── Document Title codes ───────────────────────────────────\n"
+         "  Of Interest           General key image selection.\n"
+         "  Best In Set           Best single representative image.\n"
+         "  For Referring         Selected images for the referring physician.\n"
+         "  For Surgery           Pre-operative image selection.\n"
+         "  For Teaching          Teaching file selection.\n"
+         "  For Conference        Conference presentation selection.\n"
+         "  For Therapy           Therapy planning image selection.\n"
+         "  For Research          Research or trial image selection.\n"
+         "  XDS-I Manifest        IHE Cross-Enterprise Document Sharing manifest.",
+         [("DICOM PS3.3 §C.17.6 – Key Object Selection Document IOD (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_C.17.6"),
+          ("IHE RAD TF Vol. 1 – XDS-I.b Integration Profile (IHE)", "https://www.ihe.net/uploadedFiles/Documents/Radiology/IHE_RAD_TF_Vol1.pdf")]),
     ]
 
     def __init__(self, parent, app):
@@ -1612,11 +1662,11 @@ class HelpTab(ttk.Frame):
         left = ttk.Frame(outer); left.pack(side="left",fill="y",padx=(0,10))
         _label(left,t("help.topics"),style="H1.TLabel").pack(anchor="w",pady=(0,6))
         self.topic_lb = tk.Listbox(left,bg="white",fg="#1a1a1a",selectbackground="#dbeafe",selectforeground="#1e3a5f",font=FONT,relief="solid",bd=1,activestyle="none",width=28)
-        for title, *_ in self.SECTIONS: self.topic_lb.insert("end","  "+title)
+        for key, *_ in self.SECTIONS: self.topic_lb.insert("end","  "+t(key))
         self.topic_lb.pack(fill="y",expand=True)
         self.topic_lb.bind("<<ListboxSelect>>",self._show_section); self.topic_lb.selection_set(0)
         right = ttk.Frame(outer); right.pack(side="left",fill="both",expand=True)
-        self.title_lbl = _label(right,self.SECTIONS[0][0],style="H1.TLabel"); self.title_lbl.pack(anchor="w",pady=(0,8))
+        self.title_lbl = _label(right,t(self.SECTIONS[0][0]),style="H1.TLabel"); self.title_lbl.pack(anchor="w",pady=(0,8))
         _sep(right).pack(fill="x",pady=(0,8))
         self.text = tk.Text(right,bg="white",fg="#1a1a1a",font=FONT,wrap="word",relief="solid",bd=1,state="disabled",padx=10,pady=8,spacing1=2,spacing2=2)
         self.text.tag_configure("refs_label", foreground="#555555", font=(FONT[0], FONT[1], "bold"))
@@ -1628,7 +1678,7 @@ class HelpTab(ttk.Frame):
 
     def _show_section(self,_=None):
         sel = self.topic_lb.curselection(); idx = sel[0] if sel else 0
-        title, content, links = self.SECTIONS[idx]; self.title_lbl.configure(text=title)
+        key, content, links = self.SECTIONS[idx]; self.title_lbl.configure(text=t(key))
         self.text.configure(state="normal"); self.text.delete("1.0","end")
         self.text.insert("1.0", content.strip())
         if links:
