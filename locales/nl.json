@@ -264,7 +264,18 @@
   "help": {
     "topics": "Onderwerpen",
     "official_docs": "Officiële documentatie:",
-    "official_docs_web": "Officiële documentatie"
+    "official_docs_web": "Officiële documentatie",
+    "section_cfind": "C-FIND / Opvragen",
+    "section_cstore": "C-STORE (Bestanden verzenden)",
+    "section_dmwl": "DMWL - Modaliteitswerklist",
+    "section_commit": "Opslagcommitment",
+    "section_iocm": "IOCM - Instantiebeschikbaarheid",
+    "section_hl7_send": "HL7 - Verzenden",
+    "section_hl7_recv": "HL7 - Ontvangen",
+    "section_receiver": "DICOM Opslaagreceiver",
+    "section_settings": "Instellingen",
+    "section_sr_viewer": "SR-viewer",
+    "section_kos_creator": "KOS-aanmaker"
   },
 
   "about": {
