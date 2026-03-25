@@ -20,6 +20,8 @@
     "iocm": "IOCM",
     "hl7": "HL7",
     "scp": "DICOM Ontvanger",
+    "sr_viewer": "SR Viewer",
+    "kos_creator": "KOS Maker",
     "settings": "Instellingen",
     "help": "Help",
     "about": "Over"
@@ -280,6 +282,50 @@
     "github": "GitHub Repository  \u2197",
     "dicom_standard": "DICOM Standaard (NEMA)  \u2197",
     "hl7_reference": "HL7 v2 Referentie  \u2197"
+  },
+
+  "sr_viewer": {
+    "load_file": "DICOM SR-bestand laden",
+    "select_file": "Selecteer een DICOM Structured Report-bestand",
+    "no_file": "Geen bestand geselecteerd. Gebruik Bladeren om een DICOM SR-bestand te kiezen.",
+    "parse_btn": "SR Verwerken",
+    "view_tags": "Ruwe DICOM-tags bekijken",
+    "report": "Verwerkt Rapport",
+    "parsed_ok": "Succesvol verwerkt  ({n} inhoudsitems)",
+    "no_parsed": "Geen verwerkt SR beschikbaar. Verwerk eerst een bestand.",
+    "tags_title": "SR - Alle DICOM-tags"
+  },
+
+  "kos_creator": {
+    "load_files": "DICOM-bestanden laden (studie-informatie extraheren)",
+    "no_files_loaded": "Geen bestanden geladen.",
+    "files_loaded": "{n} bestand(en) geladen",
+    "select_files": "Selecteer DICOM-bestanden om metadata uit te extraheren",
+    "extract_btn": "Metadata extraheren",
+    "no_files_loaded_msg": "Geen DICOM-bestanden geladen. Gebruik Bladeren om bestanden te selecteren.",
+    "extracting": "Studie-metadata extraheren uit bestanden\u2026",
+    "extracted_ok": "Geëxtraheerd: {n_series} series, {n_inst} instantie(s)",
+    "study_info": "Studie- en patiëntinformatie",
+    "study_uid": "Studie-UID:",
+    "patient_id": "Patiënt-ID:",
+    "patient_name": "Patiëntnaam:",
+    "accession": "Accessionsnummer:",
+    "study_date": "Studiedatum:",
+    "institution": "Instelling:",
+    "instances": "Gerefereerde instanties",
+    "instances_hint": "Formaat per regel:  SeriesUID | SOPClassUID | SOPInstanceUID  (regels met # worden genegeerd)",
+    "instances_fmt_comment": "# SeriesUID | SOPClassUID | SOPInstanceUID",
+    "options": "KOS-opties",
+    "doc_title": "Documenttitel:",
+    "storage_scp": "Doel-AE (voor C-STORE verzenden)",
+    "create_save": "KOS aanmaken & opslaan\u2026",
+    "create_send": "KOS aanmaken & verzenden (C-STORE)",
+    "save_as": "KOS DICOM-bestand opslaan",
+    "creating": "KOS-document aanmaken\u2026",
+    "saved_ok": "KOS opgeslagen: {path}",
+    "col_series": "Series-UID",
+    "col_sop_class": "SOP-klasse",
+    "col_sop_inst": "SOP-instantie-UID"
   },
 
   "dicom_detail": {

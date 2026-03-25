@@ -957,6 +957,343 @@ class SCPListenerTab(ttk.Frame):
         self.recv_listbox.insert("end",path); self.recv_listbox.see("end")
 
 
+# ---------------------------------------------------------------------------
+#  SR Viewer Tab  –  parse and display DICOM Structured Reports
+# ---------------------------------------------------------------------------
+class SRViewerTab(ttk.Frame):
+    def __init__(self, parent, app):
+        super().__init__(parent); self.app = app
+        self._current_dataset = None
+        self._build()
+
+    def _build(self):
+        # ── Top: file picker ───────────────────────────────────────────────
+        top = ttk.Frame(self); top.pack(fill="x", padx=10, pady=8)
+        lf_load = _lf(top, t("sr_viewer.load_file")); lf_load.pack(fill="x")
+        row = ttk.Frame(lf_load); row.pack(fill="x")
+        self.file_var = tk.StringVar()
+        _entry(row, textvariable=self.file_var, width=60).pack(side="left", fill="x", expand=True, padx=(0, 6))
+        _btn(row, t("common.browse"), self._browse_file).pack(side="left")
+        ctrl = ttk.Frame(lf_load); ctrl.pack(fill="x", pady=(6, 0))
+        _btn(ctrl, t("sr_viewer.parse_btn"), self._parse_sr, style="Primary.TButton").pack(side="left")
+        _btn(ctrl, t("sr_viewer.view_tags"), self._view_raw_tags).pack(side="left", padx=(6, 0))
+        self.meta_lbl = _label(ctrl, "", style="Dim.TLabel"); self.meta_lbl.pack(side="left", padx=12)
+
+        # ── Bottom: paned view – SR report text + log ─────────────────────
+        pw = ttk.PanedWindow(self, orient="vertical")
+        pw.pack(fill="both", expand=True, padx=10, pady=(0, 6))
+
+        rf = _lf(pw, t("sr_viewer.report")); pw.add(rf, weight=4)
+        self.sr_text = tk.Text(
+            rf, bg="white", fg="#1a1a1a", font=FONT_MONO,
+            relief="solid", bd=1, state="disabled", wrap="word",
+            height=22,
+        )
+        sb_v = ttk.Scrollbar(rf, orient="vertical",   command=self.sr_text.yview)
+        sb_h = ttk.Scrollbar(rf, orient="horizontal", command=self.sr_text.xview)
+        self.sr_text.configure(yscrollcommand=sb_v.set, xscrollcommand=sb_h.set)
+        self.sr_text.grid(row=0, column=0, sticky="nsew")
+        sb_v.grid(row=0, column=1, sticky="ns")
+        sb_h.grid(row=1, column=0, sticky="ew")
+        rf.rowconfigure(0, weight=1); rf.columnconfigure(0, weight=1)
+
+        lf_log, self.log = _log_frame(pw, height=4); pw.add(lf_log, weight=1)
+
+    def _browse_file(self):
+        path = filedialog.askopenfilename(
+            title=t("sr_viewer.select_file"),
+            filetypes=[("DICOM", "*.dcm *.DCM"), ("All files", "*.*")],
+        )
+        if path:
+            self.file_var.set(path)
+
+    def _parse_sr(self):
+        path = self.file_var.get().strip()
+        if not path:
+            messagebox.showwarning(t("sr_viewer.parse_btn"), t("sr_viewer.no_file"))
+            return
+        self.log.append(f"Parsing: {os.path.basename(path)}")
+        self._current_dataset = None
+        self.meta_lbl.configure(text="")
+
+        def run():
+            try:
+                import pydicom
+                from dicom.sr_reader import parse_sr, sr_to_text
+                ds = pydicom.dcmread(path)
+                self._current_dataset = ds
+                parsed = parse_sr(ds)
+                report_text = sr_to_text(parsed)
+                meta = parsed.get("meta", {})
+                label = (
+                    f"{meta.get('SOPClassName','')}"
+                    f"  |  {meta.get('PatientName','')} [{meta.get('PatientID','')}]"
+                    f"  |  {meta.get('StudyDate','')}"
+                )
+                self.sr_text.configure(state="normal")
+                self.sr_text.delete("1.0", "end")
+                self.sr_text.insert("end", report_text)
+                self.sr_text.configure(state="disabled")
+                self.meta_lbl.configure(text=label)
+                n = len(parsed.get("flat", []))
+                self.log.append(t("sr_viewer.parsed_ok", n=n), "ok")
+            except Exception as e:
+                self.log.append(f"Error: {e}", "err")
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def _view_raw_tags(self):
+        if self._current_dataset is None:
+            messagebox.showinfo(t("sr_viewer.view_tags"), t("sr_viewer.no_parsed"))
+            return
+        _show_dicom_detail(self, self._current_dataset, title=t("sr_viewer.tags_title"))
+
+
+# ---------------------------------------------------------------------------
+#  KOS Creator Tab  –  build a Key Object Selection DICOM document
+# ---------------------------------------------------------------------------
+class KOSCreatorTab(ttk.Frame):
+    def __init__(self, parent, app):
+        super().__init__(parent); self.app = app
+        self._loaded_files: list = []
+        self._build()
+
+    def _build(self):
+        outer = ttk.Frame(self); outer.pack(fill="both", expand=True)
+
+        # ── Left column: form ──────────────────────────────────────────────
+        canvas = tk.Canvas(outer, bg="#f5f5f5", highlightthickness=0)
+        vsb    = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        inner = ttk.Frame(canvas)
+        win_id = canvas.create_window((0, 0), window=inner, anchor="nw")
+
+        def _on_configure(e):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            canvas.itemconfig(win_id, width=canvas.winfo_width())
+        inner.bind("<Configure>", _on_configure)
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(win_id, width=e.width))
+
+        # ── Load from DICOM files ─────────────────────────────────────────
+        lf_load = _lf(inner, t("kos_creator.load_files")); lf_load.pack(fill="x", padx=10, pady=8)
+        row = ttk.Frame(lf_load); row.pack(fill="x")
+        self.file_count_lbl = _label(row, t("kos_creator.no_files_loaded"), style="Dim.TLabel")
+        self.file_count_lbl.pack(side="left")
+        _btn(row, t("common.browse"), self._browse_dicom_files).pack(side="right")
+        _btn(row, t("kos_creator.extract_btn"), self._extract_from_files,
+             style="Primary.TButton").pack(side="right", padx=(0, 4))
+
+        # ── Study / Patient info ──────────────────────────────────────────
+        lf_study = _lf(inner, t("kos_creator.study_info")); lf_study.pack(fill="x", padx=10, pady=(0, 4))
+        for i, (lbl, attr, val, w) in enumerate([
+            (t("kos_creator.study_uid"),    "study_uid_var",  "",         48),
+            (t("kos_creator.patient_id"),   "pat_id_var",     "",         20),
+            (t("kos_creator.patient_name"), "pat_name_var",   "",         24),
+            (t("kos_creator.accession"),    "accession_var",  "",         20),
+            (t("kos_creator.study_date"),   "study_date_var", "",         12),
+            (t("kos_creator.institution"),  "institution_var","",         24),
+        ]):
+            r, c = divmod(i, 2)
+            fr = ttk.Frame(lf_study); fr.grid(row=r, column=c, sticky="w", padx=8, pady=3)
+            _label(fr, lbl).pack(side="left")
+            var = tk.StringVar(value=val); setattr(self, attr, var)
+            _entry(fr, textvariable=var, width=w).pack(side="left", padx=4)
+
+        # ── Referenced instances ──────────────────────────────────────────
+        lf_inst = _lf(inner, t("kos_creator.instances")); lf_inst.pack(fill="x", padx=10, pady=(0, 4))
+        _label(lf_inst, t("kos_creator.instances_hint"), style="Dim.TLabel").pack(anchor="w")
+        self.inst_text = tk.Text(
+            lf_inst, height=8, font=FONT_MONO, bg="white", fg="#1a1a1a",
+            relief="solid", bd=1, wrap="none",
+        )
+        inst_vsb = ttk.Scrollbar(lf_inst, orient="vertical", command=self.inst_text.yview)
+        inst_hsb = ttk.Scrollbar(lf_inst, orient="horizontal", command=self.inst_text.xview)
+        self.inst_text.configure(yscrollcommand=inst_vsb.set, xscrollcommand=inst_hsb.set)
+        self.inst_text.grid(row=1, column=0, sticky="nsew", pady=(4, 0))
+        inst_vsb.grid(row=1, column=1, sticky="ns")
+        inst_hsb.grid(row=2, column=0, sticky="ew")
+        lf_inst.columnconfigure(0, weight=1)
+
+        # ── KOS options ───────────────────────────────────────────────────
+        lf_opt = _lf(inner, t("kos_creator.options")); lf_opt.pack(fill="x", padx=10, pady=(0, 4))
+        opt_row = ttk.Frame(lf_opt); opt_row.pack(fill="x")
+        _label(opt_row, t("kos_creator.doc_title")).pack(side="left")
+        from dicom.kos_creator import KO_DOCUMENT_TITLES
+        self.title_var = tk.StringVar(value="of_interest")
+        title_cb = ttk.Combobox(
+            opt_row, textvariable=self.title_var,
+            values=list(KO_DOCUMENT_TITLES.keys()),
+            state="readonly", width=20,
+        )
+        title_cb.pack(side="left", padx=(4, 16))
+
+        # ── Action buttons ────────────────────────────────────────────────
+        lf_act = ttk.Frame(inner); lf_act.pack(fill="x", padx=10, pady=(0, 4))
+        _btn(lf_act, t("kos_creator.create_save"), self._create_kos, style="Primary.TButton").pack(side="left")
+        _btn(lf_act, t("kos_creator.create_send"), self._create_and_send, style="Success.TButton").pack(side="left", padx=(8, 0))
+
+        # ── AE selector (for C-STORE) ─────────────────────────────────────
+        self.ae_sel = AESelector(inner, self.app.config, t("kos_creator.storage_scp"))
+        self.ae_sel.pack(fill="x", padx=10, pady=(0, 4))
+
+        # ── Log ───────────────────────────────────────────────────────────
+        lf_log, self.log = _log_frame(inner, height=5); lf_log.pack(fill="x", padx=10, pady=(0, 8))
+
+    # ── Actions ───────────────────────────────────────────────────────────
+
+    def _browse_dicom_files(self):
+        files = filedialog.askopenfilenames(
+            title=t("kos_creator.select_files"),
+            filetypes=[("DICOM", "*.dcm *.DCM"), ("All files", "*.*")],
+        )
+        if files:
+            self._loaded_files = list(files)
+            self.file_count_lbl.configure(
+                text=t("kos_creator.files_loaded", n=len(self._loaded_files))
+            )
+
+    def _extract_from_files(self):
+        if not self._loaded_files:
+            messagebox.showwarning(t("kos_creator.extract_btn"), t("kos_creator.no_files_loaded_msg"))
+            return
+        self.log.append(t("kos_creator.extracting"))
+
+        def run():
+            try:
+                from dicom.kos_creator import extract_study_info_from_dicom
+                info = extract_study_info_from_dicom(self._loaded_files)
+                self.study_uid_var.set(info.get("study_instance_uid", ""))
+                self.pat_id_var.set(info.get("patient_id", ""))
+                self.pat_name_var.set(info.get("patient_name", ""))
+                self.accession_var.set(info.get("accession_number", ""))
+                self.study_date_var.set(info.get("study_date", ""))
+                self.institution_var.set(info.get("institution_name", ""))
+                # Populate instances textarea
+                lines = [t("kos_creator.instances_fmt_comment")]
+                for series_uid, series_data in info.get("series", {}).items():
+                    for inst in series_data.get("instances", []):
+                        lines.append(
+                            f"{series_uid}|{inst['sop_class_uid']}|{inst['sop_instance_uid']}"
+                        )
+                self.inst_text.delete("1.0", "end")
+                self.inst_text.insert("end", "\n".join(lines))
+                n_inst = sum(len(s["instances"]) for s in info.get("series", {}).values())
+                self.log.append(
+                    t("kos_creator.extracted_ok",
+                      n_series=len(info.get("series", {})), n_inst=n_inst), "ok"
+                )
+                for err in info.get("errors", []):
+                    self.log.append(f"Warning: {err}", "warn")
+            except Exception as e:
+                self.log.append(f"Error: {e}", "err")
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def _build_referenced_series(self):
+        """Parse the instances textarea into a referenced_series list."""
+        text = self.inst_text.get("1.0", "end").strip()
+        series_map: dict = {}
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = [p.strip() for p in line.split("|")]
+            if len(parts) == 3:
+                series_uid, sop_class_uid, sop_inst_uid = parts
+            elif len(parts) == 2:
+                series_uid, sop_inst_uid = parts
+                sop_class_uid = "1.2.840.10008.5.1.4.1.1.2"
+            else:
+                continue
+            if series_uid not in series_map:
+                series_map[series_uid] = []
+            series_map[series_uid].append(
+                {"sop_instance_uid": sop_inst_uid, "sop_class_uid": sop_class_uid}
+            )
+        return [
+            {"series_uid": s_uid, "instances": insts}
+            for s_uid, insts in series_map.items()
+        ]
+
+    def _create_kos_dataset(self):
+        from dicom.kos_creator import create_kos
+        refs = self._build_referenced_series()
+        return create_kos(
+            study_instance_uid = self.study_uid_var.get().strip(),
+            patient_id         = self.pat_id_var.get().strip(),
+            patient_name       = self.pat_name_var.get().strip(),
+            accession_number   = self.accession_var.get().strip(),
+            study_date         = self.study_date_var.get().strip(),
+            referenced_series  = refs,
+            study_description  = "",
+            institution_name   = self.institution_var.get().strip(),
+            doc_title_key      = self.title_var.get(),
+            local_ae_title     = self.app.local_ae.get("ae_title", "PACSADMIN"),
+        )
+
+    def _create_kos(self):
+        path = filedialog.asksaveasfilename(
+            title=t("kos_creator.save_as"),
+            defaultextension=".dcm",
+            filetypes=[("DICOM KOS", "*.dcm"), ("All files", "*.*")],
+            initialfile="KOS.dcm",
+        )
+        if not path:
+            return
+        self.log.append(t("kos_creator.creating"))
+
+        def run():
+            try:
+                ds = self._create_kos_dataset()
+                try:
+                    ds.save_as(path, enforce_file_format=True)
+                except TypeError:
+                    ds.save_as(path, write_like_original=False)
+                self.log.append(t("kos_creator.saved_ok", path=path), "ok")
+            except Exception as e:
+                self.log.append(f"Error: {e}", "err")
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def _create_and_send(self):
+        ae = self.ae_sel.get()
+        local = self.app.local_ae
+        self.log.append(
+            f"Creating KOS and sending to {ae['ae_title']}@{ae['host']}:{ae['port']}"
+        )
+
+        def run():
+            try:
+                import tempfile, os as _os
+                ds = self._create_kos_dataset()
+                with tempfile.NamedTemporaryFile(suffix=".dcm", delete=False) as f:
+                    tmp_path = f.name
+                try:
+                    ds.save_as(tmp_path, enforce_file_format=True)
+                except TypeError:
+                    ds.save_as(tmp_path, write_like_original=False)
+                from dicom.operations import c_store
+                ok, msg = c_store(
+                    local["ae_title"] if isinstance(local, dict) else local,
+                    ae["host"], ae["port"], ae["ae_title"],
+                    [tmp_path],
+                    callback=lambda m: self.log.append(m),
+                )
+                self.log.append(msg, "ok" if ok else "err")
+            except Exception as e:
+                self.log.append(f"Error: {e}", "err")
+            finally:
+                try:
+                    _os.unlink(tmp_path)
+                except Exception:
+                    pass
+
+        threading.Thread(target=run, daemon=True).start()
+
+
 class SettingsTab(ttk.Frame):
     def __init__(self, parent, app):
         super().__init__(parent); self.app = app; self._build()
@@ -1392,7 +1729,10 @@ class PACSAdminApp:
             ("  "+t("tabs.cfind")+"  ", CFindTab), ("  "+t("tabs.cstore")+"  ", CStoreTab),
             ("  "+t("tabs.dmwl")+"  ", DMWLTab), ("  "+t("tabs.commit")+"  ", StorageCommitTab),
             ("  "+t("tabs.iocm")+"  ", IOCMTab), ("  "+t("tabs.hl7")+"  ", HL7Tab),
-            ("  "+t("tabs.scp")+"  ", SCPListenerTab), ("  "+t("tabs.settings")+"  ", SettingsTab),
+            ("  "+t("tabs.scp")+"  ", SCPListenerTab),
+            ("  "+t("tabs.sr_viewer")+"  ", SRViewerTab),
+            ("  "+t("tabs.kos_creator")+"  ", KOSCreatorTab),
+            ("  "+t("tabs.settings")+"  ", SettingsTab),
             ("  "+t("tabs.help")+"  ", HelpTab), ("  "+t("tabs.about")+"  ", AboutTab),
         ]:
             nb.add(cls(nb, self), text=label)

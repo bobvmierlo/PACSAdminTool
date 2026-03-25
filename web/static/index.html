@@ -328,6 +328,8 @@
   <button class="tab-btn" onclick="showTab('iocm')" data-i18n="tabs.iocm">IOCM</button>
   <button class="tab-btn" onclick="showTab('hl7')" data-i18n="tabs.hl7">HL7</button>
   <button class="tab-btn" onclick="showTab('scp')" data-i18n="tabs.scp">DICOM Receiver</button>
+  <button class="tab-btn" onclick="showTab('sr_viewer')" data-i18n="tabs.sr_viewer">SR Viewer</button>
+  <button class="tab-btn" onclick="showTab('kos_creator')" data-i18n="tabs.kos_creator">KOS Creator</button>
   <button class="tab-btn" onclick="showTab('settings')" data-i18n="tabs.settings">Settings</button>
   <button class="tab-btn" onclick="showTab('help')" data-i18n="tabs.help">Help</button>
   <button class="tab-btn" onclick="showTab('about')" data-i18n="tabs.about">About</button>
@@ -726,6 +728,102 @@
         <a href="https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents" target="_blank" rel="noopener noreferrer" data-i18n="about.hl7_reference">HL7 v2 Reference ↗</a>
       </div>
     </div>
+  </div>
+
+
+  <!-- ── SR Viewer ────────────────────────────────────────────────── -->
+  <div id="tab-sr_viewer" class="tab-panel">
+    <div class="card">
+      <h3 data-i18n="sr_viewer.load_file">Load DICOM SR File</h3>
+      <div class="btn-row">
+        <input type="file" id="sr-file-input" accept=".dcm,*" style="display:none"
+               onchange="srFileSelected()">
+        <button class="btn" onclick="document.getElementById('sr-file-input').click()"
+                data-i18n="common.browse">Browse…</button>
+        <span id="sr-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
+              text-overflow:ellipsis; white-space:nowrap"></span>
+        <button class="btn primary" onclick="doSRRead()" data-i18n="sr_viewer.parse_btn">Parse SR</button>
+        <button class="btn" onclick="srViewRawTags()" data-i18n="sr_viewer.view_tags">View Raw DICOM Tags</button>
+      </div>
+      <div id="sr-meta" style="margin-top:8px; font-size:12px; color:#888; font-style:italic"></div>
+    </div>
+    <div class="card" style="flex:1">
+      <h3 data-i18n="sr_viewer.report">Parsed Report</h3>
+      <textarea id="sr-report" readonly
+                style="width:100%; height:480px; font-family:Consolas,monospace; font-size:12px;
+                       resize:vertical; background:#fafafa; border:1px solid #e0e0e0;
+                       border-radius:3px; padding:10px; color:#1a1a1a; white-space:pre;
+                       overflow:auto"></textarea>
+    </div>
+    <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-sr"></div></div>
+  </div>
+
+  <!-- ── KOS Creator ──────────────────────────────────────────────── -->
+  <div id="tab-kos_creator" class="tab-panel">
+
+    <!-- Load from DICOM files -->
+    <div class="card">
+      <h3 data-i18n="kos_creator.load_files">Load DICOM Files (extract study info)</h3>
+      <div class="btn-row">
+        <input type="file" id="kos-files-input" multiple accept=".dcm,*" style="display:none"
+               onchange="kosFilesSelected()">
+        <button class="btn" onclick="document.getElementById('kos-files-input').click()"
+                data-i18n="common.browse">Browse…</button>
+        <span id="kos-file-count" style="font-size:13px; color:#888" data-i18n="kos_creator.no_files_loaded">No files loaded.</span>
+        <button class="btn primary" onclick="doKOSExtract()" data-i18n="kos_creator.extract_btn">Extract Metadata</button>
+      </div>
+    </div>
+
+    <!-- Study / Patient info -->
+    <div class="card">
+      <h3 data-i18n="kos_creator.study_info">Study &amp; Patient Information</h3>
+      <div class="field-grid">
+        <div class="field" style="grid-column:span 2">
+          <label data-i18n="kos_creator.study_uid">Study UID</label>
+          <input id="kos-study-uid">
+        </div>
+        <div class="field"><label data-i18n="kos_creator.patient_id">Patient ID</label><input id="kos-pid"></div>
+        <div class="field"><label data-i18n="kos_creator.patient_name">Patient Name</label><input id="kos-pname"></div>
+        <div class="field"><label data-i18n="kos_creator.accession">Accession #</label><input id="kos-acc"></div>
+        <div class="field"><label data-i18n="kos_creator.study_date">Study Date</label><input id="kos-date" placeholder="YYYYMMDD"></div>
+        <div class="field"><label data-i18n="kos_creator.institution">Institution</label><input id="kos-inst"></div>
+      </div>
+    </div>
+
+    <!-- Referenced instances -->
+    <div class="card">
+      <h3 data-i18n="kos_creator.instances">Referenced Instances</h3>
+      <p style="font-size:12px; color:#888; margin-bottom:6px" data-i18n="kos_creator.instances_hint">
+        Format per line: SeriesUID | SOPClassUID | SOPInstanceUID (lines starting with # are ignored)
+      </p>
+      <textarea id="kos-instances" rows="8"
+                placeholder="# SeriesUID | SOPClassUID | SOPInstanceUID&#10;1.2.3.4.5|1.2.840.10008.5.1.4.1.1.2|1.2.3.4.5.6.7"></textarea>
+    </div>
+
+    <!-- Options -->
+    <div class="card">
+      <h3 data-i18n="kos_creator.options">KOS Options</h3>
+      <div class="btn-row">
+        <div class="field" style="min-width:260px">
+          <label data-i18n="kos_creator.doc_title">Document Title</label>
+          <select id="kos-doc-title">
+            <option value="of_interest">Of Interest (DCM:113000)</option>
+            <option value="best_in_set">Best In Set (DCM:113001)</option>
+            <option value="for_referring">For Referring Provider (DCM:113002)</option>
+            <option value="for_surgery">For Surgery (DCM:113003)</option>
+            <option value="for_teaching">For Teaching (DCM:113004)</option>
+            <option value="for_conference">For Conference (DCM:113005)</option>
+            <option value="for_therapy">For Therapy (DCM:113006)</option>
+            <option value="for_research">For Research (DCM:113007)</option>
+            <option value="manifest">XDS-I Manifest (DCM:113500)</option>
+          </select>
+        </div>
+        <button class="btn primary" onclick="doKOSCreate()" style="margin-top:20px"
+                data-i18n="kos_creator.create_save">Create KOS &amp; Save…</button>
+      </div>
+    </div>
+
+    <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-kos"></div></div>
   </div>
 
 </div><!-- end #tab-content -->
@@ -1986,6 +2084,214 @@ function downloadText(filename, content, mimeType = "text/plain") {
     }
   });
 })();
+
+// ─────────────────────────────────────────────────────────────────
+// 18. SR Viewer
+// ─────────────────────────────────────────────────────────────────
+
+let _srRawTags = [];   // tag list from last parsed SR for the modal
+
+function srFileSelected() {
+  const f = document.getElementById("sr-file-input").files[0];
+  document.getElementById("sr-filename").textContent = f ? f.name : "";
+}
+
+async function doSRRead() {
+  const input = document.getElementById("sr-file-input");
+  if (!input.files.length) {
+    appendLog("log-sr", now(), i18n("sr_viewer.no_file"), "warn");
+    return;
+  }
+  const f = input.files[0];
+  appendLog("log-sr", now(), `Parsing: ${f.name}`);
+  document.getElementById("sr-report").value = "";
+  document.getElementById("sr-meta").textContent = "";
+  _srRawTags = [];
+
+  const fd = new FormData();
+  fd.append("file", f);
+
+  try {
+    const res  = await fetch("/api/dicom/sr/read", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!data.ok) {
+      appendLog("log-sr", now(), `Error: ${data.error}`, "err");
+      return;
+    }
+    // Display the formatted report text
+    document.getElementById("sr-report").value = data.text || "";
+
+    // Build meta summary
+    const m = data.meta || {};
+    document.getElementById("sr-meta").textContent =
+      `${m.SOPClassName || m.SOPClassUID || ""}  |  ` +
+      `${m.PatientName || ""} [${m.PatientID || ""}]  |  ${m.StudyDate || ""}`;
+
+    // Store tags for raw-tag modal
+    _srRawTags = data.flat || [];
+
+    const n = _srRawTags.length;
+    appendLog("log-sr", now(), i18n("sr_viewer.parsed_ok", {n}), "ok");
+
+    if (data.errors && data.errors.length) {
+      data.errors.forEach(e => appendLog("log-sr", now(), `Warning: ${e}`, "warn"));
+    }
+  } catch (e) {
+    appendLog("log-sr", now(), `Error: ${e}`, "err");
+  }
+}
+
+function srViewRawTags() {
+  if (!_srRawTags.length) {
+    appendLog("log-sr", now(), i18n("sr_viewer.no_parsed"), "warn");
+    return;
+  }
+  // Re-use the existing DICOM tag modal but display the flat SR content items
+  // (concept / type / value columns instead of tag / keyword / vr / value).
+  // We map SR flat items onto the same modal columns for simplicity.
+  const tags = _srRawTags.map(item => ({
+    tag:     "  ".repeat(item.depth) + (item.type || ""),
+    keyword: item.concept || "",
+    vr:      item.relationship || "",
+    value:   item.value || "",
+  }));
+  showTagModal(i18n("sr_viewer.tags_title"), tags);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 19. KOS Creator
+// ─────────────────────────────────────────────────────────────────
+
+function kosFilesSelected() {
+  const files = document.getElementById("kos-files-input").files;
+  document.getElementById("kos-file-count").textContent =
+    files.length ? i18n("kos_creator.files_loaded", {n: files.length})
+                 : i18n("kos_creator.no_files_loaded");
+}
+
+async function doKOSExtract() {
+  const input = document.getElementById("kos-files-input");
+  if (!input.files.length) {
+    appendLog("log-kos", now(), i18n("kos_creator.no_files_loaded_msg"), "warn");
+    return;
+  }
+  appendLog("log-kos", now(), i18n("kos_creator.extracting"));
+
+  const fd = new FormData();
+  Array.from(input.files).forEach(f => fd.append("files", f));
+
+  try {
+    const res  = await fetch("/api/dicom/kos/extract", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!data.ok) {
+      appendLog("log-kos", now(), `Error: ${data.error}`, "err");
+      return;
+    }
+    // Populate study/patient fields
+    document.getElementById("kos-study-uid").value = data.study_instance_uid || "";
+    document.getElementById("kos-pid").value        = data.patient_id         || "";
+    document.getElementById("kos-pname").value      = data.patient_name       || "";
+    document.getElementById("kos-acc").value         = data.accession_number  || "";
+    document.getElementById("kos-date").value        = data.study_date        || "";
+    document.getElementById("kos-inst").value        = data.institution_name  || "";
+
+    // Build instances textarea
+    const seriesMap = data.series || {};
+    const lines = ["# SeriesUID | SOPClassUID | SOPInstanceUID"];
+    for (const [seriesUid, seriesData] of Object.entries(seriesMap)) {
+      for (const inst of (seriesData.instances || [])) {
+        lines.push(`${seriesUid}|${inst.sop_class_uid}|${inst.sop_instance_uid}`);
+      }
+    }
+    document.getElementById("kos-instances").value = lines.join("\n");
+
+    const nSeries = Object.keys(seriesMap).length;
+    const nInst   = Object.values(seriesMap).reduce((s, sd) => s + (sd.instances || []).length, 0);
+    appendLog("log-kos", now(), i18n("kos_creator.extracted_ok", {n_series: nSeries, n_inst: nInst}), "ok");
+    if (data.errors && data.errors.length) {
+      data.errors.forEach(e => appendLog("log-kos", now(), `Warning: ${e}`, "warn"));
+    }
+  } catch (e) {
+    appendLog("log-kos", now(), `Error: ${e}`, "err");
+  }
+}
+
+async function doKOSCreate() {
+  const studyUid = document.getElementById("kos-study-uid").value.trim();
+  if (!studyUid) {
+    appendLog("log-kos", now(), "Study UID is required.", "warn");
+    return;
+  }
+
+  // Parse instances textarea into referenced_series list
+  const lines = document.getElementById("kos-instances").value.split("\n");
+  const seriesMap = {};
+  for (const line of lines) {
+    const l = line.trim();
+    if (!l || l.startsWith("#")) continue;
+    const parts = l.split("|").map(p => p.trim());
+    if (parts.length === 3) {
+      const [seriesUid, sopClass, sopInst] = parts;
+      if (!seriesMap[seriesUid]) seriesMap[seriesUid] = [];
+      seriesMap[seriesUid].push({ sop_class_uid: sopClass, sop_instance_uid: sopInst });
+    } else if (parts.length === 2) {
+      const [seriesUid, sopInst] = parts;
+      if (!seriesMap[seriesUid]) seriesMap[seriesUid] = [];
+      seriesMap[seriesUid].push({ sop_class_uid: "1.2.840.10008.5.1.4.1.1.2", sop_instance_uid: sopInst });
+    }
+  }
+
+  const referencedSeries = Object.entries(seriesMap).map(([uid, insts]) => ({
+    series_uid: uid,
+    instances: insts,
+  }));
+
+  if (!referencedSeries.length) {
+    appendLog("log-kos", now(), "No valid instance lines found in the instances box.", "warn");
+    return;
+  }
+
+  appendLog("log-kos", now(), i18n("kos_creator.creating"));
+
+  const body = {
+    study_instance_uid: studyUid,
+    patient_id:         document.getElementById("kos-pid").value.trim(),
+    patient_name:       document.getElementById("kos-pname").value.trim(),
+    accession_number:   document.getElementById("kos-acc").value.trim(),
+    study_date:         document.getElementById("kos-date").value.trim(),
+    institution_name:   document.getElementById("kos-inst").value.trim(),
+    doc_title_key:      document.getElementById("kos-doc-title").value,
+    referenced_series:  referencedSeries,
+  };
+
+  try {
+    const res = await fetch("/api/dicom/kos/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      appendLog("log-kos", now(), `Error: ${err.error || res.statusText}`, "err");
+      return;
+    }
+
+    // Trigger browser download of the returned .dcm file
+    const blob     = await res.blob();
+    const cd       = res.headers.get("Content-Disposition") || "";
+    const fnMatch  = cd.match(/filename="?([^";\n]+)"?/);
+    const filename = fnMatch ? fnMatch[1] : "KOS.dcm";
+    const a        = document.createElement("a");
+    a.href         = URL.createObjectURL(blob);
+    a.download     = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    appendLog("log-kos", now(), `KOS created and downloaded: ${filename}`, "ok");
+  } catch (e) {
+    appendLog("log-kos", now(), `Error: ${e}`, "err");
+  }
+}
 
 </script>
 </body>
