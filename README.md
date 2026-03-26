@@ -212,9 +212,3 @@ The compiled `.exe` has **no runtime requirements**.
 | Web UI | 5000 |
 
 Configure in **Settings** tab or `~/.pacs_admin_tool/config.json`.
-
----
-
-## License
-
-MIT — free for personal and commercial use.
