@@ -4,14 +4,12 @@
     "code": "en",
     "direction": "ltr"
   },
-
   "app": {
     "title": "PACS Admin Tool",
     "subtitle": "DICOM & HL7 Administration Utility",
     "version": "Version {version}",
     "ready": "Ready"
   },
-
   "tabs": {
     "cfind": "C-FIND / Q-R",
     "cstore": "C-STORE",
@@ -26,7 +24,6 @@
     "help": "Help",
     "about": "About"
   },
-
   "common": {
     "preset": "Preset:",
     "manual": "(manual)",
@@ -43,7 +40,7 @@
     "log": "Activity Log",
     "tags_returned": "{n} tags returned",
     "remote_ae": "Remote AE",
-    "connecting": "connecting\u2026",
+    "connecting": "connecting…",
     "connected": "connected",
     "disconnected": "disconnected",
     "name": "Name:",
@@ -52,7 +49,6 @@
     "stopped": "Stopped",
     "running": "Running"
   },
-
   "cfind": {
     "query_scp": "Query / Retrieve SCP",
     "query_params": "Query Parameters",
@@ -73,7 +69,7 @@
     "cmove_selected": "C-MOVE Selected",
     "cmove": "C-MOVE",
     "results": "Results  (double-click a row to view all DICOM tags)",
-    "results_web": "Results \u2014 click a row to see all DICOM tags",
+    "results_web": "Results — click a row to see all DICOM tags",
     "select_row_first": "Select a result row first.",
     "pydicom_missing": "pydicom not available",
     "detail_title": "C-FIND Result - All DICOM Tags",
@@ -90,7 +86,6 @@
     "no_results": "No results to export.",
     "results_count": "{n} result(s)"
   },
-
   "cstore": {
     "storage_scp": "Storage SCP (destination)",
     "destination_ae": "Destination AE",
@@ -105,7 +100,6 @@
     "select_dicom": "Select DICOM files",
     "select_folder": "Select folder with DICOM files"
   },
-
   "dmwl": {
     "worklist_scp": "Worklist SCP",
     "query_filters": "Query Filters  (leave blank = match all)",
@@ -122,7 +116,7 @@
     "items_returned": "{n} item(s) returned",
     "items_count": "{n} item(s)",
     "results": "Worklist Results  (double-click a row to view all DICOM tags)",
-    "results_web": "Results \u2014 click a row to see all DICOM tags",
+    "results_web": "Results — click a row to see all DICOM tags",
     "no_results": "No results to export.",
     "export": "Export",
     "detail_title": "Worklist Item - {pname} ({pid}) - All DICOM Tags",
@@ -134,7 +128,6 @@
     "col_station_aet": "StationAET",
     "col_procedure": "Procedure"
   },
-
   "commit": {
     "commit_scp": "Storage Commitment SCP",
     "sop_uids": "SOP Instance UIDs",
@@ -145,7 +138,6 @@
     "no_uids": "No UIDs loaded.",
     "enter_uid": "Enter at least one UID"
   },
-
   "iocm": {
     "iocm_scp": "IOCM SCP",
     "notification": "Instance Availability Notification (N-CREATE)",
@@ -158,7 +150,6 @@
     "availability": "Availability:",
     "send": "Send N-CREATE (Delete Notification)"
   },
-
   "hl7": {
     "send_tab": "Send HL7",
     "recv_tab": "Receive HL7",
@@ -196,9 +187,9 @@
     "listener_config": "Listener Configuration",
     "listen_port": "Listen Port:",
     "start_hl7": ">>  Start HL7 Listener",
-    "start_hl7_web": "\u25b6 Start HL7 Listener",
+    "start_hl7_web": "▶ Start HL7 Listener",
     "stop_hl7": "[]  Stop HL7 Listener",
-    "stop_hl7_web": "\u25a0 Stop HL7 Listener",
+    "stop_hl7_web": "■ Stop HL7 Listener",
     "listener_not_running": "Listener not running",
     "listening_on": "Listening on port {port}...",
     "listener_failed": "Listener failed",
@@ -208,7 +199,6 @@
     "messages_count": "{n} messages",
     "invalid_port": "Invalid port number."
   },
-
   "scp": {
     "listener_config": "Listener Configuration",
     "ae_title": "AE Title:",
@@ -216,9 +206,9 @@
     "save_to": "Save received files to:",
     "save_to_web": "Save received files to",
     "start_scp": ">>  Start DICOM Storage Listener",
-    "start_scp_web": "\u25b6 Start DICOM Storage Listener",
+    "start_scp_web": "▶ Start DICOM Storage Listener",
     "stop_scp": "[]  Stop DICOM Storage Listener",
-    "stop_scp_web": "\u25a0 Stop DICOM Storage Listener",
+    "stop_scp_web": "■ Stop DICOM Storage Listener",
     "listening_as": "Listening as {ae_title} on port {port}",
     "not_running": "Listener not running",
     "stopped_error": "Listener stopped (error)",
@@ -231,7 +221,6 @@
     "invalid_port": "Invalid port.",
     "select_save_folder": "Select folder to save received DICOM files"
   },
-
   "settings": {
     "local_ae": "Local AE Configuration",
     "ae_title": "AE Title:",
@@ -254,13 +243,12 @@
     "log_note": "Logs are written to logs/pacs_admin.log and rotated daily (7-day retention).",
     "save": "Save Settings",
     "saved": "Saved  {ts}",
-    "saved_web": "Saved \u2713",
+    "saved_web": "Saved ✓",
     "name_required": "Name is required.",
     "language": "Language",
     "language_label": "Interface Language:",
     "language_note": "Changes take effect after restart (desktop) or page reload (web)."
   },
-
   "help": {
     "topics": "Topics",
     "official_docs": "Official Documentation:",
@@ -275,26 +263,35 @@
     "section_receiver": "DICOM Storage Listener",
     "section_settings": "Settings",
     "section_sr_viewer": "SR Viewer",
-    "section_kos_creator": "KOS Creator"
+    "section_kos_creator": "KOS Creator",
+    "body_cfind": "Query a remote PACS for patients and studies using the DICOM Query/Retrieve service.\n\n─── Buttons ───────────────────────────────────────────────\nC-ECHO (Ping)      Verifies the remote AE is reachable and responding.\n                   Always run this first to confirm connectivity before a C-FIND.\nRun C-FIND         Sends a query using any combination of the filter fields.\n                   Leave all fields blank to retrieve everything (use with care).\nC-MOVE             Instructs the remote PACS to push the selected study to the\n                   Destination AE you specify. That AE must have a Storage SCP\n                   running and be known to the source PACS.\n\n─── Query Level ────────────────────────────────────────────\nThe Query Level determines how granular the results are:\n\n  PATIENT  Returns one row per patient. Works only with the Patient Root model.\n           Useful for patient-level lookups (e.g. find all studies for a patient).\n\n  STUDY    Returns one row per study. The most commonly used level.\n           Works with both Study Root and Patient Root models.\n\n  SERIES   Returns one row per series within a study.\n           Requires a Study Instance UID to narrow results.\n\n  IMAGE    Returns one row per SOP instance (individual DICOM file).\n           Requires a Series Instance UID. Use sparingly — very verbose.\n\n─── Model (Information Model) ──────────────────────────────\nThe Information Model defines the DICOM service class used for the query.\nMost PACS systems support both, but not all do.\n\n  STUDY  (Study Root Q/R — recommended for most use cases)\n         Hierarchy: STUDY → SERIES → IMAGE\n         Valid levels: STUDY, SERIES, IMAGE\n         ✗  PATIENT level is NOT supported in this model.\n         Use this when you already have an Accession, Date, or Study UID.\n\n  PATIENT  (Patient Root Q/R)\n           Hierarchy: PATIENT → STUDY → SERIES → IMAGE\n           Valid levels: PATIENT, STUDY, SERIES, IMAGE\n           Use this when searching by Patient ID or Patient Name without\n           a specific study context, or when the PACS requires it.\n\n─── Valid Combinations ─────────────────────────────────────\n  Model     │  Supported Query Levels\n  ──────────┼───────────────────────────────────────\n  STUDY     │  STUDY  ·  SERIES  ·  IMAGE\n  PATIENT   │  PATIENT  ·  STUDY  ·  SERIES  ·  IMAGE\n\nThe tool will warn you and auto-correct incompatible combinations.\n\n─── Date Format ────────────────────────────────────────────\nStudy Date accepts DICOM date format: YYYYMMDD or a range YYYYMMDD-YYYYMMDD\nExample: 20240101-20241231 returns all studies from 2024.\n\n─── Tips ───────────────────────────────────────────────────\n• Patient Name supports wildcards: SMITH* or *SMITH* (DICOM wildcard is *)\n• Double-click any result row to inspect all returned DICOM tags.\n• If C-FIND returns 0 results, try relaxing filters or check the Query Level.",
+    "body_cstore": "Send DICOM files from disk to a remote Storage SCP using the C-STORE service.\n\n─── Workflow ───────────────────────────────────────────────\n1. Set the destination AE Title, Host, and Port.\n2. Add Files — pick individual .dcm files, or\n   Add Folder — recursively adds all files in a directory tree.\n3. Review the queued file list.\n4. Click Send All (C-STORE) to transfer.\n\n─── Notes ──────────────────────────────────────────────────\n• Each file is sent as a separate C-STORE request within the same association.\n• The SCP must accept the SOP Class of each file (e.g. CT Image Storage).\n• Transfer Syntax negotiation is handled automatically by pynetdicom.\n• Use the DICOM Receiver tab to run a local SCP that accepts incoming files.",
+    "body_dmwl": "Query a Modality Worklist SCP for scheduled procedures.\n\n─── What is a Modality Worklist? ───────────────────────────\nThe Modality Worklist (DMWL) service allows a modality (e.g. CT scanner) to\nretrieve its scheduled procedure list from the RIS/HIS via the PACS.\nThis is how scanners auto-populate patient demographics and accession numbers.\n\n─── Station AET field ──────────────────────────────────────\nWhen set, the Station AET value is used as the CALLING AE title for the query.\nThis impersonates a specific modality's AE title, which is necessary on\nsystems (e.g. Sectra IDS7, Agfa IMPAX) that filter the worklist by calling AET.\nLeave blank to use the local AE configured in Settings.\n\n─── Date field ─────────────────────────────────────────────\nFilters by ScheduledProcedureStepStartDate.\nUse today's date (YYYYMMDD) to see today's worklist.\nLeave blank to return all scheduled items (can be very large).\n\n─── Tips ───────────────────────────────────────────────────\n• Double-click a row to view the full SPS sequence with all nested DICOM tags.\n• Export to CSV saves the visible columns for reporting or troubleshooting.\n• If you get 0 results but expect items, check the Station AET filter.",
+    "body_commit": "Verify that a remote PACS has permanently and safely stored a set of DICOM instances.\n\n─── How it works ───────────────────────────────────────────\n1. Load SOP Instance UIDs from DICOM files on disk.\n2. Send N-ACTION — this sends a Storage Commitment Push Model request.\n3. The PACS responds asynchronously with N-EVENT-REPORT:\n     • Referenced SOP Sequence — successfully committed instances\n     • Failed SOP Sequence      — instances the PACS could not commit\n\n─── When to use it ─────────────────────────────────────────\n• After C-STORE: confirm the PACS persisted the objects before deleting local copies.\n• Audit workflows: verify no data loss after migration or archive restores.\n• Troubleshooting: identify which specific instances a PACS claims to have stored.\n\n─── Note ───────────────────────────────────────────────────\nStorage Commitment requires the PACS to have an N-EVENT-REPORT callback path back\nto this tool. Some PACS systems send it synchronously; others queue it and send\nthe event minutes later or on a different port.",
+    "body_iocm": "Send an Instance Availability Notification (N-CREATE) to a remote SCP.\n\n─── What is IOCM? ──────────────────────────────────────────\nIOCM (Instance Order Change Management) is used in deletion and\navailability-change workflows. When a study is deleted or made unavailable,\nan N-CREATE is sent so downstream systems (viewers, archives) can update their\nreferences accordingly.\n\n─── Fields ─────────────────────────────────────────────────\n  Study UID       Instance UID of the study being affected.\n  Series UID      Series within that study (optional for study-level events).\n  SOP Class UID   DICOM SOP Class of the affected instances.\n  SOP Inst UID    Specific instance being reported on.\n  Availability    ONLINE | NEARLINE | OFFLINE | UNAVAILABLE\n\n─── Caution ────────────────────────────────────────────────\nThis operation instructs a PACS that objects have been deleted or are no\nlonger available. Use carefully — sending incorrect notifications can cause\na PACS to remove valid index entries.",
+    "body_hl7_send": "Send HL7 v2 messages to a remote MLLP listener.\n\n─── Workflow ───────────────────────────────────────────────\n1. Set Host and Port of the destination MLLP server.\n2. Select a Template and fill in the patient/procedure fields.\n3. Click Load Template — the editor is populated with the filled message.\n4. Review or edit the message directly in the editor.\n5. Click Send via MLLP.\n\n─── Available Templates ─────────────────────────────────────\n  ORM^O01   Radiology order (MSH/PID/PV1/ORC/OBR/ZDS)\n  ORU^R01   Radiology report with OBX observation/findings\n  ADT^A04   Register new patient (EVN/PID/PV1/PV2)\n  ADT^A08   Update existing patient demographics\n  ADT^A23   Delete a patient visit\n  SIU^S12   Schedule an appointment (SCH/AIS/AIP/AIL)\n  SIU^S15   Cancel a scheduled appointment\n  QBP^Q22   IHE PDQ patient demographics query\n  OML^O21   Lab order with SPM specimen segment\n\n─── MLLP Framing ────────────────────────────────────────────\nHL7 v2 over MLLP wraps each message with:\n  Start Block:  0x0B  (vertical tab)\n  End Block:    0x1C 0x0D  (file separator + carriage return)\nSegments are separated by carriage return (\\r, 0x0D).\n\nEnable 'Show raw MLLP bytes' to log the full TCP payload including framing.\nWhen log level is set to DEBUG, raw bytes are always captured.",
+    "body_hl7_recv": "Run a minimal MLLP listener that accepts incoming HL7 v2 messages.\n\n─── What it does ───────────────────────────────────────────\nListens on the specified TCP port for MLLP connections.\nFor every message received it:\n  • Displays the message in the Received Messages box.\n  • Sends an automatic AA (Application Accept) ACK back to the sender.\n  • Logs the sender's IP address and port.\n\n─── Use cases ──────────────────────────────────────────────\n• Test that a RIS/HIS or other HL7 source is sending correctly.\n• Capture sample messages for template building or troubleshooting.\n• Verify MLLP connectivity and framing before pointing at a real receiver.\n\n─── Notes ──────────────────────────────────────────────────\n• Windows Firewall may block the listen port — add an inbound rule if needed.\n• Only one listener can run per port. Stop before changing the port.\n• Enable 'Show raw MLLP bytes' or set log level to DEBUG to capture framing bytes.",
+    "body_receiver": "Runs a C-STORE SCP that accepts incoming DICOM objects and saves them to disk.\n\n─── Configuration ───────────────────────────────────────────\n  AE Title    What this listener calls itself. Must match the sending device's\n              Called AE Title configuration. Default: your local AE from Settings.\n  Port        TCP port to listen on. Default: 11112 (standard DICOM port).\n  Save to     Directory where received .dcm files are written. Created if absent.\n\n─── Accepted SOP Classes ────────────────────────────────────\nAccepts all standard Storage SOP Classes including:\nCT, MR, PT, NM, DX, CR, XA, US, MG, SC, SR, PR, KO, RT, PDF, Seg, Reg, PS, OPT\n\n─── How it works ────────────────────────────────────────────\nEach received file is saved as <SOPInstanceUID>.dcm in the save directory.\nThe file list on screen updates live as files arrive.\n\n─── Tips ───────────────────────────────────────────────────\n• Make sure no other process (PACS client, other SCP) is already using the port.\n• The sending device must have this AE Title in its routing table.\n• Use C-STORE tab to test-send files back to confirm round-trip storage.",
+    "body_settings": "Configure how this tool identifies itself on the network.\n\n─── Local AE Configuration ──────────────────────────────────\n  AE Title    The Application Entity title this tool uses when connecting to\n              remote DICOM systems. Must be ≤16 characters, uppercase, no spaces.\n              The remote PACS must whitelist this AE Title.\n  Port        The port this tool listens on when acting as an SCP.\n              Default: 11112. Change if another process uses that port.\n\n─── Remote AE Presets ───────────────────────────────────────\nSaved presets appear in the AE selector dropdown on every tab.\nAdd a preset once here; use it everywhere without re-typing host/port.\n\n─── HL7 Settings ────────────────────────────────────────────\n  Default HL7 Listen Port   Pre-fills the port in the HL7 Receive tab.\n\n─── Config file location ────────────────────────────────────\nSettings are saved to:\n  Windows:  %USERPROFILE%\\.pacs_admin_tool\\config.json\n  Linux:    ~/.pacs_admin_tool/config.json\n\n─── Log files ───────────────────────────────────────────────\nThe desktop client writes to:  logs/pacs_admin_client.log\nThe web server writes to:      logs/pacs_admin.log\nBoth rotate at UTC midnight and are kept for 7 days.",
+    "body_sr_viewer": "Parse and display DICOM Structured Report (SR) files.\n\n─── What is a DICOM SR? ─────────────────────────────────────\nA Structured Report is a DICOM object that encodes clinical findings,\nmeasurements, and observations in a standardised hierarchical structure.\nCommon examples: radiology reports, radiation dose reports, CAD results.\n\n─── Workflow ───────────────────────────────────────────────\n1. Click Browse — select a .dcm file that contains a Structured Report.\n2. Click Parse SR to parse and display the report content.\n3. Optionally click View Raw DICOM Tags to inspect all DICOM attributes.\n\n─── Supported SR SOP Classes ───────────────────────────────\nBasic Text SR · Enhanced SR · Comprehensive SR · Comprehensive 3D SR\nX-Ray Radiation Dose SR · Mammography CAD SR · Chest CAD SR · and others.\n\n─── Tips ───────────────────────────────────────────────────\n• The parsed view renders the SR content tree in human-readable form.\n• Supported value types: TEXT, CODE, NUM, DATE, IMAGE, SCOORD, and more.\n• Use View Raw DICOM Tags for low-level debugging of the SR dataset.",
+    "body_kos_creator": "Create a DICOM Key Object Selection (KOS) document referencing a set of instances.\n\n─── What is a KOS? ─────────────────────────────────────────\nA Key Object Selection document is a DICOM SR object that acts as a manifest,\npointing to a chosen subset of images or other instances within a study.\nUse cases: teaching files, relevant priors, XDS-I manifests, surgery planning sets.\n\n─── Workflow ───────────────────────────────────────────────\n1. Click Browse to load one or more DICOM files from the study.\n2. Click Extract Metadata to auto-fill the Study & Patient fields.\n3. Review or edit the Study fields and the Referenced Instances list.\n4. Choose a Document Title from the dropdown.\n5. Click Create KOS & Save to write the KOS to a .dcm file, or\n   Create KOS & Send (C-STORE) to store it directly on a PACS.\n\n─── Referenced Instances format ────────────────────────────\nEach line in the instances box must follow this format:\n  SeriesUID | SOPClassUID | SOPInstanceUID\nLines starting with # are treated as comments and ignored.\n\n─── Document Title codes ───────────────────────────────────\n  Of Interest           General key image selection.\n  Best In Set           Best single representative image.\n  For Referring         Selected images for the referring physician.\n  For Surgery           Pre-operative image selection.\n  For Teaching          Teaching file selection.\n  For Conference        Conference presentation selection.\n  For Therapy           Therapy planning image selection.\n  For Research          Research or trial image selection.\n  XDS-I Manifest        IHE Cross-Enterprise Document Sharing manifest."
   },
-
   "about": {
     "title": "PACS Admin Tool",
     "description": "A portable DICOM & HL7 administration utility for PACS engineers,\nradiologists, and healthcare IT professionals.",
     "description_html": "A portable DICOM &amp; HL7 administration utility for PACS engineers,<br>radiologists, and healthcare IT professionals.",
-    "supports": "Supports: C-ECHO \u00b7 C-FIND \u00b7 C-STORE \u00b7 C-MOVE \u00b7 DMWL \u00b7 Storage Commitment\n          IOCM \u00b7 HL7 v2 (MLLP) Send & Receive \u00b7 DICOM Storage SCP",
+    "supports": "Supports: C-ECHO · C-FIND · C-STORE · C-MOVE · DMWL · Storage Commitment\n          IOCM · HL7 v2 (MLLP) Send & Receive · DICOM Storage SCP",
     "supports_html": "Supports: C-ECHO &middot; C-FIND &middot; C-STORE &middot; C-MOVE &middot; DMWL &middot; Storage Commitment<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IOCM &middot; HL7 v2 (MLLP) Send &amp; Receive &middot; DICOM Storage SCP",
     "created_by": "Created by",
     "built_with": "Built with",
-    "claude_credit": "This entire application was designed and built with the assistance of Claude,\nAnthropic's AI assistant \u2014 from the DICOM/HL7 protocol logic to the UI.",
-    "claude_credit_html": "This entire application was designed and built with the assistance of Claude,<br>Anthropic's AI assistant \u2014 from the DICOM/HL7 protocol logic to the UI.",
-    "tech_stack": "Built with Python \u00b7 pynetdicom \u00b7 pydicom \u00b7 hl7 \u00b7 Tkinter \u00b7 Flask \u00b7 Flask-SocketIO",
-    "tech_stack_web": "Built with Python \u00b7 pynetdicom \u00b7 pydicom \u00b7 hl7 \u00b7 Flask \u00b7 Flask-SocketIO",
-    "github": "GitHub Repository  \u2197",
-    "dicom_standard": "DICOM Standard (NEMA)  \u2197",
-    "hl7_reference": "HL7 v2 Reference  \u2197"
+    "claude_credit": "This entire application was designed and built with the assistance of Claude,\nAnthropic's AI assistant — from the DICOM/HL7 protocol logic to the UI.",
+    "claude_credit_html": "This entire application was designed and built with the assistance of Claude,<br>Anthropic's AI assistant — from the DICOM/HL7 protocol logic to the UI.",
+    "tech_stack": "Built with Python · pynetdicom · pydicom · hl7 · Tkinter · Flask · Flask-SocketIO",
+    "tech_stack_web": "Built with Python · pynetdicom · pydicom · hl7 · Flask · Flask-SocketIO",
+    "github": "GitHub Repository  ↗",
+    "dicom_standard": "DICOM Standard (NEMA)  ↗",
+    "hl7_reference": "HL7 v2 Reference  ↗"
   },
-
   "sr_viewer": {
     "load_file": "Load DICOM SR File",
     "select_file": "Select a DICOM Structured Report file",
@@ -306,7 +303,6 @@
     "no_parsed": "No parsed SR available. Parse a file first.",
     "tags_title": "SR - All DICOM Tags"
   },
-
   "kos_creator": {
     "load_files": "Load DICOM Files (extract study info)",
     "no_files_loaded": "No files loaded.",
@@ -314,7 +310,7 @@
     "select_files": "Select DICOM files to extract metadata from",
     "extract_btn": "Extract Metadata",
     "no_files_loaded_msg": "No DICOM files loaded. Use Browse to select files first.",
-    "extracting": "Extracting study metadata from files\u2026",
+    "extracting": "Extracting study metadata from files…",
     "extracted_ok": "Extracted: {n_series} series, {n_inst} instance(s)",
     "study_info": "Study & Patient Information",
     "study_uid": "Study UID:",
@@ -329,19 +325,18 @@
     "options": "KOS Options",
     "doc_title": "Document Title:",
     "storage_scp": "Destination AE (for C-STORE Send)",
-    "create_save": "Create KOS & Save\u2026",
+    "create_save": "Create KOS & Save…",
     "create_send": "Create KOS & Send (C-STORE)",
     "save_as": "Save KOS DICOM file",
-    "creating": "Creating KOS document\u2026",
+    "creating": "Creating KOS document…",
     "saved_ok": "KOS saved: {path}",
     "col_series": "Series UID",
     "col_sop_class": "SOP Class",
     "col_sop_inst": "SOP Instance UID"
   },
-
   "dicom_detail": {
     "title": "DICOM Tags",
-    "filter_placeholder": "Filter by tag, keyword, or value\u2026",
+    "filter_placeholder": "Filter by tag, keyword, or value…",
     "tag_count": "{n} tag(s)",
     "col_tag": "Tag",
     "col_keyword": "Keyword",
