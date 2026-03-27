@@ -1384,154 +1384,24 @@ class SettingsTab(ttk.Frame):
 
 class HelpTab(ttk.Frame):
     SECTIONS = [
-        ("help.section_cfind",
-         "Query a remote PACS for patients and studies using the DICOM Query/Retrieve service.\n\n"
-         "─── Buttons ───────────────────────────────────────────────\n"
-         "C-ECHO (Ping)      Verifies the remote AE is reachable and responding.\n"
-         "                   Always run this first to confirm connectivity before a C-FIND.\n"
-         "Run C-FIND         Sends a query using any combination of the filter fields.\n"
-         "                   Leave all fields blank to retrieve everything (use with care).\n"
-         "C-MOVE             Instructs the remote PACS to push the selected study to the\n"
-         "                   Destination AE you specify. That AE must have a Storage SCP\n"
-         "                   running and be known to the source PACS.\n\n"
-         "─── Query Level ────────────────────────────────────────────\n"
-         "The Query Level determines how granular the results are:\n\n"
-         "  PATIENT  Returns one row per patient. Works only with the Patient Root model.\n"
-         "           Useful for patient-level lookups (e.g. find all studies for a patient).\n\n"
-         "  STUDY    Returns one row per study. The most commonly used level.\n"
-         "           Works with both Study Root and Patient Root models.\n\n"
-         "  SERIES   Returns one row per series within a study.\n"
-         "           Requires a Study Instance UID to narrow results.\n\n"
-         "  IMAGE    Returns one row per SOP instance (individual DICOM file).\n"
-         "           Requires a Series Instance UID. Use sparingly — very verbose.\n\n"
-         "─── Model (Information Model) ──────────────────────────────\n"
-         "The Information Model defines the DICOM service class used for the query.\n"
-         "Most PACS systems support both, but not all do.\n\n"
-         "  STUDY  (Study Root Q/R — recommended for most use cases)\n"
-         "         Hierarchy: STUDY → SERIES → IMAGE\n"
-         "         Valid levels: STUDY, SERIES, IMAGE\n"
-         "         ✗  PATIENT level is NOT supported in this model.\n"
-         "         Use this when you already have an Accession, Date, or Study UID.\n\n"
-         "  PATIENT  (Patient Root Q/R)\n"
-         "           Hierarchy: PATIENT → STUDY → SERIES → IMAGE\n"
-         "           Valid levels: PATIENT, STUDY, SERIES, IMAGE\n"
-         "           Use this when searching by Patient ID or Patient Name without\n"
-         "           a specific study context, or when the PACS requires it.\n\n"
-         "─── Valid Combinations ─────────────────────────────────────\n"
-         "  Model     │  Supported Query Levels\n"
-         "  ──────────┼───────────────────────────────────────\n"
-         "  STUDY     │  STUDY  ·  SERIES  ·  IMAGE\n"
-         "  PATIENT   │  PATIENT  ·  STUDY  ·  SERIES  ·  IMAGE\n\n"
-         "The tool will warn you and auto-correct incompatible combinations.\n\n"
-         "─── Date Format ────────────────────────────────────────────\n"
-         "Study Date accepts DICOM date format: YYYYMMDD or a range YYYYMMDD-YYYYMMDD\n"
-         "Example: 20240101-20241231 returns all studies from 2024.\n\n"
-         "─── Tips ───────────────────────────────────────────────────\n"
-         "• Patient Name supports wildcards: SMITH* or *SMITH* (DICOM wildcard is *)\n"
-         "• Double-click any result row to inspect all returned DICOM tags.\n"
-         "• If C-FIND returns 0 results, try relaxing filters or check the Query Level.",
+        ("help.section_cfind", "help.body_cfind",
          [("DICOM PS3.4 §C – Query/Retrieve Service Class (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_C"),
           ("PS3.4 Table C.6-1 – Study Root Attributes", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#table_C.6-1"),
           ("PS3.4 Table C.6-2 – Patient Root Attributes", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#table_C.6-2")]),
 
-        ("help.section_cstore",
-         "Send DICOM files from disk to a remote Storage SCP using the C-STORE service.\n\n"
-         "─── Workflow ───────────────────────────────────────────────\n"
-         "1. Set the destination AE Title, Host, and Port.\n"
-         "2. Add Files — pick individual .dcm files, or\n"
-         "   Add Folder — recursively adds all files in a directory tree.\n"
-         "3. Review the queued file list.\n"
-         "4. Click Send All (C-STORE) to transfer.\n\n"
-         "─── Notes ──────────────────────────────────────────────────\n"
-         "• Each file is sent as a separate C-STORE request within the same association.\n"
-         "• The SCP must accept the SOP Class of each file (e.g. CT Image Storage).\n"
-         "• Transfer Syntax negotiation is handled automatically by pynetdicom.\n"
-         "• Use the DICOM Receiver tab to run a local SCP that accepts incoming files.",
+        ("help.section_cstore", "help.body_cstore",
          [("DICOM PS3.4 §B – Storage Service Class (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_B")]),
 
-        ("help.section_dmwl",
-         "Query a Modality Worklist SCP for scheduled procedures.\n\n"
-         "─── What is a Modality Worklist? ───────────────────────────\n"
-         "The Modality Worklist (DMWL) service allows a modality (e.g. CT scanner) to\n"
-         "retrieve its scheduled procedure list from the RIS/HIS via the PACS.\n"
-         "This is how scanners auto-populate patient demographics and accession numbers.\n\n"
-         "─── Station AET field ──────────────────────────────────────\n"
-         "When set, the Station AET value is used as the CALLING AE title for the query.\n"
-         "This impersonates a specific modality's AE title, which is necessary on\n"
-         "systems (e.g. Sectra IDS7, Agfa IMPAX) that filter the worklist by calling AET.\n"
-         "Leave blank to use the local AE configured in Settings.\n\n"
-         "─── Date field ─────────────────────────────────────────────\n"
-         "Filters by ScheduledProcedureStepStartDate.\n"
-         "Use today's date (YYYYMMDD) to see today's worklist.\n"
-         "Leave blank to return all scheduled items (can be very large).\n\n"
-         "─── Tips ───────────────────────────────────────────────────\n"
-         "• Double-click a row to view the full SPS sequence with all nested DICOM tags.\n"
-         "• Export to CSV saves the visible columns for reporting or troubleshooting.\n"
-         "• If you get 0 results but expect items, check the Station AET filter.",
+        ("help.section_dmwl", "help.body_dmwl",
          [("DICOM PS3.4 §K – Modality Worklist Management (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_K")]),
 
-        ("help.section_commit",
-         "Verify that a remote PACS has permanently and safely stored a set of DICOM instances.\n\n"
-         "─── How it works ───────────────────────────────────────────\n"
-         "1. Load SOP Instance UIDs from DICOM files on disk.\n"
-         "2. Send N-ACTION — this sends a Storage Commitment Push Model request.\n"
-         "3. The PACS responds asynchronously with N-EVENT-REPORT:\n"
-         "     • Referenced SOP Sequence — successfully committed instances\n"
-         "     • Failed SOP Sequence      — instances the PACS could not commit\n\n"
-         "─── When to use it ─────────────────────────────────────────\n"
-         "• After C-STORE: confirm the PACS persisted the objects before deleting local copies.\n"
-         "• Audit workflows: verify no data loss after migration or archive restores.\n"
-         "• Troubleshooting: identify which specific instances a PACS claims to have stored.\n\n"
-         "─── Note ───────────────────────────────────────────────────\n"
-         "Storage Commitment requires the PACS to have an N-EVENT-REPORT callback path back\n"
-         "to this tool. Some PACS systems send it synchronously; others queue it and send\n"
-         "the event minutes later or on a different port.",
+        ("help.section_commit", "help.body_commit",
          [("DICOM PS3.4 §J – Storage Commitment Service Class (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_J")]),
 
-        ("help.section_iocm",
-         "Send an Instance Availability Notification (N-CREATE) to a remote SCP.\n\n"
-         "─── What is IOCM? ──────────────────────────────────────────\n"
-         "IOCM (Instance Order Change Management) is used in deletion and\n"
-         "availability-change workflows. When a study is deleted or made unavailable,\n"
-         "an N-CREATE is sent so downstream systems (viewers, archives) can update their\n"
-         "references accordingly.\n\n"
-         "─── Fields ─────────────────────────────────────────────────\n"
-         "  Study UID       Instance UID of the study being affected.\n"
-         "  Series UID      Series within that study (optional for study-level events).\n"
-         "  SOP Class UID   DICOM SOP Class of the affected instances.\n"
-         "  SOP Inst UID    Specific instance being reported on.\n"
-         "  Availability    ONLINE | NEARLINE | OFFLINE | UNAVAILABLE\n\n"
-         "─── Caution ────────────────────────────────────────────────\n"
-         "This operation instructs a PACS that objects have been deleted or are no\n"
-         "longer available. Use carefully — sending incorrect notifications can cause\n"
-         "a PACS to remove valid index entries.",
+        ("help.section_iocm", "help.body_iocm",
          [("DICOM PS3.4 §KK – Instance Availability Notification (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_KK")]),
 
-        ("help.section_hl7_send",
-         "Send HL7 v2 messages to a remote MLLP listener.\n\n"
-         "─── Workflow ───────────────────────────────────────────────\n"
-         "1. Set Host and Port of the destination MLLP server.\n"
-         "2. Select a Template and fill in the patient/procedure fields.\n"
-         "3. Click Load Template — the editor is populated with the filled message.\n"
-         "4. Review or edit the message directly in the editor.\n"
-         "5. Click Send via MLLP.\n\n"
-         "─── Available Templates ─────────────────────────────────────\n"
-         "  ORM^O01   Radiology order (MSH/PID/PV1/ORC/OBR/ZDS)\n"
-         "  ORU^R01   Radiology report with OBX observation/findings\n"
-         "  ADT^A04   Register new patient (EVN/PID/PV1/PV2)\n"
-         "  ADT^A08   Update existing patient demographics\n"
-         "  ADT^A23   Delete a patient visit\n"
-         "  SIU^S12   Schedule an appointment (SCH/AIS/AIP/AIL)\n"
-         "  SIU^S15   Cancel a scheduled appointment\n"
-         "  QBP^Q22   IHE PDQ patient demographics query\n"
-         "  OML^O21   Lab order with SPM specimen segment\n\n"
-         "─── MLLP Framing ────────────────────────────────────────────\n"
-         "HL7 v2 over MLLP wraps each message with:\n"
-         "  Start Block:  0x0B  (vertical tab)\n"
-         "  End Block:    0x1C 0x0D  (file separator + carriage return)\n"
-         "Segments are separated by carriage return (\\r, 0x0D).\n\n"
-         "Enable 'Show raw MLLP bytes' to log the full TCP payload including framing.\n"
-         "When log level is set to DEBUG, raw bytes are always captured.",
+        ("help.section_hl7_send", "help.body_hl7_send",
          [("ORM^O01 – Radiology Order (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ORM_O01"),
           ("ORU^R01 – Radiology Report (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ORU_R01"),
           ("ADT^A04 – Register Patient (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/ADT_A04"),
@@ -1542,114 +1412,21 @@ class HelpTab(ttk.Frame):
           ("QBP^Q22 – Patient Demographics Query (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/QBP_Q22"),
           ("OML^O21 – Lab Order (Caristix HL7 v2.4)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents/OML_O21")]),
 
-        ("help.section_hl7_recv",
-         "Run a minimal MLLP listener that accepts incoming HL7 v2 messages.\n\n"
-         "─── What it does ───────────────────────────────────────────\n"
-         "Listens on the specified TCP port for MLLP connections.\n"
-         "For every message received it:\n"
-         "  • Displays the message in the Received Messages box.\n"
-         "  • Sends an automatic AA (Application Accept) ACK back to the sender.\n"
-         "  • Logs the sender's IP address and port.\n\n"
-         "─── Use cases ──────────────────────────────────────────────\n"
-         "• Test that a RIS/HIS or other HL7 source is sending correctly.\n"
-         "• Capture sample messages for template building or troubleshooting.\n"
-         "• Verify MLLP connectivity and framing before pointing at a real receiver.\n\n"
-         "─── Notes ──────────────────────────────────────────────────\n"
-         "• Windows Firewall may block the listen port — add an inbound rule if needed.\n"
-         "• Only one listener can run per port. Stop before changing the port.\n"
-         "• Enable 'Show raw MLLP bytes' or set log level to DEBUG to capture framing bytes.",
+        ("help.section_hl7_recv", "help.body_hl7_recv",
          [("HL7 v2.4 Message Definitions (Caristix)", "https://hl7-definition.caristix.com/v2/HL7v2.4/TriggerEvents"),
           ("MLLP Transport Specification (HL7 TN)", "https://www.hl7.org/documentcenter/public/wg/inm/mllp_transport_specification.PDF")]),
 
-        ("help.section_receiver",
-         "Runs a C-STORE SCP that accepts incoming DICOM objects and saves them to disk.\n\n"
-         "─── Configuration ───────────────────────────────────────────\n"
-         "  AE Title    What this listener calls itself. Must match the sending device's\n"
-         "              Called AE Title configuration. Default: your local AE from Settings.\n"
-         "  Port        TCP port to listen on. Default: 11112 (standard DICOM port).\n"
-         "  Save to     Directory where received .dcm files are written. Created if absent.\n\n"
-         "─── Accepted SOP Classes ────────────────────────────────────\n"
-         "Accepts all standard Storage SOP Classes including:\n"
-         "CT, MR, PT, NM, DX, CR, XA, US, MG, SC, SR, PR, KO, RT, PDF, Seg, Reg, PS, OPT\n\n"
-         "─── How it works ────────────────────────────────────────────\n"
-         "Each received file is saved as <SOPInstanceUID>.dcm in the save directory.\n"
-         "The file list on screen updates live as files arrive.\n\n"
-         "─── Tips ───────────────────────────────────────────────────\n"
-         "• Make sure no other process (PACS client, other SCP) is already using the port.\n"
-         "• The sending device must have this AE Title in its routing table.\n"
-         "• Use C-STORE tab to test-send files back to confirm round-trip storage.",
+        ("help.section_receiver", "help.body_receiver",
          [("DICOM PS3.4 §B – Storage Service Class (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_B")]),
 
-        ("help.section_settings",
-         "Configure how this tool identifies itself on the network.\n\n"
-         "─── Local AE Configuration ──────────────────────────────────\n"
-         "  AE Title    The Application Entity title this tool uses when connecting to\n"
-         "              remote DICOM systems. Must be ≤16 characters, uppercase, no spaces.\n"
-         "              The remote PACS must whitelist this AE Title.\n"
-         "  Port        The port this tool listens on when acting as an SCP.\n"
-         "              Default: 11112. Change if another process uses that port.\n\n"
-         "─── Remote AE Presets ───────────────────────────────────────\n"
-         "Saved presets appear in the AE selector dropdown on every tab.\n"
-         "Add a preset once here; use it everywhere without re-typing host/port.\n\n"
-         "─── HL7 Settings ────────────────────────────────────────────\n"
-         "  Default HL7 Listen Port   Pre-fills the port in the HL7 Receive tab.\n\n"
-         "─── Config file location ────────────────────────────────────\n"
-         "Settings are saved to:\n"
-         "  Windows:  %USERPROFILE%\\.pacs_admin_tool\\config.json\n"
-         "  Linux:    ~/.pacs_admin_tool/config.json\n\n"
-         "─── Log files ───────────────────────────────────────────────\n"
-         "The desktop client writes to:  logs/pacs_admin_client.log\n"
-         "The web server writes to:      logs/pacs_admin.log\n"
-         "Both rotate at UTC midnight and are kept for 7 days.",
+        ("help.section_settings", "help.body_settings",
          []),
 
-        ("help.section_sr_viewer",
-         "Parse and display DICOM Structured Report (SR) files.\n\n"
-         "─── What is a DICOM SR? ─────────────────────────────────────\n"
-         "A Structured Report is a DICOM object that encodes clinical findings,\n"
-         "measurements, and observations in a standardised hierarchical structure.\n"
-         "Common examples: radiology reports, radiation dose reports, CAD results.\n\n"
-         "─── Workflow ───────────────────────────────────────────────\n"
-         "1. Click Browse — select a .dcm file that contains a Structured Report.\n"
-         "2. Click Parse SR to parse and display the report content.\n"
-         "3. Optionally click View Raw DICOM Tags to inspect all DICOM attributes.\n\n"
-         "─── Supported SR SOP Classes ───────────────────────────────\n"
-         "Basic Text SR · Enhanced SR · Comprehensive SR · Comprehensive 3D SR\n"
-         "X-Ray Radiation Dose SR · Mammography CAD SR · Chest CAD SR · and others.\n\n"
-         "─── Tips ───────────────────────────────────────────────────\n"
-         "• The parsed view renders the SR content tree in human-readable form.\n"
-         "• Supported value types: TEXT, CODE, NUM, DATE, IMAGE, SCOORD, and more.\n"
-         "• Use View Raw DICOM Tags for low-level debugging of the SR dataset.",
+        ("help.section_sr_viewer", "help.body_sr_viewer",
          [("DICOM PS3.3 §C.17 – Structured Reporting IODs (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#chapter_C"),
           ("DICOM PS3.3 §A.35 – SR Document Storage SOP Classes (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.35")]),
 
-        ("help.section_kos_creator",
-         "Create a DICOM Key Object Selection (KOS) document referencing a set of instances.\n\n"
-         "─── What is a KOS? ─────────────────────────────────────────\n"
-         "A Key Object Selection document is a DICOM SR object that acts as a manifest,\n"
-         "pointing to a chosen subset of images or other instances within a study.\n"
-         "Use cases: teaching files, relevant priors, XDS-I manifests, surgery planning sets.\n\n"
-         "─── Workflow ───────────────────────────────────────────────\n"
-         "1. Click Browse to load one or more DICOM files from the study.\n"
-         "2. Click Extract Metadata to auto-fill the Study & Patient fields.\n"
-         "3. Review or edit the Study fields and the Referenced Instances list.\n"
-         "4. Choose a Document Title from the dropdown.\n"
-         "5. Click Create KOS & Save to write the KOS to a .dcm file, or\n"
-         "   Create KOS & Send (C-STORE) to store it directly on a PACS.\n\n"
-         "─── Referenced Instances format ────────────────────────────\n"
-         "Each line in the instances box must follow this format:\n"
-         "  SeriesUID | SOPClassUID | SOPInstanceUID\n"
-         "Lines starting with # are treated as comments and ignored.\n\n"
-         "─── Document Title codes ───────────────────────────────────\n"
-         "  Of Interest           General key image selection.\n"
-         "  Best In Set           Best single representative image.\n"
-         "  For Referring         Selected images for the referring physician.\n"
-         "  For Surgery           Pre-operative image selection.\n"
-         "  For Teaching          Teaching file selection.\n"
-         "  For Conference        Conference presentation selection.\n"
-         "  For Therapy           Therapy planning image selection.\n"
-         "  For Research          Research or trial image selection.\n"
-         "  XDS-I Manifest        IHE Cross-Enterprise Document Sharing manifest.",
+        ("help.section_kos_creator", "help.body_kos_creator",
          [("DICOM PS3.3 §C.17.6 – Key Object Selection Document IOD (NEMA)", "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_C.17.6"),
           ("IHE RAD TF Vol. 1 – XDS-I.b Integration Profile (IHE)", "https://www.ihe.net/uploadedFiles/Documents/Radiology/IHE_RAD_TF_Vol1.pdf")]),
     ]
@@ -1678,9 +1455,9 @@ class HelpTab(ttk.Frame):
 
     def _show_section(self,_=None):
         sel = self.topic_lb.curselection(); idx = sel[0] if sel else 0
-        key, content, links = self.SECTIONS[idx]; self.title_lbl.configure(text=t(key))
+        key, body_key, links = self.SECTIONS[idx]; self.title_lbl.configure(text=t(key))
         self.text.configure(state="normal"); self.text.delete("1.0","end")
-        self.text.insert("1.0", content.strip())
+        self.text.insert("1.0", t(body_key).strip())
         if links:
             self.text.insert("end", "\n\n" + t("help.official_docs") + "\n", "refs_label")
             for label, url in links:
