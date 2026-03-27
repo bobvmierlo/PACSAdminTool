@@ -4,8 +4,11 @@ Stores and loads AE configurations, presets, and settings.
 """
 
 import json
+import logging
 import os
 import stat
+
+logger = logging.getLogger(__name__)
 
 
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".pacs_admin_tool", "config.json")
@@ -56,7 +59,12 @@ def load_config() -> dict:
             # Deep-merge: new default keys are picked up even for nested dicts.
             return _deep_merge(DEFAULT_CONFIG, loaded)
         except Exception:
-            pass
+            logger.warning(
+                "Could not load config from %s (corrupt or unreadable); "
+                "falling back to defaults.",
+                CONFIG_PATH,
+                exc_info=True,
+            )
     return _deep_merge(DEFAULT_CONFIG, {})
 
 
