@@ -1104,7 +1104,8 @@ class KOSCreatorTab(ttk.Frame):
 
         # ── Referenced instances ──────────────────────────────────────────
         lf_inst = _lf(inner, t("kos_creator.instances")); lf_inst.pack(fill="x", padx=10, pady=(0, 4))
-        _label(lf_inst, t("kos_creator.instances_hint"), style="Dim.TLabel").pack(anchor="w")
+        _label(lf_inst, t("kos_creator.instances_hint"), style="Dim.TLabel").grid(
+            row=0, column=0, columnspan=2, sticky="w")
         self.inst_text = tk.Text(
             lf_inst, height=8, font=FONT_MONO, bg="white", fg="#1a1a1a",
             relief="solid", bd=1, wrap="none",
