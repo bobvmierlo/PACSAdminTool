@@ -1067,8 +1067,9 @@ function addPreset() {
   const name = document.getElementById("new-ae-name").value.trim();
   const aet  = document.getElementById("new-ae-aet").value.trim();
   const host = document.getElementById("new-ae-host").value.trim();
-  const port = parseInt(document.getElementById("new-ae-port").value) || 104;
+  const port = parsePort(document.getElementById("new-ae-port").value);
   if (!name) { alert(i18n("settings.name_required")); return; }
+  if (port === null) { alert('Invalid port. Must be a number between 1 and 65535.'); return; }
   if (!appConfig.remote_aes) appConfig.remote_aes = [];
   appConfig.remote_aes.push({ name, ae_title: aet, host, port });
   renderPresetTable();
@@ -1084,13 +1085,17 @@ function deletePreset(i) {
 }
 
 async function saveSettings() {
+  const localPort = parsePort(document.getElementById("set-ae-port").value);
+  if (localPort === null) { alert('Invalid local AE port. Must be a number between 1 and 65535.'); return; }
+  const hl7Port = parsePort(document.getElementById("set-hl7-port").value);
+  if (hl7Port === null) { alert('Invalid HL7 listen port. Must be a number between 1 and 65535.'); return; }
   appConfig.local_ae = {
     ae_title: document.getElementById("set-ae-title").value.trim(),
-    port:     parseInt(document.getElementById("set-ae-port").value) || 11112,
+    port:     localPort,
   };
   appConfig.hl7 = {
     ...appConfig.hl7,
-    listen_port: parseInt(document.getElementById("set-hl7-port").value) || 2575,
+    listen_port: hl7Port,
   };
   appConfig.log_level = document.getElementById("set-log-level").value;
   appConfig.language = document.getElementById("set-language").value;
@@ -1160,12 +1165,26 @@ function loadPreset(prefix) {
   document.getElementById(prefix + "-port").value = ae.port;
 }
 
+// Validate and parse a port string.  Returns the numeric port (1-65535)
+// or null if the value is not a valid port number.
+function parsePort(value, fallback) {
+  const n = parseInt(value, 10);
+  if (isNaN(n) || n < 1 || n > 65535) return null;
+  return n;
+}
+
 // Read the AE fields for a given prefix into a plain object
 function getAE(prefix) {
+  const portStr = document.getElementById(prefix + "-port").value;
+  const port = parsePort(portStr);
+  if (port === null) {
+    alert(`Invalid port: "${portStr}". Must be a number between 1 and 65535.`);
+    return null;
+  }
   return {
     ae_title: document.getElementById(prefix + "-ae").value.trim(),
     host:     document.getElementById(prefix + "-host").value.trim(),
-    port:     parseInt(document.getElementById(prefix + "-port").value) || 104,
+    port:     port,
   };
 }
 
@@ -1175,6 +1194,7 @@ function getAE(prefix) {
 
 async function doEcho(prefix) {
   const ae = getAE(prefix);
+  if (!ae) return;
   appendLog(`log-${prefix}`, now(), `C-ECHO → ${ae.ae_title}@${ae.host}:${ae.port}`);
   const res  = await fetch("/api/dicom/echo", {
     method: "POST",
@@ -1193,6 +1213,7 @@ let cfindResults = [];  // keep results for C-MOVE and detail popup
 
 async function doCFind() {
   const ae = getAE("cfind");
+  if (!ae) return;
   clearTable("cfind-tbody");
   cfindResults = [];
   appendLog("log-cfind", now(), `C-FIND → ${ae.ae_title}@${ae.host}:${ae.port}`);
@@ -1236,6 +1257,7 @@ async function doCMove() {
   if (idx === -1) { alert(i18n("cfind.select_row_first")); return; }
 
   const ae   = getAE("cfind");
+  if (!ae) return;
   const dest = document.getElementById("cfind-movedest").value.trim();
   const uid  = cfindResults[idx].StudyUID;
   appendLog("log-cfind", now(), `C-MOVE → dest=${dest}  study=${uid}`);
@@ -1281,6 +1303,7 @@ function clearStoreFiles() {
 
 async function doCStore() {
   const ae    = getAE("cstore");
+  if (!ae) return;
   const input = document.getElementById("cstore-files");
   if (!input.files.length) { alert(i18n("cstore.no_files")); return; }
 
@@ -1306,6 +1329,7 @@ let dmwlResults = [];
 
 async function doDMWL() {
   const ae = getAE("dmwl");
+  if (!ae) return;
   clearTable("dmwl-tbody");
   dmwlResults = [];
   appendLog("log-dmwl", now(), `DMWL → ${ae.ae_title}@${ae.host}:${ae.port}`);
@@ -1354,6 +1378,7 @@ function exportDMWLCsv() {
 
 async function doCommit() {
   const ae   = getAE("commit");
+  if (!ae) return;
   const raw  = document.getElementById("commit-uids").value;
   const uids = raw.split("\n").map(s => s.trim()).filter(Boolean);
   if (!uids.length) { alert(i18n("commit.enter_uid")); return; }
@@ -1373,6 +1398,7 @@ async function doCommit() {
 
 async function doIOCM() {
   const ae = getAE("iocm");
+  if (!ae) return;
   appendLog("log-iocm", now(), `IOCM → ${ae.ae_title}`);
   const res  = await fetch("/api/dicom/iocm", {
     method: "POST",
@@ -1502,8 +1528,10 @@ async function loadHL7Template() {
 }
 
 async function doHL7Send() {
-  const host = document.getElementById("hl7-host").value.trim();
-  const port = document.getElementById("hl7-port").value.trim();
+  const host    = document.getElementById("hl7-host").value.trim();
+  const portStr = document.getElementById("hl7-port").value.trim();
+  const port    = parsePort(portStr);
+  if (port === null) { alert(`Invalid port: "${portStr}". Must be a number between 1 and 65535.`); return; }
   const msg  = document.getElementById("hl7-message").value.trim();
   if (!msg) { alert(i18n("hl7.no_message")); return; }
   appendLog("log-hl7-send", now(), `Sending to ${host}:${port}`);
@@ -1535,12 +1563,14 @@ async function toggleHL7Listener() {
     await fetch("/api/hl7/listener/stop", { method: "POST" });
     hl7ListenerRunning = false;
   } else {
-    const port = document.getElementById("hl7-listen-port").value;
+    const portStr = document.getElementById("hl7-listen-port").value;
+    const port = parsePort(portStr);
+    if (port === null) { alert(`Invalid port: "${portStr}". Must be a number between 1 and 65535.`); return; }
     const res  = await fetch("/api/hl7/listener/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        port: parseInt(port),
+        port: port,
         debug: document.getElementById("hl7-recv-debug").checked,
       }),
     });
@@ -1585,12 +1615,15 @@ async function toggleSCP() {
     await fetch("/api/scp/stop", { method: "POST" });
     scpRunning = false;
   } else {
+    const scpPortStr = document.getElementById("scp-port").value;
+    const scpPort = parsePort(scpPortStr);
+    if (scpPort === null) { alert(`Invalid port: "${scpPortStr}". Must be a number between 1 and 65535.`); return; }
     const res  = await fetch("/api/scp/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ae_title: document.getElementById("scp-ae").value,
-        port:     parseInt(document.getElementById("scp-port").value),
+        port:     scpPort,
         save_dir: document.getElementById("scp-dir").value,
       }),
     });
