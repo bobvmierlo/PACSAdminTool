@@ -90,7 +90,6 @@
     "no_results": "Geen resultaten om te exporteren.",
     "results_count": "{n} resultaat/resultaten"
   },
-
   "cstore": {
     "storage_scp": "Storage SCP (bestemming)",
     "destination_ae": "Bestemmings-AE",
@@ -105,7 +104,6 @@
     "select_dicom": "Selecteer DICOM-bestanden",
     "select_folder": "Selecteer map met DICOM-bestanden"
   },
-
   "dmwl": {
     "worklist_scp": "Werklijst SCP",
     "query_filters": "Queryfilters  (laat leeg = alles)",
@@ -134,7 +132,6 @@
     "col_station_aet": "StationAET",
     "col_procedure": "Procedure"
   },
-
   "commit": {
     "commit_scp": "Storage Commitment SCP",
     "sop_uids": "SOP Instance UIDs",
@@ -145,7 +142,6 @@
     "no_uids": "Geen UIDs geladen.",
     "enter_uid": "Voer minimaal één UID in"
   },
-
   "iocm": {
     "iocm_scp": "IOCM SCP",
     "notification": "Instance Availability Notificatie (N-CREATE)",
@@ -158,7 +154,6 @@
     "availability": "Beschikbaarheid:",
     "send": "N-CREATE verzenden (Verwijdermelding)"
   },
-
   "hl7": {
     "send_tab": "HL7 verzenden",
     "recv_tab": "HL7 ontvangen",
@@ -208,7 +203,6 @@
     "messages_count": "{n} berichten",
     "invalid_port": "Ongeldig poortnummer."
   },
-
   "scp": {
     "listener_config": "Listener-configuratie",
     "ae_title": "AE Titel:",
@@ -231,7 +225,6 @@
     "invalid_port": "Ongeldige poort.",
     "select_save_folder": "Selecteer map om ontvangen DICOM-bestanden op te slaan"
   },
-
   "settings": {
     "local_ae": "Lokale AE-configuratie",
     "ae_title": "AE Title:",
@@ -260,24 +253,33 @@
     "language_label": "Interfacetaal:",
     "language_note": "Wijzigingen worden van kracht na herstart (desktop) of pagina vernieuwen (web)."
   },
-
   "help": {
     "topics": "Onderwerpen",
     "official_docs": "Officiële documentatie:",
     "official_docs_web": "Officiële documentatie",
-    "section_cfind": "C-FIND / Opvragen",
+    "section_cfind": "C-FIND / Query-Retrieve",
     "section_cstore": "C-STORE (Bestanden verzenden)",
-    "section_dmwl": "DMWL - Modaliteitswerklist",
-    "section_commit": "Opslagcommitment",
-    "section_iocm": "IOCM - Instantiebeschikbaarheid",
+    "section_dmwl": "DMWL - Modality Worklist",
+    "section_commit": "Storage Commitment",
+    "section_iocm": "IOCM - Instance Availability",
     "section_hl7_send": "HL7 - Verzenden",
     "section_hl7_recv": "HL7 - Ontvangen",
-    "section_receiver": "DICOM Opslaagreceiver",
+    "section_receiver": "DICOM Storage Listener",
     "section_settings": "Instellingen",
-    "section_sr_viewer": "SR-viewer",
-    "section_kos_creator": "KOS-aanmaker"
+    "section_sr_viewer": "SR Viewer",
+    "section_kos_creator": "KOS Creator",
+    "body_cfind": "Voer een query uit op een externe PACS voor patiënten en studies via de DICOM Query/Retrieve service.\n\n─── Knoppen ───────────────────────────────────────────────\nC-ECHO (Ping)      Controleert of de externe AE bereikbaar is en reageert.\n                   Voer dit altijd eerst uit om connectiviteit te bevestigen voordat je een C-FIND doet.\nRun C-FIND         Stuurt een query met een combinatie van filtervelden.\n                   Laat alle velden leeg om alles op te halen (gebruik met voorzichtigheid).\nC-MOVE             Instrueert de externe PACS om de geselecteerde studie te sturen naar de\n                   opgegeven Destination AE. Deze AE moet een Storage SCP draaien\n                   en bekend zijn bij de bron-PACS.\n\n─── Queryniveau ───────────────────────────────────────────\nHet queryniveau bepaalt hoe gedetailleerd de resultaten zijn:\n\n  PATIENT  Geeft één regel per patiënt. Werkt alleen met het Patient Root model.\n           Handig voor patiëntniveau-zoekopdrachten (bijv. alle studies van een patiënt).\n\n  STUDY    Geeft één regel per studie. Het meest gebruikte niveau.\n           Werkt met zowel Study Root als Patient Root modellen.\n\n  SERIES   Geeft één regel per serie binnen een studie.\n           Vereist een Study Instance UID om te filteren.\n\n  IMAGE    Geeft één regel per SOP instance (individueel DICOM-bestand).\n           Vereist een Series Instance UID. Gebruik spaarzaam — zeer uitgebreid.\n\n─── Model (Informatiemodel) ──────────────────────────────\nHet informatiemodel bepaalt welke DICOM service class wordt gebruikt.\nDe meeste PACS-systemen ondersteunen beide, maar niet allemaal.\n\n  STUDY  (Study Root Q/R — aanbevolen voor de meeste use-cases)\n         Hiërarchie: STUDY → SERIES → IMAGE\n         Geldige niveaus: STUDY, SERIES, IMAGE\n         ✗  PATIENT-niveau wordt NIET ondersteund in dit model.\n         Gebruik dit als je al een Accession, datum of Study UID hebt.\n\n  PATIENT  (Patient Root Q/R)\n           Hiërarchie: PATIENT → STUDY → SERIES → IMAGE\n           Geldige niveaus: PATIENT, STUDY, SERIES, IMAGE\n           Gebruik dit bij zoeken op Patient ID of naam zonder\n           specifieke studiecontext, of als de PACS dit vereist.\n\n─── Geldige combinaties ───────────────────────────────────\n  Model     │  Ondersteunde queryniveaus\n  ──────────┼───────────────────────────────────────\n  STUDY     │  STUDY  ·  SERIES  ·  IMAGE\n  PATIENT   │  PATIENT  ·  STUDY  ·  SERIES  ·  IMAGE\n\nDe tool geeft een waarschuwing en corrigeert automatisch incompatibele combinaties.\n\n─── Datumformaat ──────────────────────────────────────────\nStudy Date accepteert DICOM-formaat: YYYYMMDD of een bereik YYYYMMDD-YYYYMMDD\nVoorbeeld: 20240101-20241231 geeft alle studies uit 2024.\n\n─── Tips ─────────────────────────────────────────────────\n• Patient Name ondersteunt wildcards: SMITH* of *SMITH* (DICOM wildcard is *)\n• Dubbelklik op een resultaatregel om alle DICOM-tags te bekijken.\n• Als C-FIND 0 resultaten geeft, versoepel filters of controleer het queryniveau.",
+    "body_cstore": "Verzend DICOM-bestanden vanaf schijf naar een externe Storage SCP via de C-STORE service.\n\n─── Workflow ─────────────────────────────────────────────\n1. Stel de bestemming AE Title, Host en poort in.\n2. Add Files — selecteer losse .dcm-bestanden, of\n   Add Folder — voegt alle bestanden in een map recursief toe.\n3. Controleer de wachtrij.\n4. Klik op Send All (C-STORE) om te verzenden.\n\n─── Opmerkingen ───────────────────────────────────────────\n• Elk bestand wordt als aparte C-STORE request verstuurd binnen dezelfde associatie.\n• De SCP moet de SOP Class van elk bestand ondersteunen.\n• Transfer Syntax wordt automatisch afgehandeld door pynetdicom.\n• Gebruik de DICOM Receiver-tab om lokaal een SCP te draaien.",
+    "body_dmwl": "Voer een query uit op een Modality Worklist SCP voor geplande procedures.\n\n─── Wat is een Modality Worklist? ─────────────────────────\nDe Modality Worklist (DMWL) service stelt een modality (bijv. CT-scanner) in staat\nom geplande onderzoeken op te halen uit RIS/HIS via de PACS.\nHiermee worden patiëntgegevens automatisch ingevuld.\n\n─── Station AET veld ──────────────────────────────────────\nIndien ingesteld wordt deze waarde gebruikt als CALLING AE title.\nDit simuleert een specifieke modality, nodig bij systemen die filteren op AET.\nLaat leeg om de lokale AE uit Settings te gebruiken.\n\n─── Datum veld ────────────────────────────────────────────\nFiltert op ScheduledProcedureStepStartDate.\nGebruik YYYYMMDD voor vandaag.\nLeeg laten = alles ophalen (kan groot zijn).\n\n─── Tips ─────────────────────────────────────────────────\n• Dubbelklik om volledige SPS-sequentie te bekijken.\n• Export naar CSV voor rapportage.\n• 0 resultaten? Controleer Station AET.",
+    "body_commit": "Controleer of een PACS DICOM-instanties permanent heeft opgeslagen.\n\n─── Werking ──────────────────────────────────────────────\n1. Laad SOP Instance UIDs.\n2. Verstuur N-ACTION.\n3. PACS reageert met N-EVENT-REPORT:\n   • Referenced SOP Sequence — succesvol\n   • Failed SOP Sequence — mislukt\n\n─── Wanneer gebruiken ────────────────────────────────────\n• Na C-STORE\n• Bij migraties/audits\n• Troubleshooting\n\n─── Opmerking ─────────────────────────────────────────────\nVereist callback naar deze tool.",
+    "body_iocm": "Stuur een Instance Availability Notification (N-CREATE).\n\n─── Wat is IOCM? ─────────────────────────────────────────\nWordt gebruikt bij verwijderen/beschikbaarheid.\n\n─── Velden ───────────────────────────────────────────────\nStudy UID, Series UID, SOP Class UID, SOP Instance UID, Availability\n\n─── Let op ───────────────────────────────────────────────\nOnjuist gebruik kan data-indexen verwijderen.",
+    "body_hl7_send": "Verzend HL7 v2-berichten via MLLP.\n\n─── Workflow ─────────────────────────────────────────────\n1. Stel host/poort in\n2. Kies template\n3. Load Template\n4. Controleer\n5. Send\n\n─── Templates ────────────────────────────────────────────\nORM, ORU, ADT, SIU, QBP, OML\n\n─── MLLP ────────────────────────────────────────────────\nBerichten worden ingepakt met start/end bytes.",
+    "body_hl7_recv": "Start een MLLP listener voor HL7 v2.\n\n─── Wat doet het ─────────────────────────────────────────\nOntvangt berichten, toont ze en stuurt ACK terug.\n\n─── Use cases ────────────────────────────────────────────\nTesten, debuggen, connectiviteit.\n\n─── Opmerkingen ─────────────────────────────────────────\nFirewall en poorten.",
+    "body_receiver": "Start een C-STORE SCP en sla DICOM-bestanden op.\n\n─── Configuratie ─────────────────────────────────────────\nAE Title, Poort, opslagmap\n\n─── Werking ──────────────────────────────────────────────\nBestanden worden opgeslagen als <SOPInstanceUID>.dcm\n\n─── Tips ────────────────────────────────────────────────\nControleer poort en routing.",
+    "body_settings": "Configureer netwerkidentiteit.\n\n─── AE Config ───────────────────────────────────────────\nAE Title en poort\n\n─── Presets ─────────────────────────────────────────────\nHerbruikbare configuraties\n\n─── Logs ────────────────────────────────────────────────\nWorden automatisch geroteerd.",
+    "body_sr_viewer": "Parse en toon DICOM SR-bestanden.\n\n─── Wat is SR ───────────────────────────────────────────\nGestructureerde rapporten.\n\n─── Workflow ────────────────────────────────────────────\nBestand kiezen → Parse → bekijken\n\n─── Tips ───────────────────────────────────────────────\nMenselijk leesbaar + debugopties.",
+    "body_kos_creator": "Maak een DICOM KOS-document.\n\n─── Wat is KOS ──────────────────────────────────────────\nVerwijst naar geselecteerde beelden.\n\n─── Workflow ────────────────────────────────────────────\nBestanden laden → metadata → opslaan/verzenden\n\n─── Formaat ─────────────────────────────────────────────\nSeriesUID | SOPClassUID | SOPInstanceUID\n\n─── Titels ──────────────────────────────────────────────\nOf Interest, Best In Set, Teaching, etc."
   },
-
   "about": {
     "title": "PACS Admin Tool",
     "description": "Een draagbare DICOM & HL7 beheertool voor PACS-engineers,\nradiologen en zorgprofessionals in de IT.",
@@ -294,7 +296,6 @@
     "dicom_standard": "DICOM Standaard (NEMA)  \u2197",
     "hl7_reference": "HL7 v2 Referentie  \u2197"
   },
-
   "sr_viewer": {
     "load_file": "DICOM SR-bestand laden",
     "select_file": "Selecteer een DICOM Structured Report-bestand",
@@ -306,7 +307,6 @@
     "no_parsed": "Geen verwerkt SR beschikbaar. Verwerk eerst een bestand.",
     "tags_title": "SR - Alle DICOM-tags"
   },
-
   "kos_creator": {
     "load_files": "DICOM-bestanden laden (studie-informatie extraheren)",
     "no_files_loaded": "Geen bestanden geladen.",
@@ -338,7 +338,6 @@
     "col_sop_class": "SOP-klasse",
     "col_sop_inst": "SOP-instantie-UID"
   },
-
   "dicom_detail": {
     "title": "DICOM-tags",
     "filter_placeholder": "Filteren op tag, trefwoord of waarde\u2026",
