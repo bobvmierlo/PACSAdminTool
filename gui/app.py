@@ -199,8 +199,16 @@ class AESelector(ttk.LabelFrame):
                 self.port_var.set(str(ae.get("port",104))); return
 
     def get(self):
+        port_str = self.port_var.get().strip() or "104"
+        try:
+            port = int(port_str)
+            if not (1 <= port <= 65535):
+                raise ValueError
+        except ValueError:
+            messagebox.showerror(t("common.error"), f"Invalid port: \"{port_str}\". Must be a number between 1 and 65535.")
+            return None
         return {"ae_title": self.ae_var.get().strip(), "host": self.host_var.get().strip(),
-                "port": int(self.port_var.get().strip() or "104")}
+                "port": port}
 
 
 def _show_dicom_detail(parent_win, dataset, title=None):
@@ -311,7 +319,9 @@ class CFindTab(ttk.Frame):
             _show_dicom_detail(self,self._datasets[idx],title=t("cfind.detail_title"))
 
     def _do_cecho(self):
-        ae = self.ae_sel.get(); local = self.app.local_ae
+        ae = self.ae_sel.get()
+        if ae is None: return
+        local = self.app.local_ae
         self.log.append(f"C-ECHO -> {ae['ae_title']}@{ae['host']}:{ae['port']}")
         def run():
             try:
@@ -352,7 +362,9 @@ class CFindTab(ttk.Frame):
         return ds
 
     def _do_cfind(self):
-        ae = self.ae_sel.get(); local = self.app.local_ae
+        ae = self.ae_sel.get()
+        if ae is None: return
+        local = self.app.local_ae
         ds = self._build_query_ds()
         if ds is None: self.log.append(t("cfind.pydicom_missing"),"err"); return
         self.tree.delete(*self.tree.get_children()); self._datasets.clear()
@@ -387,7 +399,9 @@ class CFindTab(ttk.Frame):
     def _do_cmove(self):
         sel = self.tree.selection()
         if not sel: messagebox.showwarning("C-MOVE","Select a result row first."); return
-        ae = self.ae_sel.get(); local = self.app.local_ae
+        ae = self.ae_sel.get()
+        if ae is None: return
+        local = self.app.local_ae
         dest = self.move_dest_var.get().strip()
         idx = self.tree.index(sel[0]); src = self._datasets[idx]
         try: from pydicom.dataset import Dataset
@@ -448,7 +462,9 @@ class CStoreTab(ttk.Frame):
 
     def _do_cstore(self):
         if not self._files: messagebox.showwarning("C-STORE",t("cstore.no_files")); return
-        ae = self.ae_sel.get(); local = self.app.local_ae; files = list(self._files)
+        ae = self.ae_sel.get()
+        if ae is None: return
+        local = self.app.local_ae; files = list(self._files)
         self.log.append(f"C-STORE {len(files)} file(s) -> {ae['ae_title']}@{ae['host']}:{ae['port']}")
         def run():
             try:
@@ -521,7 +537,9 @@ class DMWLTab(ttk.Frame):
         return ds
 
     def _do_dmwl(self):
-        ae = self.ae_sel.get(); local = self.app.local_ae
+        ae = self.ae_sel.get()
+        if ae is None: return
+        local = self.app.local_ae
         ds = self._build_mwl_ds()
         if ds is None: self.log.append(t("cfind.pydicom_missing"),"err"); return
         self.tree.delete(*self.tree.get_children()); self._datasets.clear()
@@ -597,7 +615,9 @@ class StorageCommitTab(ttk.Frame):
 
     def _do_commit(self):
         if not self._uids: messagebox.showwarning("Storage Commitment",t("commit.no_uids")); return
-        ae = self.ae_sel.get(); local = self.app.local_ae; uids = list(self._uids)
+        ae = self.ae_sel.get()
+        if ae is None: return
+        local = self.app.local_ae; uids = list(self._uids)
         self.log.append(f"N-ACTION -> {ae['ae_title']}@{ae['host']}:{ae['port']}  ({len(uids)} UIDs)")
         def run():
             try:
@@ -628,7 +648,9 @@ class IOCMTab(ttk.Frame):
         lf2, self.log = _log_frame(self,height=10); lf2.pack(fill="both",expand=True,padx=10,pady=6)
 
     def _do_iocm(self):
-        ae = self.ae_sel.get(); local = self.app.local_ae
+        ae = self.ae_sel.get()
+        if ae is None: return
+        local = self.app.local_ae
         params = {"patient_id":self.iocm_pid.get(),"study_uid":self.iocm_suid.get(),"series_uid":self.iocm_seruid.get(),"sop_class_uid":self.iocm_sopclass.get(),"sop_inst_uid":self.iocm_sopinst.get(),"availability":self.iocm_avail.get()}
         self.log.append(f"IOCM N-CREATE -> {ae['ae_title']}@{ae['host']}:{ae['port']}")
         def run():
@@ -813,7 +835,13 @@ class HL7Tab(ttk.Frame):
         self.hl7_msg_text.insert("1.0", msg.replace("\r", "\n"))
 
     def _do_hl7_send(self):
-        host = self.hl7_host_var.get().strip(); port = int(self.hl7_port_var.get().strip() or "2575")
+        host = self.hl7_host_var.get().strip()
+        port_str = self.hl7_port_var.get().strip() or "2575"
+        try:
+            port = int(port_str)
+            if not (1 <= port <= 65535): raise ValueError
+        except ValueError:
+            messagebox.showerror(t("common.error"), f"Invalid port: \"{port_str}\". Must be a number between 1 and 65535."); return
         msg = self.hl7_msg_text.get("1.0","end").strip().replace("\n","\r")
         if not msg: messagebox.showwarning("HL7 Send",t("hl7.no_message")); return
         debug = self.send_debug_var.get()
@@ -1260,6 +1288,7 @@ class KOSCreatorTab(ttk.Frame):
 
     def _create_and_send(self):
         ae = self.ae_sel.get()
+        if ae is None: return
         local = self.app.local_ae
         self.log.append(
             f"Creating KOS and sending to {ae['ae_title']}@{ae['host']}:{ae['port']}"
@@ -1360,7 +1389,13 @@ class SettingsTab(ttk.Frame):
             self.ae_tree.insert("","end",values=(ae.get("name",""),ae.get("ae_title",""),ae.get("host",""),ae.get("port",104)))
 
     def _add_ae(self):
-        entry = {"name":self.new_name.get().strip(),"ae_title":self.new_aet.get().strip(),"host":self.new_host.get().strip(),"port":int(self.new_port.get().strip() or "104")}
+        port_str = self.new_port.get().strip() or "104"
+        try:
+            port_val = int(port_str)
+            if not (1 <= port_val <= 65535): raise ValueError
+        except ValueError:
+            messagebox.showerror(t("common.error"), f"Invalid port: \"{port_str}\". Must be a number between 1 and 65535."); return
+        entry = {"name":self.new_name.get().strip(),"ae_title":self.new_aet.get().strip(),"host":self.new_host.get().strip(),"port":port_val}
         if not entry["name"]: messagebox.showwarning("Add AE",t("settings.name_required")); return
         self.app.config.setdefault("remote_aes",[]).append(entry); self._reload_ae_tree()
         for attr in ("new_name","new_aet","new_host","new_port"): getattr(self,attr).set("")
@@ -1372,11 +1407,19 @@ class SettingsTab(ttk.Frame):
         if idx < len(aes): aes.pop(idx); self._reload_ae_tree()
 
     def _save(self):
+        local_port_str = self.local_port_var.get().strip() or "11112"
+        hl7_port_str = self.hl7_port_var.get().strip() or "2575"
+        for label, val in [("Local AE port", local_port_str), ("HL7 listen port", hl7_port_str)]:
+            try:
+                p = int(val)
+                if not (1 <= p <= 65535): raise ValueError
+            except ValueError:
+                messagebox.showerror(t("common.error"), f"Invalid {label}: \"{val}\". Must be a number between 1 and 65535."); return
         self.app.config.setdefault("local_ae",{})
         self.app.config["local_ae"]["ae_title"] = self.local_ae_var.get().strip()
-        self.app.config["local_ae"]["port"] = int(self.local_port_var.get().strip() or "11112")
+        self.app.config["local_ae"]["port"] = int(local_port_str)
         self.app.config.setdefault("hl7",{})
-        self.app.config["hl7"]["listen_port"] = int(self.hl7_port_var.get().strip() or "2575")
+        self.app.config["hl7"]["listen_port"] = int(hl7_port_str)
         self.app.config["language"] = self.lang_var.get()
         save_config(self.app.config)
         self.save_lbl.configure(text=t("settings.saved", ts=datetime.now().strftime('%H:%M:%S')))
