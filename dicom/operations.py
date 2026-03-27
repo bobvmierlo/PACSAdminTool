@@ -581,7 +581,7 @@ def run_storage_scp(ae_title, port, save_dir,
     """Run a blocking Storage SCP that saves files and calls callbacks."""
     try:
         from pynetdicom import AE, evt
-        from pynetdicom.sop_class import VerificationSOPClass
+        from pynetdicom.sop_class import Verification
         import pydicom
         import uuid
     except ImportError as e:
@@ -608,7 +608,7 @@ def run_storage_scp(ae_title, port, save_dir,
             return 0xC001
 
     ae = AE(ae_title=ae_title)
-    ae.add_supported_context(VerificationSOPClass)
+    ae.add_supported_context(Verification)
 
     # Prioritise SR, PR and common image SOP classes so they are never
     # bumped out by the 128-presentation-context DICOM protocol limit.
