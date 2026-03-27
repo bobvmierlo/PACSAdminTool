@@ -221,6 +221,55 @@ def _local_ae():
 
 
 # ===========================================================================
+# Input validation helpers
+# ===========================================================================
+
+def _bad_request(msg: str):
+    """Return a standardized 400 error response tuple."""
+    logger.warning("Bad request: %s", msg)
+    return jsonify({"ok": False, "error": msg}), 400
+
+
+def _require_dicom_fields(d: dict | None):
+    """
+    Validate that a JSON payload contains the required DICOM connection fields.
+    Returns a 400 response tuple on failure, or None if all fields are present
+    and valid.
+    """
+    if d is None:
+        return _bad_request("Request body must be valid JSON.")
+    for field in ("host", "port", "ae_title"):
+        if not d.get(field):
+            return _bad_request(f"Missing required field: '{field}'.")
+    try:
+        port = int(d["port"])
+        if not (1 <= port <= 65535):
+            raise ValueError
+    except (ValueError, TypeError):
+        return _bad_request(f"'port' must be an integer between 1 and 65535, got: {d['port']!r}.")
+    return None
+
+
+def _require_hl7_fields(d: dict | None):
+    """
+    Validate that a JSON payload contains the required HL7 send fields.
+    Returns a 400 response tuple on failure, or None if valid.
+    """
+    if d is None:
+        return _bad_request("Request body must be valid JSON.")
+    for field in ("host", "port", "message"):
+        if not d.get(field):
+            return _bad_request(f"Missing required field: '{field}'.")
+    try:
+        port = int(d["port"])
+        if not (1 <= port <= 65535):
+            raise ValueError
+    except (ValueError, TypeError):
+        return _bad_request(f"'port' must be an integer between 1 and 65535, got: {d['port']!r}.")
+    return None
+
+
+# ===========================================================================
 # Page route – serve the single-page web UI
 # ===========================================================================
 
@@ -388,7 +437,10 @@ def dicom_echo():
     The browser sends: { ae_title, host, port }
     We return:         { ok, message }
     """
-    d = request.get_json()
+    d = request.get_json(silent=True)
+    err = _require_dicom_fields(d)
+    if err:
+        return err
     logger.debug("C-ECHO  local=%s  remote=%s@%s:%s",
                  _local_ae(), d.get("ae_title"), d.get("host"), d.get("port"))
     from dicom.operations import c_echo
@@ -398,7 +450,7 @@ def dicom_echo():
         return jsonify({"ok": ok, "message": msg})
     except Exception as e:
         logger.exception("C-ECHO exception")
-        return jsonify({"ok": False, "message": str(e)})
+        return jsonify({"ok": False, "message": str(e)}), 500
 
 
 # ===========================================================================
@@ -418,7 +470,10 @@ def dicom_find():
     Results are plain dicts (pydicom Dataset objects can't be JSON-serialised
     directly, so we convert them field by field).
     """
-    d = request.get_json()
+    d = request.get_json(silent=True)
+    err = _require_dicom_fields(d)
+    if err:
+        return err
     logger.debug("C-FIND  local=%s  remote=%s@%s:%s  level=%s  model=%s  "
                  "PatID=%r  PatName=%r  Acc=%r  Date=%r  Mod=%r  UID=%r",
                  _local_ae(), d.get("ae_title"), d.get("host"), d.get("port"),
@@ -464,7 +519,7 @@ def dicom_find():
         return jsonify({"ok": ok, "message": msg, "results": rows})
     except Exception as e:
         logger.exception("C-FIND error")
-        return jsonify({"ok": False, "message": str(e), "results": []})
+        return jsonify({"ok": False, "message": str(e), "results": []}), 500
 
 
 # ===========================================================================
@@ -478,7 +533,10 @@ def dicom_move():
     Browser sends: { ae_title, host, port, study_uid, move_dest, query_model }
     Progress log lines are pushed over WebSocket as they happen.
     """
-    d = request.get_json()
+    d = request.get_json(silent=True)
+    err = _require_dicom_fields(d)
+    if err:
+        return err
     logger.debug("C-MOVE  local=%s  remote=%s@%s:%s  dest=%s  uid=%s  model=%s",
                  _local_ae(), d.get("ae_title"), d.get("host"), d.get("port"),
                  d.get("move_dest"), d.get("study_uid"), d.get("query_model"))
@@ -502,7 +560,8 @@ def dicom_move():
         threading.Thread(target=run, daemon=True).start()
         return jsonify({"ok": True, "message": "C-MOVE started"})
     except Exception as e:
-        return jsonify({"ok": False, "message": str(e)})
+        logger.exception("C-MOVE setup error")
+        return jsonify({"ok": False, "message": str(e)}), 500
 
 
 # ===========================================================================
@@ -519,13 +578,22 @@ def dicom_store():
     """
     ae_title = request.form.get("ae_title", "")
     host     = request.form.get("host", "")
-    port     = int(request.form.get("port", 104))
+    try:
+        port = int(request.form.get("port", 104))
+        if not (1 <= port <= 65535):
+            raise ValueError
+    except (ValueError, TypeError):
+        return jsonify({"ok": False, "message": "Invalid port value"}), 400
     files    = request.files.getlist("files[]")
+
+    if not host or not ae_title:
+        return jsonify({"ok": False, "message": "Missing required fields: host, ae_title"}), 400
+
     logger.debug("C-STORE  local=%s  remote=%s@%s:%s  files=%d",
                  _local_ae(), ae_title, host, port, len(files))
 
     if not files:
-        return jsonify({"ok": False, "message": "No files uploaded"})
+        return jsonify({"ok": False, "message": "No files uploaded"}), 400
 
     # Save the uploaded files to a temp dir
     import tempfile
@@ -544,6 +612,7 @@ def dicom_store():
                               callback=lambda m: _log("cstore", m))
             _log("cstore", msg, "ok" if ok else "err")
         except Exception as e:
+            logger.exception("C-STORE background error")
             _log("cstore", f"Error: {e}", "err")
         finally:
             # Clean up temp files
@@ -566,7 +635,10 @@ def dicom_dmwl():
                      study_date, modality, accession, station_aet }
     Returns: { ok, message, results: [ { ... tags ... }, ... ] }
     """
-    d = request.get_json()
+    d = request.get_json(silent=True)
+    err = _require_dicom_fields(d)
+    if err:
+        return err
     logger.debug("DMWL  local=%s  remote=%s@%s:%s  PatID=%r  PatName=%r  "
                  "Date=%r  Mod=%r  Acc=%r  StationAET=%r",
                  _local_ae(), d.get("ae_title"), d.get("host"), d.get("port"),
@@ -638,7 +710,7 @@ def dicom_dmwl():
         return jsonify({"ok": ok, "message": msg, "results": rows})
     except Exception as e:
         logger.exception("DMWL error")
-        return jsonify({"ok": False, "message": str(e), "results": []})
+        return jsonify({"ok": False, "message": str(e), "results": []}), 500
 
 
 # ===========================================================================
@@ -652,13 +724,16 @@ def dicom_commit():
     Browser sends: { ae_title, host, port, uids: ["uid1", "uid2", ...] }
     UIDs here are SOP Instance UIDs (we use a placeholder SOP class UID).
     """
-    d = request.get_json()
+    d = request.get_json(silent=True)
+    err = _require_dicom_fields(d)
+    if err:
+        return err
     uids = d.get("uids", [])
     logger.debug("Storage Commitment  remote=%s@%s:%s  uids=%d: %s",
                  d.get("ae_title"), d.get("host"), d.get("port"),
                  len(uids), uids)
     if not uids:
-        return jsonify({"ok": False, "message": "No UIDs provided"})
+        return jsonify({"ok": False, "message": "No UIDs provided"}), 400
     try:
         from dicom.operations import storage_commit
         # storage_commit expects (sop_class_uid, sop_instance_uid) tuples.
@@ -678,7 +753,8 @@ def dicom_commit():
         threading.Thread(target=run, daemon=True).start()
         return jsonify({"ok": True, "message": "Commitment request sent"})
     except Exception as e:
-        return jsonify({"ok": False, "message": str(e)})
+        logger.exception("Storage Commitment setup error")
+        return jsonify({"ok": False, "message": str(e)}), 500
 
 
 # ===========================================================================
@@ -692,7 +768,10 @@ def dicom_iocm():
     Browser sends: { ae_title, host, port, study_uid, series_uid,
                      sop_class_uid, sop_inst_uid, availability }
     """
-    d = request.get_json()
+    d = request.get_json(silent=True)
+    err = _require_dicom_fields(d)
+    if err:
+        return err
     logger.debug("IOCM  remote=%s@%s:%s  study=%s  sop_class=%s  sop_inst=%s  avail=%s",
                  d.get("ae_title"), d.get("host"), d.get("port"),
                  d.get("study_uid"), d.get("sop_class_uid"), d.get("sop_inst_uid"),
@@ -710,7 +789,8 @@ def dicom_iocm():
         threading.Thread(target=run, daemon=True).start()
         return jsonify({"ok": True, "message": "IOCM notification sent"})
     except Exception as e:
-        return jsonify({"ok": False, "message": str(e)})
+        logger.exception("IOCM setup error")
+        return jsonify({"ok": False, "message": str(e)}), 500
 
 
 # ===========================================================================
@@ -764,7 +844,10 @@ def hl7_send():
     pushed to the log so the user can see the complete TCP packet.
     Returns: { ok, message, response }
     """
-    d = request.get_json()
+    d = request.get_json(silent=True)
+    err = _require_hl7_fields(d)
+    if err:
+        return err
     debug = bool(d.get("debug", False))
     logger.debug("HL7 Send  remote=%s:%s  debug=%s  msg_len=%d",
                  d.get("host"), d.get("port"), debug,
@@ -786,7 +869,8 @@ def hl7_send():
              "ok" if ok else "err")
         return jsonify({"ok": ok, "response": response})
     except Exception as e:
-        return jsonify({"ok": False, "response": str(e)})
+        logger.exception("HL7 Send error")
+        return jsonify({"ok": False, "response": str(e)}), 500
 
 
 # ===========================================================================
@@ -797,8 +881,13 @@ def hl7_send():
 def hl7_listener_start():
     """Start the HL7 MLLP listener on the requested port."""
     global _hl7_listener
-    d     = request.get_json() or {}
-    port  = int(d.get("port", config.get("hl7", {}).get("listen_port", 2575)))
+    d     = request.get_json(silent=True) or {}
+    try:
+        port = int(d.get("port", config.get("hl7", {}).get("listen_port", 2575)))
+        if not (1 <= port <= 65535):
+            raise ValueError
+    except (ValueError, TypeError):
+        return _bad_request(f"'port' must be an integer between 1 and 65535, got: {d.get('port')!r}.")
     debug = bool(d.get("debug", False))
     logger.debug("HL7 Listener start  port=%d  debug=%s", port, debug)
 
@@ -829,7 +918,7 @@ def hl7_listener_start():
         return jsonify({"ok": True, "message": f"HL7 listener started on port {port}"})
     except Exception as e:
         logger.exception("HL7 Listener start failed")
-        return jsonify({"ok": False, "message": str(e)})
+        return jsonify({"ok": False, "message": str(e)}), 500
 
 
 @app.route("/api/hl7/listener/stop", methods=["POST"])
@@ -858,9 +947,14 @@ def hl7_listener_status():
 def scp_start():
     """Start the DICOM Storage SCP (the 'DICOM Receiver')."""
     global _scp_listener
-    d        = request.get_json() or {}
+    d        = request.get_json(silent=True) or {}
     ae_title = d.get("ae_title", _local_ae())
-    port     = int(d.get("port", 11112))
+    try:
+        port = int(d.get("port", 11112))
+        if not (1 <= port <= 65535):
+            raise ValueError
+    except (ValueError, TypeError):
+        return _bad_request(f"'port' must be an integer between 1 and 65535, got: {d.get('port')!r}.")
     # Always expand ~ server-side — the browser sends the raw string typed
     # by the user, so "~/DICOM_Received" must be resolved on the server
     # where the files will actually be written (not the browser's machine).
@@ -885,16 +979,21 @@ def scp_start():
         return jsonify({"ok": True, "message": f"SCP started as {ae_title} on port {port}"})
     except Exception as e:
         logger.exception("SCP start failed")
-        return jsonify({"ok": False, "message": str(e)})
+        return jsonify({"ok": False, "message": str(e)}), 500
 
 
 @app.route("/api/scp/default_dir", methods=["GET"])
 def scp_default_dir():
     """Return the real expanded default save directory for this server's OS."""
     return jsonify({"path": os.path.expanduser("~/DICOM_Received")})
+
+
+@app.route("/api/scp/stop", methods=["POST"])
+def scp_stop():
     """Stop the DICOM Storage SCP."""
     global _scp_listener
     if _scp_listener:
+        logger.debug("SCP stopping")
         _scp_listener.stop()
         _scp_listener = None
     return jsonify({"ok": True, "message": "SCP stopped"})
