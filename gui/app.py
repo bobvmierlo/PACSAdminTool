@@ -326,8 +326,10 @@ class CFindTab(ttk.Frame):
         def run():
             try:
                 from dicom.operations import c_echo
-                ok, msg = c_echo(local, ae["host"], ae["port"], ae["ae_title"]); self.log.append(msg)
-            except Exception as e: self.log.append(f"Error: {e}", "err")
+                ok, msg = c_echo(local["ae_title"], ae["host"], ae["port"], ae["ae_title"]); self.log.append(msg)
+            except Exception as e:
+                logger.exception("Operation failed")
+                self.log.append(f"Error: {e}", "err")
         threading.Thread(target=run, daemon=True).start()
 
     def _on_model_change(self, _=None):
@@ -373,7 +375,7 @@ class CFindTab(ttk.Frame):
         def run():
             try:
                 from dicom.operations import c_find
-                ok, results, msg = c_find(local, ae["host"], ae["port"], ae["ae_title"], ds, self.model_var.get())
+                ok, results, msg = c_find(local["ae_title"], ae["host"], ae["port"], ae["ae_title"], ds, self.model_var.get())
                 self.log.append(msg)
                 for r in results:
                     self._datasets.append(r)
@@ -383,7 +385,9 @@ class CFindTab(ttk.Frame):
                         str(getattr(r,"AccessionNumber","")), str(getattr(r,"StudyDescription","")),
                         str(getattr(r,"StudyInstanceUID",""))))
                 self.count_lbl.configure(text=t("cfind.results_count", n=len(results)))
-            except Exception as e: self.log.append(f"Error: {e}","err")
+            except Exception as e:
+                logger.exception("Operation failed")
+                self.log.append(f"Error: {e}","err")
         threading.Thread(target=run, daemon=True).start()
 
     def _export_csv(self):
@@ -412,9 +416,11 @@ class CFindTab(ttk.Frame):
         def run():
             try:
                 from dicom.operations import c_move
-                ok, msg = c_move(local, ae["host"], ae["port"], ae["ae_title"], move_ds, dest, self.model_var.get(), callback=lambda m: self.log.append(m))
+                ok, msg = c_move(local["ae_title"], ae["host"], ae["port"], ae["ae_title"], move_ds, dest, self.model_var.get(), callback=lambda m: self.log.append(m))
                 self.log.append(msg)
-            except Exception as e: self.log.append(f"Error: {e}","err")
+            except Exception as e:
+                logger.exception("Operation failed")
+                self.log.append(f"Error: {e}","err")
         threading.Thread(target=run, daemon=True).start()
 
 
@@ -469,9 +475,11 @@ class CStoreTab(ttk.Frame):
         def run():
             try:
                 from dicom.operations import c_store
-                ok, msg = c_store(local,ae["host"],ae["port"],ae["ae_title"],files,callback=lambda m: self.log.append(m))
+                ok, msg = c_store(local["ae_title"],ae["host"],ae["port"],ae["ae_title"],files,callback=lambda m: self.log.append(m))
                 self.log.append(msg)
-            except Exception as e: self.log.append(f"Error: {e}","err")
+            except Exception as e:
+                logger.exception("Operation failed")
+                self.log.append(f"Error: {e}","err")
         threading.Thread(target=run, daemon=True).start()
 
 
@@ -548,7 +556,7 @@ class DMWLTab(ttk.Frame):
             try:
                 from dicom.operations import dmwl_find
                 station_aet = self.aet_var.get().strip()
-                calling_ae = station_aet if station_aet else local
+                calling_ae = station_aet if station_aet else local["ae_title"]
                 ok, results, msg = dmwl_find(calling_ae, ae["host"], ae["port"], ae["ae_title"], ds, log_callback=lambda m: self.log.append(m))
                 self.log.append(msg); self.count_lbl.configure(text=t("dmwl.items_returned", n=len(results)))
                 for r in results:
@@ -562,7 +570,9 @@ class DMWLTab(ttk.Frame):
                         str(getattr(sps,"ScheduledProcedureStepStartDate","")) if sps else "",
                         str(getattr(sps,"ScheduledStationAETitle","")) if sps else "",
                         str(getattr(r,"RequestedProcedureDescription",""))))
-            except Exception as e: self.log.append(f"Error: {e}","err")
+            except Exception as e:
+                logger.exception("Operation failed")
+                self.log.append(f"Error: {e}","err")
         threading.Thread(target=run, daemon=True).start()
 
     def _export_csv(self):
@@ -622,9 +632,11 @@ class StorageCommitTab(ttk.Frame):
         def run():
             try:
                 from dicom.operations import storage_commit
-                ok, msg = storage_commit(local,ae["host"],ae["port"],ae["ae_title"],uids,callback=lambda m: self.log.append(m))
+                ok, msg = storage_commit(local["ae_title"],ae["host"],ae["port"],ae["ae_title"],uids,callback=lambda m: self.log.append(m))
                 self.log.append(msg)
-            except Exception as e: self.log.append(f"Error: {e}","err")
+            except Exception as e:
+                logger.exception("Operation failed")
+                self.log.append(f"Error: {e}","err")
         threading.Thread(target=run, daemon=True).start()
 
 
@@ -656,9 +668,11 @@ class IOCMTab(ttk.Frame):
         def run():
             try:
                 from dicom.operations import iocm_notify
-                ok, msg = iocm_notify(local,ae["host"],ae["port"],ae["ae_title"],params,callback=lambda m: self.log.append(m))
+                ok, msg = iocm_notify(local["ae_title"],ae["host"],ae["port"],ae["ae_title"],params,callback=lambda m: self.log.append(m))
                 self.log.append(msg)
-            except Exception as e: self.log.append(f"Error: {e}","err")
+            except Exception as e:
+                logger.exception("Operation failed")
+                self.log.append(f"Error: {e}","err")
         threading.Thread(target=run, daemon=True).start()
 
 
@@ -852,7 +866,9 @@ class HL7Tab(ttk.Frame):
                 dbg = (lambda m: self.hl7_send_log.append(m,"info")) if debug else None
                 ok, resp = send_mllp(host, port, msg, debug_callback=dbg)
                 self.hl7_send_log.append(f"{'OK' if ok else 'FAIL'}  Response: {resp[:300]}")
-            except Exception as e: self.hl7_send_log.append(f"Error: {e}","err")
+            except Exception as e:
+                logger.exception("HL7 send failed")
+                self.hl7_send_log.append(f"Error: {e}","err")
         threading.Thread(target=run, daemon=True).start()
 
     def _toggle_listener(self):
@@ -1307,7 +1323,7 @@ class KOSCreatorTab(ttk.Frame):
                     ds.save_as(tmp_path, write_like_original=False)
                 from dicom.operations import c_store
                 ok, msg = c_store(
-                    local["ae_title"] if isinstance(local, dict) else local,
+                    local["ae_title"],
                     ae["host"], ae["port"], ae["ae_title"],
                     [tmp_path],
                     callback=lambda m: self.log.append(m),
