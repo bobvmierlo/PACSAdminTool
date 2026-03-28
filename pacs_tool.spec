@@ -6,8 +6,6 @@ import sys
 import os
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
-block_cipher = None
-
 # Collect all pynetdicom and pydicom data/submodules
 pynetdicom_datas, pynetdicom_binaries, pynetdicom_hiddenimports = collect_all('pynetdicom')
 pydicom_datas, pydicom_binaries, pydicom_hiddenimports = collect_all('pydicom')
@@ -46,11 +44,10 @@ a = Analysis(
               'pandas', 'IPython', 'jupyter'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
-    cipher=block_cipher,
     noarchive=False,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure, a.zipped_data)
 
 exe = EXE(
     pyz,
@@ -63,8 +60,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    upx_exclude=[],
+    upx=False,
     runtime_tmpdir=None,
     console=False,          # No console window
     disable_windowed_traceback=False,
@@ -72,4 +68,5 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon='icon.ico',
+    version='version_info_gui.py',
 )
