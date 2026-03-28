@@ -3,17 +3,20 @@
 # Install all at once:
 #   pip install -r requirements.txt
 #
+# Versions are pinned to compatible-release ranges (~=) so that
+# patch/minor updates are allowed but major-version bumps are not.
+#
 # Core DICOM
-pydicom>=2.4.0
-pynetdicom>=2.0.0
+pydicom~=2.4
+pynetdicom~=2.0
 
 # HL7
-hl7>=0.4.0
+hl7~=0.4
 
 # Web server (web version only)
-flask>=3.0.0
-flask-socketio>=5.3.0
-simple-websocket>=1.0.0
+flask~=3.0
+flask-socketio~=5.3
+simple-websocket~=1.0
 
 # Build desktop .exe (optional, Windows only)
-pyinstaller>=6.0.0
+pyinstaller~=6.0

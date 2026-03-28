@@ -435,8 +435,8 @@ class SCPListener:
                  log_callback: Optional[Callable] = None):
         self.ae_title = ae_title
         self.port = port
-        self.storage_dir = storage_dir or os.path.join(
-            os.path.expanduser("~"), "pacs_received"
+        self.storage_dir = storage_dir or os.path.normpath(
+            os.path.join(os.path.expanduser("~"), "pacs_received")
         )
         self.log_callback = log_callback
         self._ae = None
@@ -578,92 +578,35 @@ def iocm_notify(local_ae, host, port, ae_title, params, callback=None):
 
 def run_storage_scp(ae_title, port, save_dir,
                     on_received=None, on_log=None, running_flag=None):
-    """Run a blocking Storage SCP that saves files and calls callbacks."""
-    try:
-        from pynetdicom import AE, evt
-        from pynetdicom.sop_class import Verification
-        import pydicom
-        import uuid
-    except ImportError as e:
-        if on_log: on_log(f"pynetdicom/pydicom not available: {e}")
-        return
+    """Run a blocking Storage SCP that saves files and calls callbacks.
 
-    os.makedirs(save_dir, exist_ok=True)
+    This is a convenience wrapper around SCPListener for the GUI, which
+    needs a blocking call with a ``running_flag`` polling loop.
+    """
+    import time
 
-    def handle_store(event):
-        try:
-            ds = event.dataset
-            ds.file_meta = event.file_meta
-            uid  = str(getattr(ds, "SOPInstanceUID", uuid.uuid4()))
-            path = os.path.join(save_dir, uid + ".dcm")
-            try:
-                ds.save_as(path, enforce_file_format=True)
-            except TypeError:
-                ds.save_as(path, write_like_original=False)
-            if on_log:      on_log(f"Stored: {os.path.basename(path)}")
-            if on_received: on_received(path)
-            return 0x0000
-        except Exception as e:
-            if on_log: on_log(f"Store error: {e}")
-            return 0xC001
+    check_available()
 
-    ae = AE(ae_title=ae_title)
-    ae.add_supported_context(Verification)
+    # SCPListener already handles all SOP class registration, Verification,
+    # storage-dir creation and logging.
+    def _log_and_notify(msg):
+        if on_log:
+            on_log(msg)
+        # When a "Stored:" message arrives, call on_received with the path
+        if on_received and msg.startswith("Stored: "):
+            path = msg[len("Stored: "):]
+            on_received(path)
 
-    # Prioritise SR, PR and common image SOP classes so they are never
-    # bumped out by the 128-presentation-context DICOM protocol limit.
-    PRIORITY_SOPS = [
-        "1.2.840.10008.5.1.4.1.1.88.11",  # Basic Text SR
-        "1.2.840.10008.5.1.4.1.1.88.22",  # Enhanced SR
-        "1.2.840.10008.5.1.4.1.1.88.33",  # Comprehensive SR
-        "1.2.840.10008.5.1.4.1.1.88.34",  # Comprehensive 3D SR
-        "1.2.840.10008.5.1.4.1.1.88.59",  # Key Object Selection
-        "1.2.840.10008.5.1.4.1.1.11.1",   # Grayscale Softcopy PS
-        "1.2.840.10008.5.1.4.1.1.11.2",   # Color Softcopy PS
-        "1.2.840.10008.5.1.4.1.1.11.3",   # Pseudo-Color Softcopy PS
-        "1.2.840.10008.5.1.4.1.1.11.4",   # Blending Softcopy PS
-        "1.2.840.10008.5.1.4.1.1.2",      # CT
-        "1.2.840.10008.5.1.4.1.1.4",      # MR
-        "1.2.840.10008.5.1.4.1.1.1",      # CR
-        "1.2.840.10008.5.1.4.1.1.1.1",    # DX
-        "1.2.840.10008.5.1.4.1.1.1.2",    # Mammography
-        "1.2.840.10008.5.1.4.1.1.6.1",    # Ultrasound
-        "1.2.840.10008.5.1.4.1.1.7",      # Secondary Capture
-        "1.2.840.10008.5.1.4.1.1.12.1",   # XA
-        "1.2.840.10008.5.1.4.1.1.128",    # PET
-        "1.2.840.10008.5.1.4.1.1.20",     # NM
-        "1.2.840.10008.5.1.4.1.1.104.1",  # Encapsulated PDF
-    ]
-    for uid in PRIORITY_SOPS:
-        try:
-            ae.add_supported_context(uid)
-        except Exception:
-            pass
-
-    # Then fill remaining slots with all other known storage SOP classes
-    try:
-        from pynetdicom.presentation import AllStoragePresentationContexts
-        for cx in AllStoragePresentationContexts:
-            try:
-                ae.add_supported_context(cx.abstract_syntax)
-            except Exception:
-                pass
-    except ImportError:
-        for sop in STORAGE_SOPS:
-            try:
-                ae.add_supported_context(sop)
-            except Exception:
-                pass
-
-    handlers = [(evt.EVT_C_STORE, handle_store)]
-    if on_log: on_log(f"Starting Storage SCP '{ae_title}' on port {port}")
-
-    server = ae.start_server(("", port), block=False, evt_handlers=handlers)
-    if on_log: on_log(f"Listening on port {port}")
+    listener = SCPListener(
+        ae_title=ae_title,
+        port=port,
+        storage_dir=save_dir,
+        log_callback=_log_and_notify,
+    )
+    listener.start()
 
     try:
         while running_flag is None or running_flag():
-            import time; time.sleep(0.5)
+            time.sleep(0.5)
     finally:
-        server.shutdown()
-        if on_log: on_log("Storage SCP stopped")
+        listener.stop()

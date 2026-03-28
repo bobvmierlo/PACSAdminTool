@@ -157,6 +157,24 @@ set_language(config.get("language", "en"))
 #    We keep these as module-level variables so all requests can see them.
 _hl7_listener = None          # HL7Listener instance or None
 _scp_listener = None          # SCPListener instance or None
+_listener_lock = threading.Lock()   # guards _hl7_listener and _scp_listener
+
+
+# ===========================================================================
+# API: Health check
+# ===========================================================================
+
+@app.route("/api/health", methods=["GET"])
+def health():
+    """Lightweight health-check endpoint for monitoring / load-balancers."""
+    with _listener_lock:
+        scp_running = bool(_scp_listener and _scp_listener.running)
+        hl7_running = bool(_hl7_listener and _hl7_listener.running)
+    return jsonify({
+        "status": "ok",
+        "scp_running": scp_running,
+        "hl7_listener_running": hl7_running,
+    })
 
 
 # ===========================================================================
@@ -595,9 +613,11 @@ def dicom_store():
     if not files:
         return jsonify({"ok": False, "message": "No files uploaded"}), 400
 
-    # Save the uploaded files to a temp dir
+    # Save the uploaded files to a temp dir managed by TemporaryDirectory
+    # so cleanup happens automatically even on unexpected errors.
     import tempfile
-    tmp_dir = tempfile.mkdtemp(prefix="pacsadmin_store_")
+    tmp_dir_obj = tempfile.TemporaryDirectory(prefix="pacsadmin_store_")
+    tmp_dir = tmp_dir_obj.name
     paths   = []
     for f in files:
         path = os.path.join(tmp_dir, f.filename or "upload.dcm")
@@ -615,9 +635,7 @@ def dicom_store():
             logger.exception("C-STORE background error")
             _log("cstore", f"Error: {e}", "err")
         finally:
-            # Clean up temp files
-            import shutil
-            shutil.rmtree(tmp_dir, ignore_errors=True)
+            tmp_dir_obj.cleanup()
 
     threading.Thread(target=run, daemon=True).start()
     return jsonify({"ok": True, "message": f"Sending {len(paths)} file(s)…"})
@@ -891,51 +909,54 @@ def hl7_listener_start():
     debug = bool(d.get("debug", False))
     logger.debug("HL7 Listener start  port=%d  debug=%s", port, debug)
 
-    if _hl7_listener and _hl7_listener.running:
-        return jsonify({"ok": False, "message": "Listener already running"})
+    with _listener_lock:
+        if _hl7_listener and _hl7_listener.running:
+            return jsonify({"ok": False, "message": "Listener already running"})
 
-    from hl7_module.messaging import HL7Listener
+        from hl7_module.messaging import HL7Listener
 
-    def on_message(msg, addr):
-        """Called by HL7Listener each time a message arrives."""
-        socketio.emit("hl7_message", {
-            "ts":      datetime.now().strftime("%H:%M:%S"),
-            "from":    f"{addr[0]}:{addr[1]}",
-            "message": msg.replace("\r", "\n"),
-        })
-        _log("hl7_recv", f"Message received from {addr[0]}:{addr[1]}", "ok")
+        def on_message(msg, addr):
+            """Called by HL7Listener each time a message arrives."""
+            socketio.emit("hl7_message", {
+                "ts":      datetime.now().strftime("%H:%M:%S"),
+                "from":    f"{addr[0]}:{addr[1]}",
+                "message": msg.replace("\r", "\n"),
+            })
+            _log("hl7_recv", f"Message received from {addr[0]}:{addr[1]}", "ok")
 
-    # debug_callback pushes raw-byte lines to the hl7_recv log box;
-    # also enable it automatically when the logger is at DEBUG level
-    debug_active = debug or logger.isEnabledFor(logging.DEBUG)
-    dbg = (lambda m: _log("hl7_recv", m, "debug")) if debug_active else None
+        # debug_callback pushes raw-byte lines to the hl7_recv log box;
+        # also enable it automatically when the logger is at DEBUG level
+        debug_active = debug or logger.isEnabledFor(logging.DEBUG)
+        dbg = (lambda m: _log("hl7_recv", m, "debug")) if debug_active else None
 
-    _hl7_listener = HL7Listener(port=port, callback=on_message,
-                                debug_callback=dbg)
-    try:
-        _hl7_listener.start()
-        logger.debug("HL7 Listener started on port %d", port)
-        return jsonify({"ok": True, "message": f"HL7 listener started on port {port}"})
-    except Exception as e:
-        logger.exception("HL7 Listener start failed")
-        return jsonify({"ok": False, "message": str(e)}), 500
+        _hl7_listener = HL7Listener(port=port, callback=on_message,
+                                    debug_callback=dbg)
+        try:
+            _hl7_listener.start()
+            logger.debug("HL7 Listener started on port %d", port)
+            return jsonify({"ok": True, "message": f"HL7 listener started on port {port}"})
+        except Exception as e:
+            logger.exception("HL7 Listener start failed")
+            return jsonify({"ok": False, "message": str(e)}), 500
 
 
 @app.route("/api/hl7/listener/stop", methods=["POST"])
 def hl7_listener_stop():
     """Stop the HL7 MLLP listener."""
     global _hl7_listener
-    if _hl7_listener:
-        logger.debug("HL7 Listener stopping")
-        _hl7_listener.stop()
-        _hl7_listener = None
+    with _listener_lock:
+        if _hl7_listener:
+            logger.debug("HL7 Listener stopping")
+            _hl7_listener.stop()
+            _hl7_listener = None
     return jsonify({"ok": True, "message": "HL7 listener stopped"})
 
 
 @app.route("/api/hl7/listener/status", methods=["GET"])
 def hl7_listener_status():
     """Return whether the listener is currently running."""
-    running = bool(_hl7_listener and _hl7_listener.running)
+    with _listener_lock:
+        running = bool(_hl7_listener and _hl7_listener.running)
     return jsonify({"running": running})
 
 
@@ -958,51 +979,54 @@ def scp_start():
     # Always expand ~ server-side — the browser sends the raw string typed
     # by the user, so "~/DICOM_Received" must be resolved on the server
     # where the files will actually be written (not the browser's machine).
-    save_dir = os.path.expanduser(
+    save_dir = os.path.normpath(os.path.expanduser(
         d.get("save_dir", "~/DICOM_Received")
-    )
+    ))
     logger.debug("SCP start  ae=%s  port=%d  save_dir=%s", ae_title, port, save_dir)
 
-    if _scp_listener and _scp_listener.running:
-        return jsonify({"ok": False, "message": "SCP already running"})
+    with _listener_lock:
+        if _scp_listener and _scp_listener.running:
+            return jsonify({"ok": False, "message": "SCP already running"})
 
-    from dicom.operations import SCPListener
+        from dicom.operations import SCPListener
 
-    def on_log(msg):
-        _log("scp", msg)
+        def on_log(msg):
+            _log("scp", msg)
 
-    _scp_listener = SCPListener(ae_title=ae_title, port=port,
-                                storage_dir=save_dir, log_callback=on_log)
-    try:
-        _scp_listener.start()
-        logger.debug("SCP started as %s on port %d, saving to %s", ae_title, port, save_dir)
-        return jsonify({"ok": True, "message": f"SCP started as {ae_title} on port {port}"})
-    except Exception as e:
-        logger.exception("SCP start failed")
-        return jsonify({"ok": False, "message": str(e)}), 500
+        _scp_listener = SCPListener(ae_title=ae_title, port=port,
+                                    storage_dir=save_dir, log_callback=on_log)
+        try:
+            _scp_listener.start()
+            logger.debug("SCP started as %s on port %d, saving to %s", ae_title, port, save_dir)
+            return jsonify({"ok": True, "message": f"SCP started as {ae_title} on port {port}"})
+        except Exception as e:
+            logger.exception("SCP start failed")
+            return jsonify({"ok": False, "message": str(e)}), 500
 
 
 @app.route("/api/scp/default_dir", methods=["GET"])
 def scp_default_dir():
     """Return the real expanded default save directory for this server's OS."""
-    return jsonify({"path": os.path.expanduser("~/DICOM_Received")})
+    return jsonify({"path": os.path.normpath(os.path.expanduser("~/DICOM_Received"))})
 
 
 @app.route("/api/scp/stop", methods=["POST"])
 def scp_stop():
     """Stop the DICOM Storage SCP."""
     global _scp_listener
-    if _scp_listener:
-        logger.debug("SCP stopping")
-        _scp_listener.stop()
-        _scp_listener = None
+    with _listener_lock:
+        if _scp_listener:
+            logger.debug("SCP stopping")
+            _scp_listener.stop()
+            _scp_listener = None
     return jsonify({"ok": True, "message": "SCP stopped"})
 
 
 @app.route("/api/scp/status", methods=["GET"])
 def scp_status():
     """Return whether the SCP is currently running."""
-    running = bool(_scp_listener and _scp_listener.running)
+    with _listener_lock:
+        running = bool(_scp_listener and _scp_listener.running)
     return jsonify({"running": running})
 
 
