@@ -33,7 +33,7 @@ class TestWebValidationHelpers:
         assert "hl7_listener_running" in data
 
     def test_cfind_missing_fields_returns_400(self, client):
-        resp = client.post("/api/dicom/cfind",
+        resp = client.post("/api/dicom/find",
                            data=json.dumps({}),
                            content_type="application/json")
         assert resp.status_code == 400
@@ -45,7 +45,7 @@ class TestWebValidationHelpers:
         assert resp.status_code == 400
 
     def test_cfind_invalid_port_returns_400(self, client):
-        resp = client.post("/api/dicom/cfind",
+        resp = client.post("/api/dicom/find",
                            data=json.dumps({
                                "ae_title": "TEST",
                                "host": "localhost",
