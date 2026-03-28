@@ -27,7 +27,13 @@ all_hidden    = (
     + collect_submodules('pydicom')
     + ['hl7', 'flask', 'flask_socketio',
        'simple_websocket', 'engineio', 'socketio',
+       'engineio.async_drivers.threading',
+       'engineio.async_threading',
+       'socketio.async_drivers.threading',
        'threading', 'socket', 'json', 'logging']
+    + collect_submodules('engineio')
+    + collect_submodules('socketio')
+    + collect_submodules('simple_websocket')
 )
 
 a = Analysis(
