@@ -721,6 +721,8 @@
         </tr>
       </table>
       <hr class="about-sep">
+      <p class="about-dim">Data folder: <span id="about-app-dir" style="color:#2b6cb0" title="Configuration and log files location">...</span></p>
+      <hr class="about-sep">
       <p class="about-dim" data-i18n="about.tech_stack_web">Built with Python &middot; pynetdicom &middot; pydicom &middot; hl7 &middot; Flask &middot; Flask-SocketIO</p>
       <div class="about-links">
         <a href="https://github.com/bobvmierlo/PACSAdminTool" target="_blank" rel="noopener noreferrer" data-i18n="about.github">GitHub Repository ↗</a>
@@ -1473,10 +1475,16 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("change", updateTemplateDesc);
 
   // Fetch app version from the server and display it in the About tab
+  // Fetch app version and data paths from the server
   fetch("/api/version")
     .then(r => r.json())
     .then(d => {
       document.getElementById("about-version").textContent = "Version " + (d.version || "?");
+      if (d.app_dir) {
+        const el = document.getElementById("about-app-dir");
+        el.textContent = d.app_dir;
+        el.title = "Configuration and log files location: " + d.app_dir;
+      }
     })
     .catch(() => {});
 });

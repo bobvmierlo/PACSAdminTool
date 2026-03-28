@@ -12,7 +12,9 @@ import tempfile
 logger = logging.getLogger(__name__)
 
 
-CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".pacs_admin_tool", "config.json")
+APP_DIR = os.path.join(os.path.expanduser("~"), ".pacs_admin_tool")
+CONFIG_PATH = os.path.join(APP_DIR, "config.json")
+LOG_DIR = os.path.join(APP_DIR, "logs")
 
 DEFAULT_CONFIG = {
     "local_ae": {

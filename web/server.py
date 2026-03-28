@@ -41,12 +41,13 @@ sys.path.insert(0, BASE_DIR)
 from flask import Flask, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
 
-from config.manager import load_config, save_config
+from config.manager import load_config, save_config, APP_DIR, LOG_DIR
 from locales import t as _t, set_language, current_language, available_languages
 from __version__ import __version__ as APP_VERSION
 
-# ── Logging setup: console + daily rotating file in logs/, 7-day retention
-LOG_DIR = os.path.join(BASE_DIR, "logs")
+# ── Logging setup: console + daily rotating file, 7-day retention
+#    Logs are written to ~/.pacs_admin_tool/logs/ so they persist
+#    regardless of where the .exe is launched from.
 os.makedirs(LOG_DIR, exist_ok=True)
 
 
@@ -180,8 +181,12 @@ def health():
 
 @app.route("/api/version", methods=["GET"])
 def version():
-    """Return the application version."""
-    return jsonify({"version": APP_VERSION})
+    """Return the application version and data directory paths."""
+    return jsonify({
+        "version": APP_VERSION,
+        "app_dir": APP_DIR,
+        "log_dir": LOG_DIR,
+    })
 
 
 # ===========================================================================
