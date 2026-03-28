@@ -312,6 +312,18 @@ def index():
     return send_from_directory(app.static_folder, "index.html")
 
 
+@app.route("/favicon.ico")
+def favicon():
+    """Serve the app icon as the browser tab favicon."""
+    # In a PyInstaller bundle icon.png lives at sys._MEIPASS;
+    # in development it sits in the project root.
+    if getattr(sys, "frozen", False):
+        icon_dir = sys._MEIPASS
+    else:
+        icon_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return send_from_directory(icon_dir, "icon.png", mimetype="image/png")
+
+
 # ===========================================================================
 # API: Config
 # ===========================================================================

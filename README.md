@@ -22,11 +22,27 @@ A portable, self-contained DICOM/HL7 workstation for PACS administrators.
 
 ---
 
+## System Tray Icon
+
+Both the desktop GUI and the web server show a **system tray icon** (notification area, bottom-right on Windows).
+
+**Desktop GUI:**
+- Closing the window (X button) minimises the app to the tray instead of quitting
+- Double-click the tray icon or use the right-click menu to restore the window
+- Right-click menu: *Show Window*, *Open Data Folder*, *Exit*
+
+**Web Server:**
+- The tray icon is the only visual indicator that the server is running (no console window)
+- Right-click menu: *Open in Browser*, *Open Data Folder*, *Exit*
+- No need to use Task Manager to stop the server — just click *Exit* in the tray menu
+
+---
+
 ## Quick Start (Desktop GUI)
 
 ```bash
 # 1. Install dependencies
-pip install pydicom pynetdicom hl7
+pip install pydicom pynetdicom hl7 pystray Pillow
 
 # 2. Run
 python main.py
@@ -38,7 +54,7 @@ python main.py
 
 ```bash
 # 1. Install dependencies (includes the desktop ones plus web extras)
-pip install pydicom pynetdicom hl7 flask flask-socketio simple-websocket
+pip install pydicom pynetdicom hl7 flask flask-socketio simple-websocket pystray Pillow
 
 # 2. Run the web server
 python webmain.py
@@ -192,6 +208,8 @@ All templates are editable before sending. Raw HL7 text can also be pasted direc
 - pynetdicom >= 2.0
 - pydicom >= 2.4
 - hl7 >= 0.4.5
+- pystray >= 0.19 (system tray icon)
+- Pillow >= 10.0 (icon rendering)
 - PyInstaller >= 6.0 (build only)
 
 **Web version (additional):**

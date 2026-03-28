@@ -22,6 +22,8 @@ import sys
 import os
 import argparse
 import logging
+import webbrowser
+import signal
 
 # ── Put our project folder on Python's search path so imports work
 #    regardless of where you launch this script from.
@@ -32,6 +34,20 @@ sys.path.insert(0, BASE_DIR)
 from web.server import app, socketio
 
 logger = logging.getLogger(__name__)
+
+
+def _shutdown():
+    """Cleanly shut down the web server."""
+    logger.info("Shutdown requested via system tray")
+    os._exit(0)
+
+
+def _open_browser(url):
+    """Open the web UI in the default browser."""
+    def _handler(icon, item):
+        webbrowser.open(url)
+    return _handler
+
 
 if __name__ == "__main__":
     # ── Parse command-line arguments so the user can customise host/port
@@ -56,12 +72,45 @@ if __name__ == "__main__":
   +--------------------------------------------------+
 """)
 
+    # ── Start system tray icon (if available)
+    tray = None
+    try:
+        from tray import TrayIcon
+        from config.manager import APP_DIR
+
+        def _open_data_folder(icon, item):
+            import subprocess
+            os.makedirs(APP_DIR, exist_ok=True)
+            if sys.platform == "win32":
+                os.startfile(APP_DIR)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", APP_DIR])
+            else:
+                subprocess.Popen(["xdg-open", APP_DIR])
+
+        tray = TrayIcon(
+            tooltip=f"PACS Admin Tool Web — {url}",
+            menu_items=[
+                ("Open in Browser", _open_browser(url)),
+                ("Open Data Folder", _open_data_folder),
+            ],
+            on_quit=_shutdown,
+        )
+        tray.start()
+    except Exception:
+        logger.debug("System tray not available; running without tray icon",
+                      exc_info=True)
+
     # socketio.run() is used instead of app.run() because Flask-SocketIO
     # needs to manage the server to support WebSocket connections.
-    socketio.run(
-        app,
-        host=args.host,
-        port=args.port,
-        debug=args.debug,
-        allow_unsafe_werkzeug=True,   # needed for newer Werkzeug versions
-    )
+    try:
+        socketio.run(
+            app,
+            host=args.host,
+            port=args.port,
+            debug=args.debug,
+            allow_unsafe_werkzeug=True,   # needed for newer Werkzeug versions
+        )
+    finally:
+        if tray:
+            tray.stop()
