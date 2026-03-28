@@ -1,7 +1,11 @@
 # PACS Admin Tool
 
 A portable, self-contained DICOM/HL7 workstation for PACS administrators.
-**No installation required** — just run `PacsAdminTool.exe`.
+
+**No installation required** — just run `PacsAdminTool.exe` or `PacsAdminToolWeb.exe`.
+Can also be run locally with python installed and the required dependencies installed using pip.
+
+**I created this tool to accomodate for my personal (professional) needs, and won't be actively maintaining the repo and/or fixing issues.**
 
 ---
 
