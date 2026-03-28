@@ -7,7 +7,8 @@ Run this file to start the web version of the tool:
 
 Then open http://localhost:5000 in your browser.
 
-You can also specify a port:
+The host and port default to the values in config.json (web.host / web.port).
+You can override them via CLI flags:
     python webmain.py --port 8080
 
 Or allow access from other machines on your network:
@@ -50,12 +51,17 @@ def _open_browser(url):
 
 
 if __name__ == "__main__":
+    # ── Load config so we can use web.host / web.port as defaults
+    from config.manager import load_config
+    _cfg_web = load_config().get("web", {})
+
     # ── Parse command-line arguments so the user can customise host/port
+    #    CLI args override config.json values, which override built-in defaults.
     parser = argparse.ArgumentParser(description="PACS Admin Tool Web Server")
-    parser.add_argument("--host", default="127.0.0.1",
-        help="Host to listen on. Use 0.0.0.0 to allow network access (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=5000,
-        help="Port to listen on (default: 5000)")
+    parser.add_argument("--host", default=_cfg_web.get("host", "127.0.0.1"),
+        help="Host to listen on. Use 0.0.0.0 to allow network access (default: config or 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=_cfg_web.get("port", 5000),
+        help="Port to listen on (default: config or 5000)")
     parser.add_argument("--debug", action="store_true",
         help="Enable Flask debug mode (auto-reloads on code changes)")
     args = parser.parse_args()

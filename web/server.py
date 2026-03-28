@@ -343,6 +343,7 @@ _CONFIG_SCHEMA = {
     "remote_aes":    list,
     "hl7":           dict,
     "query_defaults": dict,
+    "web":           dict,
     "log_level":     str,
     "language":      str,
 }
@@ -403,6 +404,15 @@ def _validate_config_payload(data: dict) -> str | None:
             not isinstance(hl7["default_host"], str) or len(hl7["default_host"]) > _MAX_HOST_LEN
         ):
             return f"hl7.default_host must be a string of at most {_MAX_HOST_LEN} characters."
+    if "web" in data:
+        web = data["web"]
+        if "port" in web:
+            if not isinstance(web["port"], int) or not (1 <= web["port"] <= 65535):
+                return "web.port must be an integer between 1 and 65535."
+        if "host" in web and (
+            not isinstance(web["host"], str) or len(web["host"]) > _MAX_HOST_LEN
+        ):
+            return f"web.host must be a string of at most {_MAX_HOST_LEN} characters."
     return None
 
 

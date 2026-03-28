@@ -245,6 +245,10 @@
     "saved": "Saved  {ts}",
     "saved_web": "Saved ✓",
     "name_required": "Name is required.",
+    "web_server": "Web Server",
+    "web_host": "Host",
+    "web_port": "Port",
+    "web_note": "Changes take effect after restarting the application.",
     "language": "Language",
     "language_label": "Interface Language:",
     "language_note": "Changes take effect after restart (desktop) or page reload (web)."
