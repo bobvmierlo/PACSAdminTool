@@ -618,6 +618,7 @@ def dicom_store():
     import tempfile
     tmp_dir_obj = tempfile.TemporaryDirectory(prefix="pacsadmin_store_")
     tmp_dir = tmp_dir_obj.name
+    logger.debug("C-STORE  temp dir created: %s", tmp_dir)
     paths   = []
     for f in files:
         path = os.path.join(tmp_dir, f.filename or "upload.dcm")
@@ -636,6 +637,7 @@ def dicom_store():
             _log("cstore", f"Error: {e}", "err")
         finally:
             tmp_dir_obj.cleanup()
+            logger.debug("C-STORE  temp dir cleaned up: %s", tmp_dir)
 
     threading.Thread(target=run, daemon=True).start()
     return jsonify({"ok": True, "message": f"Sending {len(paths)} file(s)…"})
