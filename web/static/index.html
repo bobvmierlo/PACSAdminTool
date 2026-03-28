@@ -721,7 +721,7 @@
         </tr>
       </table>
       <hr class="about-sep">
-      <p class="about-dim">Data folder: <span id="about-app-dir" style="color:#2b6cb0" title="Configuration and log files location">...</span></p>
+      <p class="about-dim">Data folder: <span id="about-app-dir" style="color:#2b6cb0; cursor:pointer; text-decoration:underline" title="Click to copy path to clipboard" onclick="navigator.clipboard.writeText(this.textContent).then(()=>{this.title='Copied!'; setTimeout(()=>{this.title='Click to copy path to clipboard'},2000)})">...</span></p>
       <hr class="about-sep">
       <p class="about-dim" data-i18n="about.tech_stack_web">Built with Python &middot; pynetdicom &middot; pydicom &middot; hl7 &middot; Flask &middot; Flask-SocketIO</p>
       <div class="about-links">
