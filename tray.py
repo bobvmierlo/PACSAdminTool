@@ -10,8 +10,14 @@ import sys
 import threading
 import logging
 
-import pystray
-from PIL import Image
+try:
+    import pystray
+    from PIL import Image
+except ImportError:
+    raise ImportError(
+        "pystray and Pillow are required for system tray support. "
+        "Install them with: pip install pystray Pillow"
+    )
 
 logger = logging.getLogger(__name__)
 

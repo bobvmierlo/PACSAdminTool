@@ -20,7 +20,10 @@ from config.manager import load_config, save_config, APP_DIR, LOG_DIR
 from hl7_templates import load_templates as _load_hl7_templates
 from locales import t, set_language, current_language, available_languages
 from __version__ import __version__ as _APP_VERSION
-from tray import TrayIcon
+try:
+    from tray import TrayIcon
+except ImportError:
+    TrayIcon = None
 
 logger = logging.getLogger(__name__)
 
@@ -1661,6 +1664,8 @@ class PACSAdminApp:
 
     def _start_tray(self):
         """Start the system tray icon with show/exit menu."""
+        if TrayIcon is None:
+            return
         try:
             self._tray = TrayIcon(
                 tooltip="PACS Admin Tool",
