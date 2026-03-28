@@ -34,7 +34,7 @@ jobs:
         run: pyinstaller pacs_web.spec
 
       - name: Upload executables to release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v2.6.1
         with:
           files: |
             dist/PacsAdminTool.exe
