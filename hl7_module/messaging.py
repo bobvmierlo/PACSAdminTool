@@ -116,71 +116,6 @@ def send_hl7(host: str, port: int, message: str,
         return False, str(e)
 
 
-def build_hl7_message(msg_type: str, sending_app: str = "PACSADMIN",
-                      sending_facility: str = "PACS",
-                      receiving_app: str = "RIS",
-                      receiving_facility: str = "HOSPITAL",
-                      patient_id: str = "TEST001",
-                      patient_name: str = "TEST^PATIENT",
-                      study_uid: str = "",
-                      accession: str = "",
-                      modality: str = "CT",
-                      scheduled_date: str = "") -> str:
-    """
-    Build common HL7 v2.x messages:
-    - ORM^O01 (Order message)
-    - ORU^R01 (Observation result)
-    - ADT^A04 (Register patient)
-    - QBP^Q22 (Query by parameter - patient demographics)
-    - SIU^S12 (Schedule notification)
-    """
-    now = datetime.now().strftime("%Y%m%d%H%M%S")
-    msg_ctrl_id = datetime.now().strftime("%Y%m%d%H%M%S%f")[:20]
-    sch_date = scheduled_date or datetime.now().strftime("%Y%m%d%H%M")
-
-    if msg_type == "ORM^O01":
-        return (
-            f"MSH|^~\\&|{sending_app}|{sending_facility}|{receiving_app}|{receiving_facility}|{now}||ORM^O01|{msg_ctrl_id}|P|2.3\r"
-            f"PID|1||{patient_id}^^^HOSPITAL^MR||{patient_name}||19700101|M\r"
-            f"ORC|NW|{accession}||{accession}|SC||||{now}\r"
-            f"OBR|1|{accession}||EXAM^Examination||{sch_date}|||||||||||{accession}|||{modality}||||^^^^^^^^^{study_uid}\r"
-        )
-    elif msg_type == "ORU^R01":
-        return (
-            f"MSH|^~\\&|{sending_app}|{sending_facility}|{receiving_app}|{receiving_facility}|{now}||ORU^R01|{msg_ctrl_id}|P|2.3\r"
-            f"PID|1||{patient_id}^^^HOSPITAL^MR||{patient_name}||19700101|M\r"
-            f"OBR|1|{accession}||EXAM^Examination||{sch_date}|||||||||||{accession}|||{modality}|||F\r"
-            f"OBX|1|TX|REPORT^Report||Findings: Normal study.||||||F\r"
-        )
-    elif msg_type == "ADT^A04":
-        return (
-            f"MSH|^~\\&|{sending_app}|{sending_facility}|{receiving_app}|{receiving_facility}|{now}||ADT^A04|{msg_ctrl_id}|P|2.3\r"
-            f"EVN|A04|{now}\r"
-            f"PID|1||{patient_id}^^^HOSPITAL^MR||{patient_name}||19700101|M|||123 Main St^^City^ST^12345\r"
-            f"PV1|1|O|^^^RADIOLOGY\r"
-        )
-    elif msg_type == "SIU^S12":
-        return (
-            f"MSH|^~\\&|{sending_app}|{sending_facility}|{receiving_app}|{receiving_facility}|{now}||SIU^S12|{msg_ctrl_id}|P|2.3\r"
-            f"SCH|{accession}||{accession}||EXAM^Examination|{sch_date}|60|MIN||{sch_date}|^^^{modality}\r"
-            f"PID|1||{patient_id}^^^HOSPITAL^MR||{patient_name}||19700101|M\r"
-            f"RGS|1|A\r"
-            f"AIS|1|A|EXAM^Examination|{sch_date}|0|MIN\r"
-        )
-    elif msg_type == "QBP^Q22":
-        return (
-            f"MSH|^~\\&|{sending_app}|{sending_facility}|{receiving_app}|{receiving_facility}|{now}||QBP^Q22|{msg_ctrl_id}|P|2.5\r"
-            f"QPD|IHE PDQ Query|{msg_ctrl_id}|@PID.3.1^{patient_id}\r"
-            f"RCP|I|10^RD\r"
-        )
-    else:
-        # Generic template
-        return (
-            f"MSH|^~\\&|{sending_app}|{sending_facility}|{receiving_app}|{receiving_facility}|{now}||{msg_type}|{msg_ctrl_id}|P|2.3\r"
-            f"PID|1||{patient_id}^^^HOSPITAL^MR||{patient_name}||19700101|M\r"
-        )
-
-
 def parse_hl7(message: str) -> dict:
     """Parse HL7 message into a dict of segment -> fields."""
     result = {}
@@ -259,17 +194,27 @@ class HL7Listener:
             conn.close()
 
     def _build_ack(self, message: str) -> str:
-        """Build a simple AA ACK."""
+        """Build a simple AA ACK, swapping sender/receiver from the incoming MSH."""
         now = datetime.now().strftime("%Y%m%d%H%M%S")
         lines = message.strip().split("\r")
         ctrl_id = "UNKNOWN"
+        # Default to the incoming message's receiving fields (i.e. us)
+        send_app = ""
+        send_fac = ""
+        recv_app = ""
+        recv_fac = ""
         for line in lines:
             if line.startswith("MSH"):
                 parts = line.split("|")
                 ctrl_id = parts[9] if len(parts) > 9 else "UNKNOWN"
+                # Swap: our ACK's sender = incoming receiver, and vice-versa
+                recv_app = parts[2] if len(parts) > 2 else ""
+                recv_fac = parts[3] if len(parts) > 3 else ""
+                send_app = parts[4] if len(parts) > 4 else ""
+                send_fac = parts[5] if len(parts) > 5 else ""
                 break
         return (
-            f"MSH|^~\\&|PACSADMIN|PACS|SENDER|FACILITY|{now}||ACK|{now}|P|2.3\r"
+            f"MSH|^~\\&|{send_app}|{send_fac}|{recv_app}|{recv_fac}|{now}||ACK|{now}|P|2.3\r"
             f"MSA|AA|{ctrl_id}|Message received successfully\r"
         )
 
