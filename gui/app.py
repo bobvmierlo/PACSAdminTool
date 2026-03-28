@@ -16,7 +16,7 @@ from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config.manager import load_config, save_config
+from config.manager import load_config, save_config, APP_DIR, LOG_DIR
 from hl7_templates import load_templates as _load_hl7_templates
 from locales import t, set_language, current_language, available_languages
 from __version__ import __version__ as _APP_VERSION
@@ -33,8 +33,7 @@ def _setup_client_logging():
     The filename starts with 'pacs_admin' so the web server's existing
     cleanup pattern ('pacs_admin*.log*') covers client logs too.
     """
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    log_dir  = os.path.join(base_dir, "logs")
+    log_dir = LOG_DIR
     os.makedirs(log_dir, exist_ok=True)
 
     root = logging.getLogger()
@@ -99,6 +98,18 @@ def _style_setup(root):
     style.map("Danger.TButton", background=[("active","#b91c1c")])
     style.configure("Success.TButton", background="#16a34a", foreground="white", font=FONT_BOLD, padding=[10,4])
     style.map("Success.TButton", background=[("active","#15803d")])
+
+
+def _open_folder(path):
+    """Open a folder in the OS file manager."""
+    import subprocess
+    os.makedirs(path, exist_ok=True)
+    if sys.platform == "win32":
+        os.startfile(path)
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", path])
+    else:
+        subprocess.Popen(["xdg-open", path])
 
 
 def _btn(parent, text, command, style="TButton", **kw):
@@ -1541,6 +1552,16 @@ class AboutTab(ttk.Frame):
         _label(credit_frame, t("about.claude_credit"),
                style="Dim.TLabel", justify="left").grid(
             row=2, column=0, columnspan=2, sticky="w", pady=(4, 0))
+
+        _sep(outer).pack(fill="x", pady=20)
+
+        # Data folder
+        df_frame = ttk.Frame(outer); df_frame.pack()
+        _label(df_frame, "Data folder:", style="Dim.TLabel").pack(side="left", padx=(0, 6))
+        df_lbl = _label(df_frame, APP_DIR, style="TLabel")
+        df_lbl.pack(side="left")
+        df_lbl.configure(foreground="#2b6cb0", cursor="hand2")
+        df_lbl.bind("<Button-1>", lambda e: _open_folder(APP_DIR))
 
         _sep(outer).pack(fill="x", pady=20)
 
