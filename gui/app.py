@@ -164,6 +164,17 @@ def _log_frame(parent, height=5, label=None):
     return lf, box
 
 
+def _run_in_thread(log_box, fn):
+    """Run *fn* in a daemon thread; log any exception to *log_box*."""
+    def _wrapper():
+        try:
+            fn()
+        except Exception as e:
+            logger.exception("Operation failed")
+            log_box.append(f"Error: {e}", "err")
+    threading.Thread(target=_wrapper, daemon=True).start()
+
+
 class AESelector(ttk.LabelFrame):
     def __init__(self, parent, config, label=None, **kw):
         if label is None:
@@ -324,13 +335,9 @@ class CFindTab(ttk.Frame):
         local = self.app.local_ae
         self.log.append(f"C-ECHO -> {ae['ae_title']}@{ae['host']}:{ae['port']}")
         def run():
-            try:
-                from dicom.operations import c_echo
-                ok, msg = c_echo(local["ae_title"], ae["host"], ae["port"], ae["ae_title"]); self.log.append(msg)
-            except Exception as e:
-                logger.exception("Operation failed")
-                self.log.append(f"Error: {e}", "err")
-        threading.Thread(target=run, daemon=True).start()
+            from dicom.operations import c_echo
+            ok, msg = c_echo(local["ae_title"], ae["host"], ae["port"], ae["ae_title"]); self.log.append(msg)
+        _run_in_thread(self.log, run)
 
     def _on_model_change(self, _=None):
         """
@@ -373,22 +380,18 @@ class CFindTab(ttk.Frame):
         self.count_lbl.configure(text="")
         self.log.append(f"C-FIND -> {ae['ae_title']}@{ae['host']}:{ae['port']}")
         def run():
-            try:
-                from dicom.operations import c_find
-                ok, results, msg = c_find(local["ae_title"], ae["host"], ae["port"], ae["ae_title"], ds, self.model_var.get())
-                self.log.append(msg)
-                for r in results:
-                    self._datasets.append(r)
-                    self.tree.insert("","end",values=(
-                        str(getattr(r,"PatientID","")), str(getattr(r,"PatientName","")),
-                        str(getattr(r,"StudyDate","")), str(getattr(r,"ModalitiesInStudy","")),
-                        str(getattr(r,"AccessionNumber","")), str(getattr(r,"StudyDescription","")),
-                        str(getattr(r,"StudyInstanceUID",""))))
-                self.count_lbl.configure(text=t("cfind.results_count", n=len(results)))
-            except Exception as e:
-                logger.exception("Operation failed")
-                self.log.append(f"Error: {e}","err")
-        threading.Thread(target=run, daemon=True).start()
+            from dicom.operations import c_find
+            ok, results, msg = c_find(local["ae_title"], ae["host"], ae["port"], ae["ae_title"], ds, self.model_var.get())
+            self.log.append(msg)
+            for r in results:
+                self._datasets.append(r)
+                self.tree.insert("","end",values=(
+                    str(getattr(r,"PatientID","")), str(getattr(r,"PatientName","")),
+                    str(getattr(r,"StudyDate","")), str(getattr(r,"ModalitiesInStudy","")),
+                    str(getattr(r,"AccessionNumber","")), str(getattr(r,"StudyDescription","")),
+                    str(getattr(r,"StudyInstanceUID",""))))
+            self.count_lbl.configure(text=t("cfind.results_count", n=len(results)))
+        _run_in_thread(self.log, run)
 
     def _export_csv(self):
         if not self._datasets: messagebox.showinfo(t("cfind.export_csv"),t("cfind.no_results")); return
@@ -414,14 +417,10 @@ class CFindTab(ttk.Frame):
         move_ds.StudyInstanceUID = getattr(src,"StudyInstanceUID","")
         self.log.append(f"C-MOVE -> dest={dest}  study={move_ds.StudyInstanceUID}")
         def run():
-            try:
-                from dicom.operations import c_move
-                ok, msg = c_move(local["ae_title"], ae["host"], ae["port"], ae["ae_title"], move_ds, dest, self.model_var.get(), callback=lambda m: self.log.append(m))
-                self.log.append(msg)
-            except Exception as e:
-                logger.exception("Operation failed")
-                self.log.append(f"Error: {e}","err")
-        threading.Thread(target=run, daemon=True).start()
+            from dicom.operations import c_move
+            ok, msg = c_move(local["ae_title"], ae["host"], ae["port"], ae["ae_title"], move_ds, dest, self.model_var.get(), callback=lambda m: self.log.append(m))
+            self.log.append(msg)
+        _run_in_thread(self.log, run)
 
 
 class CStoreTab(ttk.Frame):
@@ -473,14 +472,10 @@ class CStoreTab(ttk.Frame):
         local = self.app.local_ae; files = list(self._files)
         self.log.append(f"C-STORE {len(files)} file(s) -> {ae['ae_title']}@{ae['host']}:{ae['port']}")
         def run():
-            try:
-                from dicom.operations import c_store
-                ok, msg = c_store(local["ae_title"],ae["host"],ae["port"],ae["ae_title"],files,callback=lambda m: self.log.append(m))
-                self.log.append(msg)
-            except Exception as e:
-                logger.exception("Operation failed")
-                self.log.append(f"Error: {e}","err")
-        threading.Thread(target=run, daemon=True).start()
+            from dicom.operations import c_store
+            ok, msg = c_store(local["ae_title"],ae["host"],ae["port"],ae["ae_title"],files,callback=lambda m: self.log.append(m))
+            self.log.append(msg)
+        _run_in_thread(self.log, run)
 
 
 class DMWLTab(ttk.Frame):
@@ -553,27 +548,23 @@ class DMWLTab(ttk.Frame):
         self.tree.delete(*self.tree.get_children()); self._datasets.clear()
         self.log.append(f"DMWL query -> {ae['ae_title']}@{ae['host']}:{ae['port']}")
         def run():
-            try:
-                from dicom.operations import dmwl_find
-                station_aet = self.aet_var.get().strip()
-                calling_ae = station_aet if station_aet else local["ae_title"]
-                ok, results, msg = dmwl_find(calling_ae, ae["host"], ae["port"], ae["ae_title"], ds, log_callback=lambda m: self.log.append(m))
-                self.log.append(msg); self.count_lbl.configure(text=t("dmwl.items_returned", n=len(results)))
-                for r in results:
-                    self._datasets.append(r)
-                    sps_seq = getattr(r,"ScheduledProcedureStepSequence",[])
-                    sps = sps_seq[0] if sps_seq else None
-                    self.tree.insert("","end",values=(
-                        str(getattr(r,"PatientID","")), str(getattr(r,"PatientName","")),
-                        str(getattr(r,"AccessionNumber","")),
-                        str(getattr(sps,"Modality","")) if sps else "",
-                        str(getattr(sps,"ScheduledProcedureStepStartDate","")) if sps else "",
-                        str(getattr(sps,"ScheduledStationAETitle","")) if sps else "",
-                        str(getattr(r,"RequestedProcedureDescription",""))))
-            except Exception as e:
-                logger.exception("Operation failed")
-                self.log.append(f"Error: {e}","err")
-        threading.Thread(target=run, daemon=True).start()
+            from dicom.operations import dmwl_find
+            station_aet = self.aet_var.get().strip()
+            calling_ae = station_aet if station_aet else local["ae_title"]
+            ok, results, msg = dmwl_find(calling_ae, ae["host"], ae["port"], ae["ae_title"], ds, log_callback=lambda m: self.log.append(m))
+            self.log.append(msg); self.count_lbl.configure(text=t("dmwl.items_returned", n=len(results)))
+            for r in results:
+                self._datasets.append(r)
+                sps_seq = getattr(r,"ScheduledProcedureStepSequence",[])
+                sps = sps_seq[0] if sps_seq else None
+                self.tree.insert("","end",values=(
+                    str(getattr(r,"PatientID","")), str(getattr(r,"PatientName","")),
+                    str(getattr(r,"AccessionNumber","")),
+                    str(getattr(sps,"Modality","")) if sps else "",
+                    str(getattr(sps,"ScheduledProcedureStepStartDate","")) if sps else "",
+                    str(getattr(sps,"ScheduledStationAETitle","")) if sps else "",
+                    str(getattr(r,"RequestedProcedureDescription",""))))
+        _run_in_thread(self.log, run)
 
     def _export_csv(self):
         if not self._datasets: messagebox.showinfo(t("dmwl.export"),t("dmwl.no_results")); return
@@ -630,14 +621,10 @@ class StorageCommitTab(ttk.Frame):
         local = self.app.local_ae; uids = list(self._uids)
         self.log.append(f"N-ACTION -> {ae['ae_title']}@{ae['host']}:{ae['port']}  ({len(uids)} UIDs)")
         def run():
-            try:
-                from dicom.operations import storage_commit
-                ok, msg = storage_commit(local["ae_title"],ae["host"],ae["port"],ae["ae_title"],uids,callback=lambda m: self.log.append(m))
-                self.log.append(msg)
-            except Exception as e:
-                logger.exception("Operation failed")
-                self.log.append(f"Error: {e}","err")
-        threading.Thread(target=run, daemon=True).start()
+            from dicom.operations import storage_commit
+            ok, msg = storage_commit(local["ae_title"],ae["host"],ae["port"],ae["ae_title"],uids,callback=lambda m: self.log.append(m))
+            self.log.append(msg)
+        _run_in_thread(self.log, run)
 
 
 class IOCMTab(ttk.Frame):
@@ -666,14 +653,10 @@ class IOCMTab(ttk.Frame):
         params = {"patient_id":self.iocm_pid.get(),"study_uid":self.iocm_suid.get(),"series_uid":self.iocm_seruid.get(),"sop_class_uid":self.iocm_sopclass.get(),"sop_inst_uid":self.iocm_sopinst.get(),"availability":self.iocm_avail.get()}
         self.log.append(f"IOCM N-CREATE -> {ae['ae_title']}@{ae['host']}:{ae['port']}")
         def run():
-            try:
-                from dicom.operations import iocm_notify
-                ok, msg = iocm_notify(local["ae_title"],ae["host"],ae["port"],ae["ae_title"],params,callback=lambda m: self.log.append(m))
-                self.log.append(msg)
-            except Exception as e:
-                logger.exception("Operation failed")
-                self.log.append(f"Error: {e}","err")
-        threading.Thread(target=run, daemon=True).start()
+            from dicom.operations import iocm_notify
+            ok, msg = iocm_notify(local["ae_title"],ae["host"],ae["port"],ae["ae_title"],params,callback=lambda m: self.log.append(m))
+            self.log.append(msg)
+        _run_in_thread(self.log, run)
 
 
 class HL7Tab(ttk.Frame):
@@ -861,15 +844,11 @@ class HL7Tab(ttk.Frame):
         debug = self.send_debug_var.get()
         self.hl7_send_log.append(f"Sending to {host}:{port}")
         def run():
-            try:
-                from hl7_module.messaging import send_mllp
-                dbg = (lambda m: self.hl7_send_log.append(m,"info")) if debug else None
-                ok, resp = send_mllp(host, port, msg, debug_callback=dbg)
-                self.hl7_send_log.append(f"{'OK' if ok else 'FAIL'}  Response: {resp[:300]}")
-            except Exception as e:
-                logger.exception("HL7 send failed")
-                self.hl7_send_log.append(f"Error: {e}","err")
-        threading.Thread(target=run, daemon=True).start()
+            from hl7_module.messaging import send_mllp
+            dbg = (lambda m: self.hl7_send_log.append(m,"info")) if debug else None
+            ok, resp = send_mllp(host, port, msg, debug_callback=dbg)
+            self.hl7_send_log.append(f"{'OK' if ok else 'FAIL'}  Response: {resp[:300]}")
+        _run_in_thread(self.hl7_send_log, run)
 
     def _toggle_listener(self):
         if self._listener_running: self._stop_listener()
@@ -938,7 +917,7 @@ class SCPListenerTab(ttk.Frame):
         _entry(row,textvariable=self.scp_port_var,width=8).pack(side="left",padx=(0,20))
         save_row = ttk.Frame(cfg_lf); save_row.pack(fill="x",pady=(6,0))
         _label(save_row,t("scp.save_to")).pack(side="left",padx=(0,6))
-        self.save_dir_var = tk.StringVar(value=os.path.expanduser("~/DICOM_Received"))
+        self.save_dir_var = tk.StringVar(value=os.path.normpath(os.path.expanduser("~/DICOM_Received")))
         _entry(save_row,textvariable=self.save_dir_var,width=40).pack(side="left")
         _btn(save_row,t("common.browse"),self._browse_save_dir).pack(side="left",padx=4)
         self.scp_btn = _btn(top,t("scp.start_scp"),self._toggle_scp,style="Primary.TButton")

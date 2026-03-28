@@ -503,7 +503,7 @@
         <h3 data-i18n="hl7.destination">Destination</h3>
         <div class="field-grid">
           <div class="field"><label data-i18n="hl7.host">Host</label><input id="hl7-host" value="127.0.0.1"></div>
-          <div class="field" style="max-width:100px"><label data-i18n="hl7.port">Port</label><input id="hl7-port" value="2575"></div>
+          <div class="field" style="max-width:100px"><label data-i18n="hl7.port">Port</label><input id="hl7-port" type="number" min="1" max="65535" value="2575"></div>
         </div>
       </div>
       <div class="card">
@@ -555,7 +555,7 @@
       <div class="card">
         <h3 data-i18n="hl7.listener_config">Listener Configuration</h3>
         <div class="field-grid">
-          <div class="field" style="max-width:120px"><label data-i18n="hl7.port">Port</label><input id="hl7-listen-port" value="2575"></div>
+          <div class="field" style="max-width:120px"><label data-i18n="hl7.port">Port</label><input id="hl7-listen-port" type="number" min="1" max="65535" value="2575"></div>
         </div>
         <div class="btn-row" style="margin-top:12px">
           <button class="btn primary" id="hl7-listen-btn" onclick="toggleHL7Listener()" data-i18n="hl7.start_hl7_web">&#9654; Start HL7 Listener</button>
@@ -586,7 +586,7 @@
       <h3 data-i18n="scp.listener_config">Listener Configuration</h3>
       <div class="field-grid">
         <div class="field"><label data-i18n="scp.ae_title">AE Title</label><input id="scp-ae" value="PACSADMIN"></div>
-        <div class="field" style="max-width:120px"><label data-i18n="scp.port">Port</label><input id="scp-port" value="11112"></div>
+        <div class="field" style="max-width:120px"><label data-i18n="scp.port">Port</label><input id="scp-port" type="number" min="1" max="65535" value="11112"></div>
         <div class="field"><label data-i18n="scp.save_to_web">Save received files to</label><input id="scp-dir" value=""></div>
       </div>
       <div class="btn-row" style="margin-top:12px">
@@ -614,7 +614,7 @@
       <h3 data-i18n="settings.local_ae">Local AE Configuration</h3>
       <div class="field-grid">
         <div class="field"><label data-i18n="settings.ae_title_web">Local AE Title</label><input id="set-ae-title" value="PACSADMIN"></div>
-        <div class="field" style="max-width:120px"><label data-i18n="settings.port_web">Default Port</label><input id="set-ae-port" value="11112"></div>
+        <div class="field" style="max-width:120px"><label data-i18n="settings.port_web">Default Port</label><input id="set-ae-port" type="number" min="1" max="65535" value="11112"></div>
       </div>
     </div>
     <div class="card">
@@ -629,7 +629,7 @@
         <div class="field"><label data-i18n="common.name">Name</label><input id="new-ae-name" placeholder="My PACS"></div>
         <div class="field"><label data-i18n="common.ae_title">AE Title</label><input id="new-ae-aet" placeholder="PACS_AE"></div>
         <div class="field"><label data-i18n="common.host">Host</label><input id="new-ae-host" placeholder="192.168.1.10"></div>
-        <div class="field" style="max-width:100px"><label data-i18n="common.port">Port</label><input id="new-ae-port" placeholder="104"></div>
+        <div class="field" style="max-width:100px"><label data-i18n="common.port">Port</label><input id="new-ae-port" type="number" min="1" max="65535" placeholder="104"></div>
       </div>
       <div class="btn-row" style="margin-top:10px">
         <button class="btn primary" onclick="addPreset()" data-i18n="settings.add_preset">+ Add Preset</button>
@@ -638,7 +638,7 @@
     <div class="card">
       <h3 data-i18n="settings.hl7_settings">HL7 Settings</h3>
       <div class="field-grid">
-        <div class="field" style="max-width:150px"><label data-i18n="settings.hl7_port_web">Default HL7 Listen Port</label><input id="set-hl7-port" value="2575"></div>
+        <div class="field" style="max-width:150px"><label data-i18n="settings.hl7_port_web">Default HL7 Listen Port</label><input id="set-hl7-port" type="number" min="1" max="65535" value="2575"></div>
       </div>
     </div>
     <div class="card">
@@ -1136,7 +1136,7 @@ function buildAESelector(containerId, prefix) {
       </div>
       <div class="field"><label>${i18n("common.ae_title")}</label><input id="${prefix}-ae" value="REMOTE_AE"></div>
       <div class="field"><label>${i18n("common.host")}</label><input id="${prefix}-host" value="127.0.0.1"></div>
-      <div class="field" style="max-width:90px"><label>${i18n("common.port")}</label><input id="${prefix}-port" value="104"></div>
+      <div class="field" style="max-width:90px"><label>${i18n("common.port")}</label><input id="${prefix}-port" type="number" min="1" max="65535" value="104"></div>
     </div>`;
 }
 

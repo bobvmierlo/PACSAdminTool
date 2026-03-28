@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import stat
+import tempfile
 
 logger = logging.getLogger(__name__)
 
@@ -69,16 +70,29 @@ def load_config() -> dict:
 
 
 def save_config(config: dict):
-    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
-    with open(CONFIG_PATH, "w") as f:
-        json.dump(config, f, indent=2)
-    # Restrict permissions to owner-only (rw-------) so that credentials
-    # stored in the config (e.g. future TLS keys, passwords) are not readable
-    # by other users on the same system.  No-op on Windows.
+    config_dir = os.path.dirname(CONFIG_PATH)
+    os.makedirs(config_dir, exist_ok=True)
+    # Write to a temp file in the same directory, then atomically replace.
+    # This prevents a half-written config if the process crashes mid-write.
+    fd, tmp_path = tempfile.mkstemp(dir=config_dir, suffix=".tmp")
     try:
-        os.chmod(CONFIG_PATH, stat.S_IRUSR | stat.S_IWUSR)
-    except OSError:
-        pass
+        with os.fdopen(fd, "w") as f:
+            json.dump(config, f, indent=2)
+        # Restrict permissions to owner-only (rw-------) so that credentials
+        # stored in the config (e.g. future TLS keys, passwords) are not readable
+        # by other users on the same system.  No-op on Windows.
+        try:
+            os.chmod(tmp_path, stat.S_IRUSR | stat.S_IWUSR)
+        except OSError:
+            pass
+        os.replace(tmp_path, CONFIG_PATH)
+    except BaseException:
+        # Clean up the temp file if anything goes wrong
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def get_remote_ae(config: dict, name: str) -> dict | None:
