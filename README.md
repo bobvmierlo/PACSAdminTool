@@ -5,7 +5,7 @@ A portable, self-contained DICOM/HL7 workstation for PACS administrators.
 **No installation required** — just run `PacsAdminTool.exe` or `PacsAdminToolWeb.exe`.
 Can also be run locally with python installed and the required dependencies installed using pip.
 
-**I created this tool to accomodate for my personal (professional) needs, and won't be actively maintaining the repo and/or fixing issues.**
+**Note:** This tool was built for my own professional use. The repository is not actively maintained and issues may not be addressed.
 
 ---
 
@@ -18,17 +18,17 @@ Can also be run locally with python installed and the required dependencies inst
 | **DMWL** | Full Modality Worklist query with export to CSV |
 | **Storage Commit** | Send N-ACTION storage commitment requests; receive N-EVENT-REPORT responses |
 | **IOCM** | Send Instance Availability Notifications (delete/change notifications) |
-| **HL7** | Send/receive HL7 v2 messages over MLLP; built-in templates for ORM, ORU, ADT, SIU, QBP |
+| **HL7** | Send/receive HL7 v2 messages over MLLP; built-in templates for ORM, ORU, ADT, SIU, OML, QBP |
 | **DICOM Receiver** | Embedded DICOM SCP — receive C-STORE and C-ECHO; auto-saves received DICOM files |
 | **SR Viewer** | Parse and display any DICOM Structured Report in a human-readable format |
 | **KOS Creator** | Build a DICOM Key Object Selection document (XDS-I manifest) from existing DICOM files |
-| **Settings** | Manage local AE title/port, remote AE presets, HL7 defaults |
+| **Settings** | Manage local AE title/port, remote AE presets, HL7 defaults, language, log level |
 
 ---
 
 ## System Tray Icon
 
-Both the desktop GUI and the web server show a **system tray icon** (notification area, bottom-right on Windows).
+Both the desktop GUI and the web server can show a **system tray icon** (notification area, bottom-right on Windows) when `pystray` and `Pillow` are installed. The app works without them, but system tray functionality will be disabled.
 
 **Desktop GUI:**
 - Closing the window (X button) minimises the app to the tray instead of quitting
@@ -46,9 +46,12 @@ Both the desktop GUI and the web server show a **system tray icon** (notificatio
 
 ```bash
 # 1. Install dependencies
-pip install pydicom pynetdicom hl7 pystray Pillow
+pip install pydicom pynetdicom hl7
 
-# 2. Run
+# 2. (Optional) Install system tray support
+pip install pystray Pillow
+
+# 3. Run
 python main.py
 ```
 
@@ -57,13 +60,16 @@ python main.py
 ## Quick Start (Web Version)
 
 ```bash
-# 1. Install dependencies (includes the desktop ones plus web extras)
-pip install pydicom pynetdicom hl7 flask flask-socketio simple-websocket pystray Pillow
+# 1. Install dependencies
+pip install pydicom pynetdicom hl7 flask flask-socketio simple-websocket
 
-# 2. Run the web server
+# 2. (Optional) Install system tray support
+pip install pystray Pillow
+
+# 3. Run the web server
 python webmain.py
 
-# 3. Open in your browser
+# 4. Open in your browser
 #    http://localhost:5000
 ```
 
@@ -76,6 +82,11 @@ python webmain.py --host 0.0.0.0
 To use a different port:
 ```bash
 python webmain.py --port 8080
+```
+
+To enable debug mode with auto-reload:
+```bash
+python webmain.py --debug
 ```
 
 ---
@@ -91,7 +102,7 @@ This produces `dist\PacsAdminTool.exe` — a single executable with no external 
 
 ### Manual build steps:
 ```bash
-pip install pydicom pynetdicom hl7 pyinstaller
+pip install -r requirements.txt
 pyinstaller pacs_tool.spec --clean --noconfirm
 ```
 
@@ -110,10 +121,14 @@ chmod +x build.sh
 ## Configuration
 
 Settings are saved to `~/.pacs_admin_tool/config.json` automatically.
+Logs are written to `~/.pacs_admin_tool/logs/` with automatic 7-day rotation.
 
 ### Remote AE Presets
 Add your PACS, RIS, and modality AE entries in the **Settings** tab.
 They become available as a dropdown in every other tab.
+
+### Language
+The UI supports English and Dutch. Switch languages in the **Settings** tab.
 
 ---
 
@@ -196,9 +211,13 @@ The generated KOS includes:
 | Template | Description |
 |----------|-------------|
 | ORM^O01 | Radiology order |
+| OML^O21 | Lab order |
 | ORU^R01 | Observation/report result |
 | ADT^A04 | Patient registration |
-| SIU^S12 | Schedule notification |
+| ADT^A08 | Patient update |
+| ADT^A23 | Delete visit |
+| SIU^S12 | Schedule appointment |
+| SIU^S15 | Cancel appointment |
 | QBP^Q22 | Patient demographics query (PDQ) |
 
 All templates are editable before sending. Raw HL7 text can also be pasted directly.
@@ -211,9 +230,11 @@ All templates are editable before sending. Raw HL7 text can also be pasted direc
 - Python 3.10+
 - pynetdicom >= 2.0
 - pydicom >= 2.4
-- hl7 >= 0.4.5
+- hl7 >= 0.4
+
+**Optional:**
 - pystray >= 0.19 (system tray icon)
-- Pillow >= 10.0 (icon rendering)
+- Pillow >= 10.0 (icon rendering for tray)
 - PyInstaller >= 6.0 (build only)
 
 **Web version (additional):**
