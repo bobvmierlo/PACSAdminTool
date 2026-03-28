@@ -147,7 +147,7 @@ app = Flask(__name__,
 # ── Create the SocketIO instance.
 #    cors_allowed_origins="*" lets any browser origin connect (fine for a
 #    local network tool; tighten this in a production deployment).
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 # ── Load config once at startup. All routes share this dict.
 config = load_config()

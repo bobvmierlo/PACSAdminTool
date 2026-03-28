@@ -16,7 +16,6 @@ hl7~=0.4
 # Web server (web version only)
 flask~=3.0
 flask-socketio~=5.3
-eventlet~=0.37
 simple-websocket~=1.0
 
 # Build desktop .exe (optional, Windows only)

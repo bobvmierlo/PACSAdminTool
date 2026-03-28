@@ -25,9 +25,7 @@ all_hidden    = (
     + pydicom_hiddenimports
     + collect_submodules('pynetdicom')
     + collect_submodules('pydicom')
-    + collect_submodules('eventlet')
-    + collect_submodules('dns')          # eventlet dependency
-    + ['hl7', 'flask', 'flask_socketio', 'eventlet',
+    + ['hl7', 'flask', 'flask_socketio',
        'simple_websocket', 'engineio', 'socketio',
        'threading', 'socket', 'json', 'logging']
 )

@@ -15,7 +15,7 @@ Or allow access from other machines on your network:
     Then other PCs can reach it at http://<your-ip>:5000
 
 Requirements (install once):
-    pip install flask flask-socketio eventlet pynetdicom pydicom hl7
+    pip install flask flask-socketio pynetdicom pydicom hl7
 """
 
 import sys
@@ -56,12 +56,12 @@ if __name__ == "__main__":
   +--------------------------------------------------+
 """)
 
-    # socketio.run() uses the best available async server:
-    # - With eventlet installed: eventlet production server (recommended)
-    # - Without eventlet: falls back to Werkzeug dev server
+    # socketio.run() is used instead of app.run() because Flask-SocketIO
+    # needs to manage the server to support WebSocket connections.
     socketio.run(
         app,
         host=args.host,
         port=args.port,
         debug=args.debug,
+        allow_unsafe_werkzeug=True,   # needed for newer Werkzeug versions
     )
