@@ -695,7 +695,7 @@
   <div id="tab-about" class="tab-panel">
     <div id="about-layout">
       <h2 id="about-app-title" data-i18n="about.title">PACS Admin Tool</h2>
-      <p id="about-version" class="about-dim">Version 1.0</p>
+      <p id="about-version" class="about-dim">Version ...</p>
       <hr class="about-sep">
       <p class="about-desc" data-i18n-html="about.description_html">
         A portable DICOM &amp; HL7 administration utility for PACS engineers,<br>
@@ -1471,6 +1471,14 @@ function updateTemplateDesc() {
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("hl7-template")
     .addEventListener("change", updateTemplateDesc);
+
+  // Fetch app version from the server and display it in the About tab
+  fetch("/api/version")
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById("about-version").textContent = "Version " + (d.version || "?");
+    })
+    .catch(() => {});
 });
 
 async function loadHL7Template() {

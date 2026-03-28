@@ -19,10 +19,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.manager import load_config, save_config
 from hl7_templates import load_templates as _load_hl7_templates
 from locales import t, set_language, current_language, available_languages
+from __version__ import __version__ as _APP_VERSION
 
 logger = logging.getLogger(__name__)
-
-_APP_VERSION = "1.0"
 
 
 def _setup_client_logging():
