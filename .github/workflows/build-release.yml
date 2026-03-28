@@ -1,4 +1,4 @@
-name: Build and attach release executable
+name: Build and attach release executables
 
 on:
   release:
@@ -27,10 +27,15 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Build executable with PyInstaller
+      - name: Build GUI executable
         run: pyinstaller pacs_tool.spec
 
-      - name: Upload .exe to release
+      - name: Build Web Server executable
+        run: pyinstaller pacs_web.spec
+
+      - name: Upload executables to release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/PacsAdminTool.exe
+          files: |
+            dist/PacsAdminTool.exe
+            dist/PacsAdminToolWeb.exe

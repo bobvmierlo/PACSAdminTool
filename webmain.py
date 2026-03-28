@@ -15,12 +15,13 @@ Or allow access from other machines on your network:
     Then other PCs can reach it at http://<your-ip>:5000
 
 Requirements (install once):
-    pip install flask flask-socketio pynetdicom pydicom hl7
+    pip install flask flask-socketio eventlet pynetdicom pydicom hl7
 """
 
 import sys
 import os
 import argparse
+import logging
 
 # ── Put our project folder on Python's search path so imports work
 #    regardless of where you launch this script from.
@@ -29,6 +30,8 @@ sys.path.insert(0, BASE_DIR)
 
 # ── Import our Flask app and the SocketIO instance from server.py
 from web.server import app, socketio
+
+logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     # ── Parse command-line arguments so the user can customise host/port
@@ -41,21 +44,24 @@ if __name__ == "__main__":
         help="Enable Flask debug mode (auto-reloads on code changes)")
     args = parser.parse_args()
 
+    url = f"http://{args.host}:{args.port}"
+    logger.info("PACS Admin Tool Web Server starting on %s", url)
+
     print(f"""
   +--------------------------------------------------+
   |          PACS Admin Tool  -  Web Mode            |
   +--------------------------------------------------+
-  |  Open in browser:  http://{args.host}:{args.port:<21} |
+  |  Open in browser:  {url:<29} |
   |  Press Ctrl+C to stop the server                 |
   +--------------------------------------------------+
 """)
 
-    # socketio.run() is used instead of app.run() because Flask-SocketIO
-    # needs to manage the server to support WebSocket connections.
+    # socketio.run() uses the best available async server:
+    # - With eventlet installed: eventlet production server (recommended)
+    # - Without eventlet: falls back to Werkzeug dev server
     socketio.run(
         app,
         host=args.host,
         port=args.port,
         debug=args.debug,
-        allow_unsafe_werkzeug=True,   # needed for newer Werkzeug versions
     )
