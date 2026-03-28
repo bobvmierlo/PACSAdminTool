@@ -249,6 +249,10 @@
     "saved": "Opgeslagen  {ts}",
     "saved_web": "Opgeslagen \u2713",
     "name_required": "Naam is verplicht.",
+    "web_server": "Webserver",
+    "web_host": "Host",
+    "web_port": "Poort",
+    "web_note": "Wijzigingen worden van kracht na herstart van de applicatie.",
     "language": "Taal",
     "language_label": "Interfacetaal:",
     "language_note": "Wijzigingen worden van kracht na herstart (desktop) of pagina vernieuwen (web)."
