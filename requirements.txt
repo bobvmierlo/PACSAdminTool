@@ -18,5 +18,9 @@ flask~=3.0
 flask-socketio~=5.3
 simple-websocket~=1.0
 
+# System tray icon
+pystray~=0.19
+Pillow~=10.0
+
 # Build desktop .exe (optional, Windows only)
 pyinstaller~=6.0

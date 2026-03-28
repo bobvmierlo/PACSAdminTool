@@ -20,6 +20,7 @@ from config.manager import load_config, save_config, APP_DIR, LOG_DIR
 from hl7_templates import load_templates as _load_hl7_templates
 from locales import t, set_language, current_language, available_languages
 from __version__ import __version__ as _APP_VERSION
+from tray import TrayIcon
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,15 @@ def _style_setup(root):
     style.map("Danger.TButton", background=[("active","#b91c1c")])
     style.configure("Success.TButton", background="#16a34a", foreground="white", font=FONT_BOLD, padding=[10,4])
     style.map("Success.TButton", background=[("active","#15803d")])
+
+
+def _icon_path(filename):
+    """Return the absolute path to an icon file, handling PyInstaller bundles."""
+    if getattr(sys, "frozen", False):
+        base = sys._MEIPASS
+    else:
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, filename)
 
 
 def _open_folder(path):
@@ -1594,8 +1604,11 @@ class PACSAdminApp:
         self.root.geometry("1100x760")
         self.root.minsize(900, 600)
         self.root.configure(bg="#f5f5f5")
+        self._set_window_icon()
         _style_setup(self.root)
         self._build_ui()
+        self._tray = None
+        self._start_tray()
 
     @property
     def local_ae(self):
@@ -1627,8 +1640,58 @@ class PACSAdminApp:
         self._status_var = tk.StringVar(value=t("app.ready"))
         tk.Label(sb,textvariable=self._status_var,font=("Segoe UI",8),bg="#e8e8e8",fg="#666666").pack(side="left",padx=10)
 
+    def _set_window_icon(self):
+        """Set the window/taskbar icon from icon.ico or icon.png."""
+        try:
+            ico = _icon_path("icon.ico")
+            if os.path.isfile(ico):
+                self.root.iconbitmap(ico)
+                return
+        except tk.TclError:
+            pass
+        # Fallback: use icon.png via PhotoImage
+        try:
+            png = _icon_path("icon.png")
+            if os.path.isfile(png):
+                img = tk.PhotoImage(file=png)
+                self.root.iconphoto(True, img)
+                self._icon_photo = img  # prevent garbage collection
+        except Exception:
+            logger.debug("Could not set window icon", exc_info=True)
+
+    def _start_tray(self):
+        """Start the system tray icon with show/exit menu."""
+        try:
+            self._tray = TrayIcon(
+                tooltip="PACS Admin Tool",
+                menu_items=[
+                    ("Show Window", lambda icon, item: self.root.after(0, self._show_window)),
+                    ("Open Data Folder", lambda icon, item: _open_folder(APP_DIR)),
+                ],
+                on_quit=lambda: self.root.after(0, self.root.destroy),
+            )
+            self._tray.start()
+            # Minimise to tray on window close (X button)
+            self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        except Exception:
+            logger.debug("System tray not available", exc_info=True)
+
+    def _show_window(self):
+        """Restore the window from minimised/hidden state."""
+        self.root.deiconify()
+        self.root.lift()
+        self.root.focus_force()
+
+    def _on_close(self):
+        """Hide to tray instead of quitting when the user clicks X."""
+        self.root.withdraw()
+
     def run(self):
-        self.root.mainloop()
+        try:
+            self.root.mainloop()
+        finally:
+            if self._tray:
+                self._tray.stop()
 
 
 def main():

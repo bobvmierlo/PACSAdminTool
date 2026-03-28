@@ -18,6 +18,8 @@ all_datas = (
     + [('locales/*.json',       'locales')]
     + [('hl7_templates/*.hl7',  'hl7_templates')]
     + [('web/static/*',         'web/static')]
+    + [('icon.png',             '.')]
+    + [('icon.ico',             '.')]
 )
 all_binaries  = pynetdicom_binaries + pydicom_binaries
 all_hidden    = (
@@ -34,6 +36,8 @@ all_hidden    = (
     + collect_submodules('engineio')
     + collect_submodules('socketio')
     + collect_submodules('simple_websocket')
+    + collect_submodules('pystray')
+    + ['PIL', 'PIL.Image']
 )
 
 a = Analysis(
@@ -45,7 +49,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['matplotlib', 'numpy', 'scipy', 'PIL', 'cv2',
+    excludes=['matplotlib', 'numpy', 'scipy', 'cv2',
               'pandas', 'IPython', 'jupyter',
               'tkinter', 'tkinter.ttk', 'tkinter.messagebox',
               'tkinter.filedialog', 'tkinter.scrolledtext'],
@@ -76,5 +80,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    # icon='assets/icon.ico',  # Uncomment and add icon.ico if desired
+    icon='icon.ico',
 )
