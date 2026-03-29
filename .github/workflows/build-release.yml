@@ -1,41 +1,15 @@
-name: CI / Build executables
+name: Build and attach release executables
 
 on:
-  push:
-    branches: [main]
-  pull_request:
   release:
     types: [published]
-  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write          # needed to upload assets to the release
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.13"
-
-      - name: Install Ruff
-        run: pip install ruff
-
-      - name: Run linter
-        run: ruff check .
-
   build:
     runs-on: windows-latest
-    needs: lint
-
-    # Only run build for releases or manual trigger
-    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout code
@@ -59,17 +33,7 @@ jobs:
       - name: Build Web Server executable
         run: pyinstaller pacs_web.spec
 
-      # 📦 Upload artifacts for manual runs (download via Actions UI)
-      - name: Upload build artifacts
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
-        with:
-          name: pacs-build-${{ github.run_number }}
-          path: dist/
-
-      # 🚀 Attach executables to GitHub release
       - name: Upload executables to release
-        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2.6.1
         with:
           files: |
