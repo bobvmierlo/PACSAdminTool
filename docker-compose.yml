@@ -1,0 +1,24 @@
+services:
+  pacsadmintool:
+    image: ghcr.io/bobvmierlo/pacsadmintool:latest
+    container_name: pacsadmintool
+    restart: unless-stopped
+
+    ports:
+      - "5000:5000"       # Web UI
+      # Uncomment the ports below if you want to use the built-in listeners
+      # from outside the container (e.g. receiving DICOM or HL7 from the network).
+      # The port numbers must match what you configure in the Settings tab.
+      #- "11112:11112"    # DICOM Storage SCP listener
+      #- "2575:2575"      # HL7 MLLP listener
+
+    volumes:
+      - pacs_data:/data   # Stores config.json and log files
+
+    environment:
+      # PACS_DATA_DIR is already set to /data inside the image.
+      # Override here only if you need a custom path.
+      # - PACS_DATA_DIR=/data
+
+volumes:
+  pacs_data:

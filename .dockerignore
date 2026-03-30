@@ -1,0 +1,42 @@
+.git
+.github
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Build output
+dist/
+build/
+*.exe
+*.spec
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Desktop-only modules (not used by the web server)
+gui/
+main.py
+tray.py
+version_info_gui.py
+version_info_web.py
+build.bat
+build.sh
+
+# Runtime data (not part of the image)
+logs/
+*.log
+DICOM_Received/
+config.json
+
+# Tests
+tests/
+
+# Misc
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
