@@ -238,6 +238,8 @@
     "hl7_settings": "HL7 Settings",
     "hl7_port": "Default HL7 Listen Port:",
     "hl7_port_web": "Default HL7 Listen Port",
+    "hl7_default_host": "Default Destination Host",
+    "hl7_default_port": "Default Destination Port",
     "logging": "Logging",
     "log_level": "Log Level",
     "log_note": "Logs are written to logs/pacs_admin.log and rotated daily (7-day retention).",

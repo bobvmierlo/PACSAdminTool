@@ -640,6 +640,8 @@
       <h3 data-i18n="settings.hl7_settings">HL7 Settings</h3>
       <div class="field-grid">
         <div class="field" style="max-width:150px"><label data-i18n="settings.hl7_port_web">Default HL7 Listen Port</label><input id="set-hl7-port" type="number" min="1" max="65535" value="2575"></div>
+        <div class="field"><label data-i18n="settings.hl7_default_host">Default Destination Host</label><input id="set-hl7-default-host" value="127.0.0.1"></div>
+        <div class="field" style="max-width:150px"><label data-i18n="settings.hl7_default_port">Default Destination Port</label><input id="set-hl7-default-port" type="number" min="1" max="65535" value="2575"></div>
       </div>
     </div>
     <div class="card">
@@ -1050,7 +1052,13 @@ async function loadConfig() {
   const lae = appConfig.local_ae || {};
   document.getElementById("set-ae-title").value = lae.ae_title || "PACSADMIN";
   document.getElementById("set-ae-port").value  = lae.port     || 11112;
-  document.getElementById("set-hl7-port").value  = (appConfig.hl7 || {}).listen_port || 2575;
+  const hl7 = appConfig.hl7 || {};
+  document.getElementById("set-hl7-port").value         = hl7.listen_port   || 2575;
+  document.getElementById("set-hl7-default-host").value = hl7.default_host  || "127.0.0.1";
+  document.getElementById("set-hl7-default-port").value = hl7.default_port  || 2575;
+  // Pre-fill the HL7 send form with the configured defaults
+  document.getElementById("hl7-host").value = hl7.default_host || "127.0.0.1";
+  document.getElementById("hl7-port").value = hl7.default_port || 2575;
   const web = appConfig.web || {};
   document.getElementById("set-web-host").value  = web.host || "0.0.0.0";
   document.getElementById("set-web-port").value  = web.port || 5000;
@@ -1062,7 +1070,7 @@ async function loadConfig() {
   // Set SCP / HL7 listener defaults from config
   document.getElementById("scp-ae").value          = lae.ae_title || "PACSADMIN";
   document.getElementById("scp-port").value         = lae.port     || 11112;
-  document.getElementById("hl7-listen-port").value  = (appConfig.hl7 || {}).listen_port || 2575;
+  document.getElementById("hl7-listen-port").value  = hl7.listen_port || 2575;
 
   // Pre-fill Move Destination with local AE title
   document.getElementById("cfind-movedest").value = lae.ae_title || "PACSADMIN";
@@ -1114,9 +1122,13 @@ async function saveSettings() {
     ae_title: document.getElementById("set-ae-title").value.trim(),
     port:     localPort,
   };
+  const hl7DefaultPort = parsePort(document.getElementById("set-hl7-default-port").value);
+  if (hl7DefaultPort === null) { alert('Invalid HL7 default destination port. Must be a number between 1 and 65535.'); return; }
   appConfig.hl7 = {
     ...appConfig.hl7,
-    listen_port: hl7Port,
+    listen_port:  hl7Port,
+    default_host: document.getElementById("set-hl7-default-host").value.trim(),
+    default_port: hl7DefaultPort,
   };
   const webPort = parsePort(document.getElementById("set-web-port").value);
   if (webPort === null) { alert('Invalid web server port. Must be a number between 1 and 65535.'); return; }
