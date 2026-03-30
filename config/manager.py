@@ -12,7 +12,10 @@ import tempfile
 logger = logging.getLogger(__name__)
 
 
-APP_DIR = os.path.join(os.path.expanduser("~"), ".pacs_admin_tool")
+APP_DIR = (
+    os.environ.get("PACS_DATA_DIR")
+    or os.path.join(os.path.expanduser("~"), ".pacs_admin_tool")
+)
 CONFIG_PATH = os.path.join(APP_DIR, "config.json")
 LOG_DIR = os.path.join(APP_DIR, "logs")
 

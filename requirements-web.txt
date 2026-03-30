@@ -1,0 +1,17 @@
+# PACS Admin Tool - Web server dependencies
+# Used by the Docker image (excludes desktop-only packages).
+#
+# Install:
+#   pip install -r requirements-web.txt
+
+# Core DICOM
+pydicom~=2.4
+pynetdicom~=2.0
+
+# HL7
+hl7~=0.4
+
+# Web server
+flask~=3.0
+flask-socketio~=5.3
+simple-websocket~=1.0
