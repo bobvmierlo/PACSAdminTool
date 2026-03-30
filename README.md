@@ -3,7 +3,7 @@
 A portable, self-contained DICOM/HL7 workstation for PACS administrators.
 
 **No installation required** — just run `PacsAdminTool.exe` or `PacsAdminToolWeb.exe`.
-Can also be run locally with python installed and the required dependencies installed using pip.
+Can also be run locally with Python and pip, or deployed as a Docker container.
 
 **Note:** This tool was built for my own professional use. The repository is not actively maintained and issues may not be addressed.
 
@@ -91,6 +91,90 @@ python webmain.py --debug
 
 ---
 
+## Quick Start (Docker)
+
+The web server is available as a pre-built Docker image on the GitHub Container Registry.
+No Python installation required — Docker is all you need.
+
+### Using docker-compose (recommended)
+
+Copy the `docker-compose.yml` from this repository and run:
+
+```bash
+docker compose up -d
+```
+
+Then open **http://localhost:5000** in your browser.
+
+Config and logs are stored in a named Docker volume (`pacs_data`) so they survive container restarts and upgrades.
+
+To upgrade to a newer version:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+---
+
+### docker-compose.yml options explained
+
+```yaml
+services:
+  pacsadmintool:
+    image: ghcr.io/bobvmierlo/pacsadmintool:latest
+    container_name: pacsadmintool
+    restart: unless-stopped
+
+    ports:
+      - "5000:5000"       # Web UI — change the left number to use a different host port
+                          # e.g. "8080:5000" to reach the UI at http://your-server:8080
+
+      # Uncomment these if you want the built-in listeners to accept traffic
+      # from outside the container. The left (host) port must match what you
+      # configure in the Settings tab inside the app.
+      #- "11112:11112"    # DICOM Storage SCP (C-STORE / C-ECHO receiver)
+      #- "2575:2575"      # HL7 MLLP listener
+
+    volumes:
+      - pacs_data:/data   # Named volume — stores config.json and log files.
+                          # Replace with a bind-mount if you prefer a specific path
+                          # on the host, e.g.: - /opt/pacsadmin:/data
+
+    environment:
+      # PACS_DATA_DIR is already set to /data inside the image.
+      # Only override this if you change the volume mount point above.
+      # - PACS_DATA_DIR=/data
+
+volumes:
+  pacs_data:
+```
+
+**Key settings at a glance:**
+
+| Option | What it does |
+|--------|-------------|
+| `"5000:5000"` | Maps host port → container port. Change the left number to expose the UI on a different host port. |
+| `"11112:11112"` | Required if you want to receive DICOM via C-STORE from external systems. Must match the SCP port in Settings. |
+| `"2575:2575"` | Required if you want to receive HL7 messages from external systems. Must match the HL7 listener port in Settings. |
+| `pacs_data:/data` | Named volume for persistent storage. Swap for a bind-mount (e.g. `/opt/pacsadmin:/data`) if you need direct host-filesystem access to your config or logs. |
+| `restart: unless-stopped` | The container restarts automatically after a reboot or crash. Use `no` to disable, or `always` to restart even after a manual `docker stop`. |
+
+---
+
+### Running without docker-compose
+
+```bash
+docker run -d \
+  --name pacsadmintool \
+  --restart unless-stopped \
+  -p 5000:5000 \
+  -v pacs_data:/data \
+  ghcr.io/bobvmierlo/pacsadmintool:latest
+```
+
+---
+
 ## Build a Portable .exe (Windows)
 
 ```bat
@@ -122,6 +206,10 @@ chmod +x build.sh
 
 Settings are saved to `~/.pacs_admin_tool/config.json` automatically.
 Logs are written to `~/.pacs_admin_tool/logs/` with automatic 7-day rotation.
+
+When running in Docker the data directory is `/data` inside the container
+(controlled by the `PACS_DATA_DIR` environment variable). Mount a volume there
+to keep your config and logs across restarts — see the Docker section above.
 
 ### Remote AE Presets
 Add your PACS, RIS, and modality AE entries in the **Settings** tab.
