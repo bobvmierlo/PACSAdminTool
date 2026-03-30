@@ -242,6 +242,8 @@
     "hl7_settings": "HL7-instellingen",
     "hl7_port": "Standaard HL7-luisterpoort:",
     "hl7_port_web": "Standaard HL7-luisterpoort",
+    "hl7_default_host": "Standaard bestemmingshost",
+    "hl7_default_port": "Standaard bestemmingspoort",
     "logging": "Logboek",
     "log_level": "Logniveau",
     "log_note": "Logs worden geschreven naar logs/pacs_admin.log en dagelijks geroteerd (7 dagen bewaard).",
