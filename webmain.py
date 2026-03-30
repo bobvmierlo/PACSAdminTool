@@ -58,22 +58,25 @@ if __name__ == "__main__":
     # ── Parse command-line arguments so the user can customise host/port
     #    CLI args override config.json values, which override built-in defaults.
     parser = argparse.ArgumentParser(description="PACS Admin Tool Web Server")
-    parser.add_argument("--host", default=_cfg_web.get("host", "127.0.0.1"),
-        help="Host to listen on. Use 0.0.0.0 to allow network access (default: config or 127.0.0.1)")
+    parser.add_argument("--host", default=_cfg_web.get("host", "0.0.0.0"),
+        help="Host to listen on. Use 0.0.0.0 to allow network access (default: config or 0.0.0.0)")
     parser.add_argument("--port", type=int, default=_cfg_web.get("port", 5000),
         help="Port to listen on (default: config or 5000)")
     parser.add_argument("--debug", action="store_true",
         help="Enable Flask debug mode (auto-reloads on code changes)")
     args = parser.parse_args()
 
+    # When binding to all interfaces (0.0.0.0) show localhost URL for convenience
+    display_host = "localhost" if args.host in ("0.0.0.0", "::") else args.host
     url = f"http://{args.host}:{args.port}"
+    display_url = f"http://{display_host}:{args.port}"
     logger.info("PACS Admin Tool Web Server starting on %s", url)
 
     print(f"""
   +--------------------------------------------------+
   |          PACS Admin Tool  -  Web Mode            |
   +--------------------------------------------------+
-  |  Open in browser:  {url:<29} |
+  |  Open in browser:  {display_url:<29} |
   |  Press Ctrl+C to stop the server                 |
   +--------------------------------------------------+
 """)
@@ -95,9 +98,9 @@ if __name__ == "__main__":
                 subprocess.Popen(["xdg-open", APP_DIR])
 
         tray = TrayIcon(
-            tooltip=f"PACS Admin Tool Web — {url}",
+            tooltip=f"PACS Admin Tool Web — {display_url}",
             menu_items=[
-                ("Open in Browser", _open_browser(url)),
+                ("Open in Browser", _open_browser(display_url)),
                 ("Open Data Folder", _open_data_folder),
             ],
             on_quit=_shutdown,

@@ -22,8 +22,8 @@
   <title data-i18n="app.title">PACS Admin Tool</title>
   <link rel="icon" href="/favicon.ico" type="image/png">
 
-  <!-- Socket.IO client library - must match the server version -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+  <!-- Socket.IO client library - bundled locally so no CDN required -->
+  <script src="/static/socket.io.min.js"></script>
 
   <style>
     /* ── Reset & base ─────────────────────────────────────────────── */
@@ -657,7 +657,7 @@
     <div class="card">
       <h3 data-i18n="settings.web_server">Web Server</h3>
       <div class="field-grid">
-        <div class="field"><label data-i18n="settings.web_host">Host</label><input id="set-web-host" value="127.0.0.1"></div>
+        <div class="field"><label data-i18n="settings.web_host">Host</label><input id="set-web-host" value="0.0.0.0"></div>
         <div class="field" style="max-width:120px"><label data-i18n="settings.web_port">Port</label><input id="set-web-port" type="number" min="1" max="65535" value="5000"></div>
       </div>
       <p style="font-size:12px; color:#888; margin:6px 0 0" data-i18n="settings.web_note">
@@ -1038,8 +1038,13 @@ let appConfig = {};  // holds the full config from the server
 
 // Called once on page load to populate all forms with saved settings
 async function loadConfig() {
-  const res  = await fetch("/api/config");
-  appConfig  = await res.json();
+  try {
+    const res  = await fetch("/api/config");
+    appConfig  = await res.json();
+  } catch (e) {
+    console.warn("Could not load config from server:", e);
+    return;
+  }
 
   // Populate settings tab
   const lae = appConfig.local_ae || {};
@@ -1047,7 +1052,7 @@ async function loadConfig() {
   document.getElementById("set-ae-port").value  = lae.port     || 11112;
   document.getElementById("set-hl7-port").value  = (appConfig.hl7 || {}).listen_port || 2575;
   const web = appConfig.web || {};
-  document.getElementById("set-web-host").value  = web.host || "127.0.0.1";
+  document.getElementById("set-web-host").value  = web.host || "0.0.0.0";
   document.getElementById("set-web-port").value  = web.port || 5000;
   document.getElementById("set-log-level").value = appConfig.log_level || "INFO";
   if (appConfig.language) {
