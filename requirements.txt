@@ -8,7 +8,7 @@
 #
 # Core DICOM
 pydicom~=2.4
-pynetdicom~=2.0
+pynetdicom~=3.0
 
 # HL7
 hl7~=0.4
