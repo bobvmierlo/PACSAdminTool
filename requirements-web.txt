@@ -13,5 +13,5 @@ hl7~=0.4
 
 # Web server
 flask~=3.0
-flask-socketio~=5.3
+flask-socketio~=5.6
 simple-websocket~=1.0
