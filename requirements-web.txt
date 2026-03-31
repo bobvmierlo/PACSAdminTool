@@ -12,6 +12,6 @@ pynetdicom~=2.0
 hl7~=0.4
 
 # Web server
-flask~=3.0
+flask~=3.1
 flask-socketio~=5.3
 simple-websocket~=1.0
