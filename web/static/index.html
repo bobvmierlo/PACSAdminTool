@@ -342,6 +342,7 @@
   <button class="tab-btn" onclick="showTab('sr_viewer')" data-i18n="tabs.sr_viewer">SR Viewer</button>
   <button class="tab-btn" onclick="showTab('kos_creator')" data-i18n="tabs.kos_creator">KOS Creator</button>
   <button class="tab-btn" onclick="showTab('settings')" data-i18n="tabs.settings">Settings</button>
+  <button class="tab-btn" onclick="showTab('logs')">Logs</button>
   <button class="tab-btn" onclick="showTab('help')" data-i18n="tabs.help">Help</button>
   <button class="tab-btn" onclick="showTab('about')" data-i18n="tabs.about">About</button>
 </div>
@@ -762,6 +763,46 @@
     </div>
   </div>
 
+  <!-- ── Log Viewer ──────────────────────────────────────────────── -->
+  <div id="tab-logs" class="tab-panel">
+    <div class="card">
+      <h3>Log Viewer</h3>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end">
+        <div class="field" style="flex:2; min-width:200px">
+          <label>Log File</label>
+          <select id="log-file-select" style="width:100%" onchange="loadLogContent()"></select>
+        </div>
+        <div class="field" style="min-width:90px">
+          <label>Last N lines</label>
+          <select id="log-lines-select" onchange="loadLogContent()">
+            <option value="100">100</option>
+            <option value="200" selected>200</option>
+            <option value="500">500</option>
+            <option value="1000">1000</option>
+            <option value="5000">5000</option>
+          </select>
+        </div>
+        <div class="field" style="flex:2; min-width:160px">
+          <label>Filter</label>
+          <input id="log-filter-input" placeholder="Substring filter…" oninput="scheduleLogRefresh()">
+        </div>
+        <div class="field" style="align-self:flex-end">
+          <button class="btn primary" onclick="loadLogContent()">Refresh</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px">
+        <h3 style="margin:0">Content</h3>
+        <span id="log-meta" style="font-size:11px; color:#888"></span>
+      </div>
+      <div id="log-viewer-content"
+           style="background:#fff; border:1px solid #e0e0e0; border-radius:3px;
+                  font-family:Consolas,monospace; font-size:12px; padding:8px;
+                  height:520px; overflow-y:auto; white-space:pre; word-break:break-all"></div>
+    </div>
+  </div>
+
   <!-- ── Help ────────────────────────────────────────────────────── -->
   <div id="tab-help" class="tab-panel">
     <div id="help-layout">
@@ -1095,6 +1136,8 @@ function showTab(name) {
   document.querySelectorAll(".tab-btn").forEach(b => {
     if (b.getAttribute("onclick") === `showTab('${name}')`) b.classList.add("active");
   });
+
+  if (name === "logs") initLogViewer();
 }
 
 function showHL7Tab(sub) {
@@ -2595,6 +2638,74 @@ async function doKOSCreate() {
   } catch (e) {
     appendLog("log-kos", now(), `Error: ${e}`, "err");
   }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Log Viewer
+// ─────────────────────────────────────────────────────────────────
+
+let _logRefreshTimer   = null;
+let _logViewerReady    = false;   // true once file list has been loaded
+
+async function initLogViewer() {
+  if (_logViewerReady) return;   // already initialised – just re-use current selection
+  try {
+    const res  = await fetch("/api/logs/files");
+    const data = await res.json();
+    if (!data.ok) return;
+    const sel = document.getElementById("log-file-select");
+    sel.innerHTML = "";
+    for (const f of data.files) {
+      const opt  = document.createElement("option");
+      opt.value  = f.name;
+      const kb   = f.size < 1024
+                   ? f.size + " B"
+                   : f.size < 1048576
+                     ? (f.size / 1024).toFixed(1) + " KB"
+                     : (f.size / 1048576).toFixed(1) + " MB";
+      opt.textContent = `${f.name}  (${kb})`;
+      sel.appendChild(opt);
+    }
+    _logViewerReady = true;
+    if (data.files.length > 0) loadLogContent();
+  } catch (e) {
+    console.error("Log viewer init error:", e);
+  }
+}
+
+async function loadLogContent() {
+  const file   = document.getElementById("log-file-select").value;
+  const lines  = document.getElementById("log-lines-select").value;
+  const filter = document.getElementById("log-filter-input").value.trim();
+  if (!file) return;
+
+  let url = `/api/logs/content?file=${encodeURIComponent(file)}&lines=${lines}`;
+  if (filter) url += `&filter=${encodeURIComponent(filter)}`;
+
+  const box  = document.getElementById("log-viewer-content");
+  const meta = document.getElementById("log-meta");
+  box.textContent = "Loading…";
+
+  try {
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (!data.ok) {
+      box.textContent = "Error: " + data.error;
+      meta.textContent = "";
+      return;
+    }
+    box.textContent = data.lines.join("\n");
+    box.scrollTop   = box.scrollHeight;
+    meta.textContent = `${data.returned} of ${data.total} lines`;
+  } catch (e) {
+    box.textContent = "Error loading log: " + e;
+    meta.textContent = "";
+  }
+}
+
+function scheduleLogRefresh() {
+  clearTimeout(_logRefreshTimer);
+  _logRefreshTimer = setTimeout(loadLogContent, 400);
 }
 
 </script>
