@@ -7,20 +7,20 @@
 # patch/minor updates are allowed but major-version bumps are not.
 #
 # Core DICOM
-pydicom~=2.4
-pynetdicom~=2.0
+pydicom~=3.0
+pynetdicom~=3.0
 
 # HL7
 hl7~=0.4
 
 # Web server (web version only)
-flask~=3.0
-flask-socketio~=5.3
-simple-websocket~=1.0
+flask~=3.1
+flask-socketio~=5.6
+simple-websocket~=1.1
 
 # System tray icon
 pystray~=0.19
-Pillow~=10.0
+Pillow~=12.1
 
 # Build desktop .exe (optional, Windows only)
-pyinstaller~=6.0
+pyinstaller~=6.19
