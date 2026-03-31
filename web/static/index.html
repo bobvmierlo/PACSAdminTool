@@ -316,6 +316,8 @@
   <h1 data-i18n="app.title">PACS Admin Tool</h1>
   <span data-i18n="app.subtitle">DICOM &amp; HL7 Administration Utility</span>
   <span id="ws-status" style="margin-left:auto; font-size:12px; color:#aaa" data-i18n="common.connecting">⬤ connecting…</span>
+  <span id="header-user" style="font-size:12px; color:#555; display:none"></span>
+  <button id="btn-logout" onclick="doLogout()" style="display:none; padding:4px 10px; font-size:12px; border:1px solid #d0d0d0; border-radius:3px; background:#fff; cursor:pointer; color:#555" data-i18n="auth.logout">Sign out</button>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════
@@ -374,6 +376,14 @@
       </div>
     </div>
 
+    <div class="card" id="cfind-history-card" style="display:none">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+        <h3 data-i18n="cfind.query_history">Recent Queries</h3>
+        <button class="btn danger" style="font-size:12px; padding:3px 10px" onclick="clearCFindHistory()" data-i18n="cfind.clear_history">Clear history</button>
+      </div>
+      <ul id="cfind-history-list" style="list-style:none; padding:0; margin:0; font-size:12px"></ul>
+    </div>
+
     <div class="card">
       <h3 data-i18n="cfind.cmove">C-MOVE</h3>
       <div class="btn-row">
@@ -386,7 +396,10 @@
     </div>
 
     <div class="card">
-      <h3 data-i18n="cfind.results_web">Results &mdash; click a row to see all DICOM tags</h3>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+        <h3 data-i18n="cfind.results_web">Results &mdash; click a row to see all DICOM tags</h3>
+        <button class="btn" style="font-size:12px; padding:3px 10px" onclick="exportCFindCSV()" data-i18n="cfind.export_csv">Export CSV</button>
+      </div>
       <div class="result-table-wrap">
         <table id="cfind-table">
           <thead><tr>
@@ -606,6 +619,23 @@
                   font-size:12px; border:1px solid #e0e0e0; border-radius:3px;
                   padding:6px; background:#fff; color:#555"></div>
     </div>
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+        <h3 data-i18n="scp.files_on_disk">Files on Disk</h3>
+        <button class="btn" style="font-size:12px; padding:3px 10px" onclick="loadSCPFiles()" data-i18n="common.refresh">Refresh</button>
+      </div>
+      <div id="scp-disk-info" style="font-size:12px; color:#888; margin-bottom:6px"></div>
+      <div class="result-table-wrap" id="scp-disk-wrap" style="display:none">
+        <table id="scp-disk-table">
+          <thead><tr>
+            <th data-i18n="scp.file_name">Filename</th>
+            <th data-i18n="scp.file_size">Size</th>
+            <th data-i18n="scp.file_mtime">Modified</th>
+          </tr></thead>
+          <tbody id="scp-disk-tbody"></tbody>
+        </table>
+      </div>
+    </div>
     <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-scp"></div></div>
   </div>
 
@@ -622,7 +652,7 @@
       <h3 data-i18n="settings.remote_presets">Saved Remote AE Presets</h3>
       <div class="result-table-wrap">
         <table>
-          <thead><tr><th data-i18n="common.name">Name</th><th data-i18n="common.ae_title">AE Title</th><th data-i18n="common.host">Host</th><th data-i18n="common.port">Port</th><th></th></tr></thead>
+          <thead><tr><th data-i18n="common.name">Name</th><th data-i18n="common.ae_title">AE Title</th><th data-i18n="common.host">Host</th><th data-i18n="common.port">Port</th><th data-i18n="common.actions">Actions</th></tr></thead>
           <tbody id="ae-presets-tbody"></tbody>
         </table>
       </div>
@@ -687,6 +717,40 @@
     <div class="btn-row" style="margin-top:4px; padding:0 0 20px 0">
       <button class="btn primary" onclick="saveSettings()" data-i18n="settings.save">Save Settings</button>
       <span id="save-status" style="color:#888; font-size:13px"></span>
+    </div>
+
+    <!-- User management card (shown only when auth is active and user is admin) -->
+    <div class="card" id="user-mgmt-card" style="display:none">
+      <h3 data-i18n="settings.user_management">User Management</h3>
+      <div class="result-table-wrap" style="margin-bottom:12px">
+        <table id="users-table">
+          <thead><tr>
+            <th data-i18n="common.username">Username</th>
+            <th data-i18n="common.role">Role</th>
+            <th data-i18n="settings.created_at">Created</th>
+            <th data-i18n="common.actions">Actions</th>
+          </tr></thead>
+          <tbody id="users-tbody"></tbody>
+        </table>
+      </div>
+      <details style="margin-top:8px">
+        <summary style="cursor:pointer; font-size:13px; font-weight:600; color:#2b6cb0" data-i18n="settings.add_user">Add user…</summary>
+        <div class="field-grid" style="margin-top:10px">
+          <div class="field"><label data-i18n="common.username">Username</label><input id="new-user-name" placeholder="username"></div>
+          <div class="field"><label data-i18n="auth.password">Password</label><input id="new-user-pass" type="password" placeholder="min 8 chars"></div>
+          <div class="field">
+            <label data-i18n="common.role">Role</label>
+            <select id="new-user-role">
+              <option value="user">user</option>
+              <option value="admin">admin</option>
+            </select>
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:8px">
+          <button class="btn primary" onclick="addUser()" data-i18n="settings.create_user">Create user</button>
+          <span id="new-user-status" style="font-size:12px; color:#888"></span>
+        </div>
+      </details>
     </div>
   </div>
 
@@ -1086,10 +1150,44 @@ function renderPresetTable() {
     const tr = document.createElement("tr");
     tr.innerHTML =
       `<td>${ae.name}</td><td>${ae.ae_title}</td><td>${ae.host}</td><td>${ae.port}</td>` +
-      `<td><button class="btn danger" style="padding:2px 8px; font-size:11px"
-          onclick="deletePreset(${i})">Delete</button></td>`;
+      `<td style="white-space:nowrap">` +
+      `<button class="btn" style="padding:2px 8px; font-size:11px; margin-right:4px"
+          onclick="testPreset(${i}, this)">Test</button>` +
+      `<button class="btn danger" style="padding:2px 8px; font-size:11px"
+          onclick="deletePreset(${i})">Delete</button>` +
+      `<span id="preset-test-${i}" style="margin-left:6px; font-size:11px"></span>` +
+      `</td>`;
     tbody.appendChild(tr);
   });
+}
+
+async function testPreset(i, btn) {
+  const ae = (appConfig.remote_aes || [])[i];
+  if (!ae) return;
+  btn.disabled = true;
+  const statusEl = document.getElementById(`preset-test-${i}`);
+  statusEl.textContent = "…";
+  statusEl.style.color = "#888";
+  try {
+    const res = await fetch("/api/dicom/echo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ae_title: ae.ae_title, host: ae.host, port: ae.port }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      statusEl.textContent = "✓ reachable";
+      statusEl.style.color = "#16a34a";
+    } else {
+      statusEl.textContent = "✗ " + (data.message || "failed");
+      statusEl.style.color = "#dc2626";
+    }
+  } catch {
+    statusEl.textContent = "✗ network error";
+    statusEl.style.color = "#dc2626";
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function addPreset() {
@@ -1277,6 +1375,7 @@ async function doCFind() {
   appendLog("log-cfind", now(), data.message, data.ok ? "ok" : "err");
 
   cfindResults = data.results || [];
+  if (data.ok) _cfindHistorySave();
   const tbody  = document.getElementById("cfind-tbody");
   cfindResults.forEach((r, i) => {
     const tr = document.createElement("tr");
@@ -1322,6 +1421,97 @@ document.getElementById("cfind-tbody").addEventListener("click", e => {
   tr.classList.add("selected");
   tr.style.background = "#eff6ff";
 });
+
+// ── C-FIND: CSV export ──────────────────────────────────────────
+function exportCFindCSV() {
+  if (!cfindResults.length) { alert("No results to export."); return; }
+  const cols = ["PatientID","PatientName","StudyDate","Modality","Accession","Description","StudyUID"];
+  const esc  = v => `"${String(v).replace(/"/g, '""')}"`;
+  const rows = [cols.join(",")].concat(
+    cfindResults.map(r => cols.map(c => esc(r[c] ?? "")).join(","))
+  );
+  downloadText("cfind_results.csv", rows.join("\r\n"), "text/csv");
+}
+
+// ── C-FIND: query history (LocalStorage) ────────────────────────
+const CFIND_HISTORY_KEY = "pacsadmin_cfind_history";
+const CFIND_HISTORY_MAX = 20;
+
+function _cfindHistorySave() {
+  const query = {
+    ae_title:     document.getElementById("cfind-ae-title")?.value ?? "",
+    host:         document.getElementById("cfind-host")?.value ?? "",
+    port:         document.getElementById("cfind-port")?.value ?? "",
+    query_level:  document.getElementById("cfind-level").value,
+    query_model:  document.getElementById("cfind-model").value,
+    patient_id:   document.getElementById("cfind-pid").value,
+    patient_name: document.getElementById("cfind-pname").value,
+    accession:    document.getElementById("cfind-acc").value,
+    study_date:   document.getElementById("cfind-date").value,
+    modality:     document.getElementById("cfind-mod").value,
+    study_uid:    document.getElementById("cfind-suid").value,
+    ts: new Date().toISOString(),
+  };
+  const existing = _cfindHistoryLoad();
+  // Deduplicate by a quick key (ignore ts)
+  const key = q => `${q.host}:${q.port}|${q.patient_id}|${q.patient_name}|${q.accession}|${q.study_date}|${q.modality}|${q.study_uid}`;
+  const deduped = existing.filter(q => key(q) !== key(query));
+  deduped.unshift(query);
+  try {
+    localStorage.setItem(CFIND_HISTORY_KEY,
+      JSON.stringify(deduped.slice(0, CFIND_HISTORY_MAX)));
+  } catch { /* storage full – ignore */ }
+  renderCFindHistory();
+}
+
+function _cfindHistoryLoad() {
+  try { return JSON.parse(localStorage.getItem(CFIND_HISTORY_KEY) || "[]"); }
+  catch { return []; }
+}
+
+function renderCFindHistory() {
+  const history = _cfindHistoryLoad();
+  const card    = document.getElementById("cfind-history-card");
+  const ul      = document.getElementById("cfind-history-list");
+  if (!history.length) { card.style.display = "none"; return; }
+  card.style.display = "";
+  ul.innerHTML = "";
+  history.forEach((q, i) => {
+    const parts = [];
+    if (q.patient_id)   parts.push(`PID: ${q.patient_id}`);
+    if (q.patient_name) parts.push(`Name: ${q.patient_name}`);
+    if (q.accession)    parts.push(`Acc: ${q.accession}`);
+    if (q.study_date)   parts.push(`Date: ${q.study_date}`);
+    if (q.modality)     parts.push(`Mod: ${q.modality}`);
+    if (!parts.length)  parts.push("(empty query)");
+    const label = parts.join(" · ");
+    const ts    = q.ts ? new Date(q.ts).toLocaleString() : "";
+    const li = document.createElement("li");
+    li.style.cssText = "display:flex; align-items:center; padding:4px 0; border-bottom:1px solid #f0f0f0; gap:8px";
+    li.innerHTML =
+      `<span style="flex:1; cursor:pointer; color:#2b6cb0" onclick="loadCFindHistory(${i})">${label}</span>` +
+      `<span style="color:#aaa; font-size:11px; white-space:nowrap">${ts}</span>`;
+    ul.appendChild(li);
+  });
+}
+
+function loadCFindHistory(i) {
+  const q = _cfindHistoryLoad()[i];
+  if (!q) return;
+  if (q.patient_id)   document.getElementById("cfind-pid").value   = q.patient_id;
+  if (q.patient_name) document.getElementById("cfind-pname").value = q.patient_name;
+  if (q.accession)    document.getElementById("cfind-acc").value   = q.accession;
+  if (q.study_date)   document.getElementById("cfind-date").value  = q.study_date;
+  if (q.modality)     document.getElementById("cfind-mod").value   = q.modality;
+  if (q.study_uid)    document.getElementById("cfind-suid").value  = q.study_uid;
+  if (q.query_level)  document.getElementById("cfind-level").value = q.query_level;
+  if (q.query_model)  document.getElementById("cfind-model").value = q.query_model;
+}
+
+function clearCFindHistory() {
+  localStorage.removeItem(CFIND_HISTORY_KEY);
+  renderCFindHistory();
+}
 
 // ─────────────────────────────────────────────────────────────────
 // 7. C-STORE
@@ -1722,6 +1912,31 @@ function clearSCPList() {
   document.getElementById("scp-count").textContent = "0 files";
 }
 
+async function loadSCPFiles() {
+  const info  = document.getElementById("scp-disk-info");
+  const wrap  = document.getElementById("scp-disk-wrap");
+  const tbody = document.getElementById("scp-disk-tbody");
+  info.textContent = "Loading…";
+  try {
+    const res  = await fetch("/api/scp/files");
+    const data = await res.json();
+    if (!data.ok) { info.textContent = `Error: ${data.error}`; wrap.style.display = "none"; return; }
+    info.textContent = `Directory: ${data.dir}  (${data.files.length} file(s))`;
+    if (!data.files.length) { wrap.style.display = "none"; return; }
+    tbody.innerHTML = "";
+    data.files.forEach(f => {
+      const tr = document.createElement("tr");
+      const kb = (f.size / 1024).toFixed(1);
+      tr.innerHTML = `<td>${f.name}</td><td>${kb} KB</td><td>${f.mtime.replace("T", " ").replace("+00:00","")}</td>`;
+      tbody.appendChild(tr);
+    });
+    wrap.style.display = "";
+  } catch (e) {
+    info.textContent = `Error: ${e.message}`;
+    wrap.style.display = "none";
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────
 // 14. DICOM Tag Detail Modal
 // ─────────────────────────────────────────────────────────────────
@@ -1918,6 +2133,105 @@ function downloadText(filename, content, mimeType = "text/plain") {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// User management (Settings tab)
+// ─────────────────────────────────────────────────────────────────
+
+async function loadUsers() {
+  const res = await fetch("/api/users");
+  if (!res.ok) return;
+  const data = await res.json();
+  if (!data.ok) return;
+  document.getElementById("user-mgmt-card").style.display = "";
+  const tbody = document.getElementById("users-tbody");
+  tbody.innerHTML = "";
+  data.users.forEach(u => {
+    const tr = document.createElement("tr");
+    const created = u.created_at ? u.created_at.slice(0, 10) : "";
+    tr.innerHTML =
+      `<td>${u.username}</td><td>${u.role}</td><td>${created}</td>` +
+      `<td><button class="btn danger" style="padding:2px 8px; font-size:11px"
+          onclick="deleteUser('${u.username}', this)">Delete</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+async function addUser() {
+  const username = document.getElementById("new-user-name").value.trim();
+  const password = document.getElementById("new-user-pass").value;
+  const role     = document.getElementById("new-user-role").value;
+  const status   = document.getElementById("new-user-status");
+  if (!username || !password) { status.textContent = "Username and password required."; status.style.color = "#dc2626"; return; }
+  const res  = await fetch("/api/users", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ username, password, role }),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    status.textContent = `User '${username}' created.`;
+    status.style.color = "#16a34a";
+    document.getElementById("new-user-name").value = "";
+    document.getElementById("new-user-pass").value = "";
+    loadUsers();
+  } else {
+    status.textContent = data.error || "Failed.";
+    status.style.color = "#dc2626";
+  }
+}
+
+async function deleteUser(username, btn) {
+  if (!confirm(`Delete user '${username}'?`)) return;
+  btn.disabled = true;
+  const res  = await fetch(`/api/users/${encodeURIComponent(username)}`, { method: "DELETE" });
+  const data = await res.json();
+  if (data.ok) {
+    loadUsers();
+  } else {
+    alert(data.error || "Delete failed.");
+    btn.disabled = false;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Auth UI helpers
+// ─────────────────────────────────────────────────────────────────
+
+async function initAuthUI() {
+  // Check if auth is active by calling /api/users (returns 404 if no auth)
+  // We use /api/version which always works – but if the page loaded at all,
+  // auth succeeded. We just read the current username from a meta header if
+  // the server provides one, OR we call /api/users to check.
+  // Simpler approach: if we can hit /api/users we know auth is active.
+  try {
+    const res = await fetch("/api/users");
+    if (res.ok) {
+      const data = await res.json();
+      // Find the currently logged-in user by hitting /api/config which always
+      // carries the session. We read the username from the session-based approach.
+      // Since Flask doesn't expose the session to JS, we add a lightweight endpoint:
+      // Instead, we use a simpler trick – check /api/users was accessible, meaning
+      // we are an admin. But we can't know the username this way.
+      // So we add a /api/me endpoint in server.py instead.
+      const meRes = await fetch("/api/me");
+      if (meRes.ok) {
+        const me = await meRes.json();
+        const el = document.getElementById("header-user");
+        el.textContent = me.username;
+        el.style.display = "";
+        document.getElementById("btn-logout").style.display = "";
+        // Load user management table for admins
+        if (me.role === "admin") loadUsers();
+      }
+    }
+  } catch { /* auth not active or request failed – ignore */ }
+}
+
+async function doLogout() {
+  await fetch("/logout", { method: "POST" });
+  location.href = "/login";
+}
+
+// ─────────────────────────────────────────────────────────────────
 // 17. Initialisation – runs when the page first loads
 // ─────────────────────────────────────────────────────────────────
 
@@ -1952,6 +2266,12 @@ function downloadText(filename, content, mimeType = "text/plain") {
 
   // Build the help topic list
   buildHelp();
+
+  // Restore C-FIND query history
+  renderCFindHistory();
+
+  // Show username + logout button (if auth is active)
+  initAuthUI();
 
   // ── C-FIND model/level validation ─────────────────────────────────
   // Study Root model (STUDY) does not support PATIENT query level.

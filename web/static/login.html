@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PACS Admin Tool – Login</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 36px 40px;
+      width: 340px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+    h1 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+    .subtitle { font-size: 12px; color: #888; margin-bottom: 24px; }
+    label { display: block; font-size: 12px; color: #555; margin-bottom: 4px; }
+    input {
+      width: 100%; padding: 7px 9px; border: 1px solid #d0d0d0;
+      border-radius: 3px; font-size: 13px; margin-bottom: 14px;
+    }
+    input:focus { outline: none; border-color: #2b6cb0; }
+    button {
+      width: 100%; padding: 8px; background: #2b6cb0; color: #fff;
+      border: none; border-radius: 3px; font-size: 13px; cursor: pointer;
+      margin-top: 4px;
+    }
+    button:hover { background: #245a99; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    #error {
+      display: none; color: #dc2626; font-size: 12px;
+      margin-top: 12px; text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>PACS Admin Tool</h1>
+    <p class="subtitle">Sign in to continue</p>
+    <form id="form">
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" autocomplete="username" required>
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <button id="btn" type="submit">Sign in</button>
+    </form>
+    <p id="error"></p>
+  </div>
+
+  <script>
+    // Read ?next= from the URL so we can redirect back after login
+    const next = new URLSearchParams(location.search).get("next") || "/";
+
+    document.getElementById("form").addEventListener("submit", async e => {
+      e.preventDefault();
+      const btn = document.getElementById("btn");
+      const err = document.getElementById("error");
+      btn.disabled = true;
+      err.style.display = "none";
+
+      try {
+        const res = await fetch("/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: document.getElementById("username").value.trim(),
+            password: document.getElementById("password").value,
+          }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          location.href = next;
+        } else {
+          err.textContent = data.error || "Login failed.";
+          err.style.display = "block";
+          btn.disabled = false;
+        }
+      } catch {
+        err.textContent = "Could not reach the server.";
+        err.style.display = "block";
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

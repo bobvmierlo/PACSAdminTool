@@ -47,7 +47,10 @@
     "save": "Save",
     "browse": "Browse...",
     "stopped": "Stopped",
-    "running": "Running"
+    "running": "Running",
+    "actions": "Actions",
+    "username": "Username",
+    "role": "Role"
   },
   "cfind": {
     "query_scp": "Query / Retrieve SCP",
@@ -82,9 +85,11 @@
     "col_accession": "Accession",
     "col_description": "Description",
     "col_study_uid": "StudyUID",
-    "export_csv": "Export to CSV...",
+    "export_csv": "Export CSV",
     "no_results": "No results to export.",
-    "results_count": "{n} result(s)"
+    "results_count": "{n} result(s)",
+    "query_history": "Recent Queries",
+    "clear_history": "Clear history"
   },
   "cstore": {
     "storage_scp": "Storage SCP (destination)",
@@ -219,7 +224,11 @@
     "files_count": "{n} files",
     "clear_list": "Clear List",
     "invalid_port": "Invalid port.",
-    "select_save_folder": "Select folder to save received DICOM files"
+    "select_save_folder": "Select folder to save received DICOM files",
+    "files_on_disk": "Files on Disk",
+    "file_name": "Filename",
+    "file_size": "Size",
+    "file_mtime": "Modified"
   },
   "settings": {
     "local_ae": "Local AE Configuration",
@@ -253,7 +262,11 @@
     "web_note": "Changes take effect after restarting the application.",
     "language": "Language",
     "language_label": "Interface Language:",
-    "language_note": "Changes take effect after restart (desktop) or page reload (web)."
+    "language_note": "Changes take effect after restart (desktop) or page reload (web).",
+    "user_management": "User Management",
+    "add_user": "Add user…",
+    "create_user": "Create user",
+    "created_at": "Created"
   },
   "help": {
     "topics": "Topics",
@@ -348,5 +361,16 @@
     "col_keyword": "Keyword",
     "col_vr": "VR",
     "col_value": "Value"
+  },
+  "auth": {
+    "login": "Sign in",
+    "logout": "Sign out",
+    "password": "Password",
+    "username": "Username",
+    "login_title": "Sign in to continue",
+    "setup_title": "Initial setup",
+    "setup_notice": "No users exist yet. Create the first administrator account to secure this instance.",
+    "invalid_credentials": "Invalid username or password.",
+    "session_expired": "Your session has expired. Please sign in again."
   }
 }
