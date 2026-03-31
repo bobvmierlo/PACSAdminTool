@@ -38,12 +38,25 @@ from logging.handlers import TimedRotatingFileHandler
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, session, redirect
 from flask_socketio import SocketIO, emit
 
 from config.manager import load_config, save_config, APP_DIR, LOG_DIR
 from locales import t as _t, set_language, current_language, available_languages
 from __version__ import __version__ as APP_VERSION
+from web.audit import log as _audit
+from web.auth import (
+    load_or_create_secret_key,
+    has_users,
+    list_users,
+    create_user,
+    delete_user,
+    change_password,
+    verify_password,
+    require_login,
+    require_admin,
+    current_user as _current_user,
+)
 
 # ── Logging setup: console + daily rotating file, 7-day retention
 #    Logs are written to ~/.pacs_admin_tool/logs/ so they persist
@@ -150,6 +163,9 @@ app = Flask(__name__,
 #    local network tool; tighten this in a production deployment).
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
+# ── Set the Flask secret key (persisted across restarts).
+app.secret_key = load_or_create_secret_key()
+
 # ── Load config once at startup. All routes share this dict.
 config = load_config()
 _apply_log_level(config.get("log_level", "INFO"))
@@ -198,9 +214,60 @@ def _log_incoming_request():
     logger.debug("→ %s %s", request.method, request.path)
 
 
+# Paths that are always public (no auth required)
+_PUBLIC_PREFIXES = ("/static/", "/login", "/setup", "/favicon.ico")
+_PUBLIC_PATHS    = {"/api/health"}
+
+
+@app.before_request
+def _auth_guard():
+    """
+    Redirect unauthenticated requests.
+
+    1. Public paths are always accessible.
+    2. If no users exist yet, redirect everything (except /setup) to /setup.
+    3. If a user is not logged in, redirect HTML requests to /login and
+       return 401 JSON for API calls.
+    """
+    path = request.path
+
+    # Always allow public paths
+    if path in _PUBLIC_PATHS or any(path.startswith(p) for p in _PUBLIC_PREFIXES):
+        return None
+
+    # First-run: no users configured yet → force setup
+    if not has_users():
+        if path.startswith("/api/"):
+            return jsonify({"ok": False, "error": "Server not configured yet."}), 503
+        return redirect("/setup")
+
+    # Require authentication
+    if not session.get("username"):
+        if path.startswith("/api/"):
+            return jsonify({"ok": False, "error": "Authentication required."}), 401
+        return redirect(f"/login?next={request.path}")
+
+
 @app.after_request
 def _log_outgoing_response(response):
     logger.debug("← %s %s  HTTP %s", request.method, request.path, response.status_code)
+    # Security headers ────────────────────────────────────────────────────────
+    # NOTE: 'unsafe-inline' for script-src/style-src is required because the
+    # entire UI is a single self-contained HTML file with inline JS and CSS.
+    # All other directives are as strict as possible.
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "connect-src 'self' ws: wss:; "
+        "img-src 'self' data:; "
+        "object-src 'none'; "
+        "frame-ancestors 'none'",
+    )
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
     return response
 
 
@@ -260,6 +327,16 @@ def _bad_request(msg: str):
     return jsonify({"ok": False, "error": msg}), 400
 
 
+def _req_ip() -> str:
+    """Return the client IP for the current request."""
+    return request.remote_addr or "-"
+
+
+def _req_user() -> str:
+    """Return the authenticated username for the current request, or '-'."""
+    return session.get("username", "-")
+
+
 def _require_dicom_fields(d: dict | None):
     """
     Validate that a JSON payload contains the required DICOM connection fields.
@@ -314,14 +391,171 @@ def index():
 
 @app.route("/favicon.ico")
 def favicon():
-    """Serve the app icon as the browser tab favicon."""
-    # In a PyInstaller bundle icon.png lives at sys._MEIPASS;
-    # in development it sits in the project root.
+    """Serve the app icon as the browser tab favicon.
+
+    Resolution order (first directory that contains icon.png wins):
+      1. PyInstaller bundle  – sys._MEIPASS
+      2. Project root        – one level above web/
+      3. web/static/         – copied into the Docker image by the Dockerfile
+    """
+    candidates = []
     if getattr(sys, "frozen", False):
-        icon_dir = sys._MEIPASS
-    else:
-        icon_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return send_from_directory(icon_dir, "icon.png", mimetype="image/png")
+        candidates.append(sys._MEIPASS)
+    candidates.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    candidates.append(app.static_folder)   # fallback for Docker
+
+    for icon_dir in candidates:
+        if os.path.isfile(os.path.join(icon_dir, "icon.png")):
+            return send_from_directory(icon_dir, "icon.png", mimetype="image/png")
+
+    return "", 404
+
+
+# ===========================================================================
+# Auth routes – login / logout / first-run setup
+# ===========================================================================
+
+@app.route("/login", methods=["GET"])
+def login_page():
+    if session.get("username"):
+        return redirect("/")
+    return send_from_directory(app.static_folder, "login.html")
+
+
+@app.route("/login", methods=["POST"])
+def login_post():
+    d = request.get_json(silent=True) or {}
+    username = (d.get("username") or "").strip()
+    password = d.get("password") or ""
+    if not username or not password:
+        return jsonify({"ok": False, "error": "Username and password are required."}), 400
+    if verify_password(username, password):
+        session.clear()
+        session["username"] = username
+        session.permanent = True
+        _audit("auth.login", ip=_req_ip(), user=username)
+        logger.info("User '%s' logged in from %s", username, _req_ip())
+        return jsonify({"ok": True})
+    _audit("auth.login", ip=_req_ip(), user=username, result="error",
+           error="Invalid credentials")
+    logger.warning("Failed login for '%s' from %s", username, _req_ip())
+    return jsonify({"ok": False, "error": "Invalid username or password."}), 401
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    username = session.get("username", "-")
+    _audit("auth.logout", ip=_req_ip(), user=username)
+    session.clear()
+    return jsonify({"ok": True})
+
+
+@app.route("/setup", methods=["GET"])
+def setup_page():
+    if has_users():
+        return redirect("/")
+    return send_from_directory(app.static_folder, "setup.html")
+
+
+@app.route("/setup", methods=["POST"])
+def setup_post():
+    if has_users():
+        return jsonify({"ok": False, "error": "Setup already completed."}), 403
+    d = request.get_json(silent=True) or {}
+    username = (d.get("username") or "").strip()
+    password = d.get("password") or ""
+    if not username or not password:
+        return jsonify({"ok": False, "error": "Username and password are required."}), 400
+    if len(password) < 8:
+        return jsonify({"ok": False, "error": "Password must be at least 8 characters."}), 400
+    try:
+        user = create_user(username, password, role="admin")
+        session.clear()
+        session["username"] = username
+        session.permanent = True
+        _audit("auth.setup", ip=_req_ip(), user=username,
+               detail={"username": username})
+        logger.info("First-run setup: admin '%s' created from %s", username, _req_ip())
+        return jsonify({"ok": True, "user": user})
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+
+# ===========================================================================
+# API: User management
+# ===========================================================================
+
+@app.route("/api/users", methods=["GET"])
+@require_admin
+def users_list():
+    return jsonify({"ok": True, "users": list_users()})
+
+
+@app.route("/api/users", methods=["POST"])
+@require_admin
+def users_create():
+    d = request.get_json(silent=True) or {}
+    username = (d.get("username") or "").strip()
+    password = d.get("password") or ""
+    role     = d.get("role", "user")
+    if not username or not password:
+        return jsonify({"ok": False, "error": "username and password are required."}), 400
+    if len(password) < 8:
+        return jsonify({"ok": False, "error": "Password must be at least 8 characters."}), 400
+    if role not in ("admin", "user"):
+        return jsonify({"ok": False, "error": "role must be 'admin' or 'user'."}), 400
+    try:
+        user = create_user(username, password, role=role)
+        _audit("user.create", ip=_req_ip(), user=_req_user(),
+               detail={"username": username, "role": role})
+        return jsonify({"ok": True, "user": user}), 201
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 409
+
+
+@app.route("/api/users/<username>", methods=["DELETE"])
+@require_admin
+def users_delete(username):
+    # Prevent self-deletion
+    if username == session.get("username"):
+        return jsonify({"ok": False, "error": "Cannot delete your own account."}), 400
+    if not delete_user(username):
+        return jsonify({"ok": False, "error": f"User '{username}' not found."}), 404
+    _audit("user.delete", ip=_req_ip(), user=_req_user(),
+           detail={"username": username})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/me", methods=["GET"])
+@require_login
+def me():
+    """Return the currently authenticated user (for the UI header)."""
+    user = _current_user()
+    if not user:
+        return jsonify({"ok": False, "error": "Not authenticated."}), 401
+    return jsonify({
+        "ok":       True,
+        "username": user["username"],
+        "role":     user.get("role", "user"),
+    })
+
+
+@app.route("/api/users/<username>/password", methods=["POST"])
+@require_login
+def users_change_password(username):
+    # Admins can change anyone's password; non-admins can only change their own.
+    requester = _current_user()
+    if username != session.get("username") and (not requester or requester.get("role") != "admin"):
+        return jsonify({"ok": False, "error": "Permission denied."}), 403
+    d = request.get_json(silent=True) or {}
+    new_password = d.get("password") or ""
+    if len(new_password) < 8:
+        return jsonify({"ok": False, "error": "Password must be at least 8 characters."}), 400
+    if not change_password(username, new_password):
+        return jsonify({"ok": False, "error": f"User '{username}' not found."}), 404
+    _audit("user.change_password", ip=_req_ip(), user=_req_user(),
+           detail={"username": username})
+    return jsonify({"ok": True})
 
 
 # ===========================================================================
@@ -439,6 +673,8 @@ def save_config_route():
     if "language" in data:
         set_language(data["language"])
         logger.info("Language changed to %s", data["language"])
+    _audit("config.save", ip=_req_ip(), user=_req_user(),
+           detail={"keys": sorted(data.keys())})
     return jsonify({"ok": True})
 
 
@@ -499,9 +735,15 @@ def dicom_echo():
     try:
         ok, msg = c_echo(_local_ae(), d["host"], int(d["port"]), d["ae_title"])
         logger.debug("C-ECHO result: ok=%s  msg=%s", ok, msg)
+        _audit("dicom.c_echo", ip=_req_ip(), user=_req_user(),
+               detail={"ae_title": d["ae_title"], "host": d["host"], "port": d["port"]},
+               result="ok" if ok else "error", error=None if ok else msg)
         return jsonify({"ok": ok, "message": msg})
     except Exception as e:
         logger.exception("C-ECHO exception")
+        _audit("dicom.c_echo", ip=_req_ip(), user=_req_user(),
+               detail={"ae_title": d.get("ae_title"), "host": d.get("host"), "port": d.get("port")},
+               result="error", error=str(e))
         return jsonify({"ok": False, "message": str(e)}), 500
 
 
@@ -568,9 +810,16 @@ def dicom_find():
                 "StudyUID":     _safe_str(getattr(r, "StudyInstanceUID",  "")),
                 "tags": _dataset_to_tag_list(r),
             })
+        _audit("dicom.c_find", ip=_req_ip(), user=_req_user(),
+               detail={"ae_title": d["ae_title"], "host": d["host"], "port": d["port"],
+                       "level": d.get("query_level"), "results": len(rows)},
+               result="ok" if ok else "error", error=None if ok else msg)
         return jsonify({"ok": ok, "message": msg, "results": rows})
     except Exception as e:
         logger.exception("C-FIND error")
+        _audit("dicom.c_find", ip=_req_ip(), user=_req_user(),
+               detail={"ae_title": d.get("ae_title"), "host": d.get("host"), "port": d.get("port")},
+               result="error", error=str(e))
         return jsonify({"ok": False, "message": str(e), "results": []}), 500
 
 
@@ -921,9 +1170,15 @@ def hl7_send():
         logger.debug("HL7 Send result: ok=%s  response_len=%d", ok, len(response))
         _log("hl7_send", f"{'ACK received' if ok else 'FAILED'}: {response[:200]}",
              "ok" if ok else "err")
+        _audit("hl7.send", ip=_req_ip(), user=_req_user(),
+               detail={"host": d["host"], "port": d["port"]},
+               result="ok" if ok else "error", error=None if ok else response[:200])
         return jsonify({"ok": ok, "response": response})
     except Exception as e:
         logger.exception("HL7 Send error")
+        _audit("hl7.send", ip=_req_ip(), user=_req_user(),
+               detail={"host": d.get("host"), "port": d.get("port")},
+               result="error", error=str(e))
         return jsonify({"ok": False, "response": str(e)}), 500
 
 
@@ -970,9 +1225,13 @@ def hl7_listener_start():
         try:
             _hl7_listener.start()
             logger.debug("HL7 Listener started on port %d", port)
+            _audit("hl7.listener.start", ip=_req_ip(), user=_req_user(),
+                   detail={"port": port})
             return jsonify({"ok": True, "message": f"HL7 listener started on port {port}"})
         except Exception as e:
             logger.exception("HL7 Listener start failed")
+            _audit("hl7.listener.start", ip=_req_ip(), user=_req_user(),
+                   detail={"port": port}, result="error", error=str(e))
             return jsonify({"ok": False, "message": str(e)}), 500
 
 
@@ -985,6 +1244,7 @@ def hl7_listener_stop():
             logger.debug("HL7 Listener stopping")
             _hl7_listener.stop()
             _hl7_listener = None
+    _audit("hl7.listener.stop", ip=_req_ip(), user=_req_user())
     return jsonify({"ok": True, "message": "HL7 listener stopped"})
 
 
@@ -1034,9 +1294,14 @@ def scp_start():
         try:
             _scp_listener.start()
             logger.debug("SCP started as %s on port %d, saving to %s", ae_title, port, save_dir)
+            _audit("scp.start", ip=_req_ip(), user=_req_user(),
+                   detail={"ae_title": ae_title, "port": port, "save_dir": save_dir})
             return jsonify({"ok": True, "message": f"SCP started as {ae_title} on port {port}"})
         except Exception as e:
             logger.exception("SCP start failed")
+            _audit("scp.start", ip=_req_ip(), user=_req_user(),
+                   detail={"ae_title": ae_title, "port": port},
+                   result="error", error=str(e))
             return jsonify({"ok": False, "message": str(e)}), 500
 
 
@@ -1055,6 +1320,7 @@ def scp_stop():
             logger.debug("SCP stopping")
             _scp_listener.stop()
             _scp_listener = None
+    _audit("scp.stop", ip=_req_ip(), user=_req_user())
     return jsonify({"ok": True, "message": "SCP stopped"})
 
 
@@ -1064,6 +1330,45 @@ def scp_status():
     with _listener_lock:
         running = bool(_scp_listener and _scp_listener.running)
     return jsonify({"running": running})
+
+
+@app.route("/api/scp/files", methods=["GET"])
+def scp_files():
+    """
+    List DICOM files received by the SCP in its current storage directory.
+    Returns: { ok, dir, files: [{ name, size, mtime }, ...] }
+    Files are sorted by modification time (newest first).
+    """
+    with _listener_lock:
+        scp = _scp_listener
+
+    if scp is None:
+        # SCP never started: use the default directory if it exists
+        storage_dir = os.path.normpath(os.path.expanduser("~/DICOM_Received"))
+    else:
+        storage_dir = scp.storage_dir
+
+    if not os.path.isdir(storage_dir):
+        return jsonify({"ok": True, "dir": storage_dir, "files": []})
+
+    try:
+        entries = []
+        for fname in os.listdir(storage_dir):
+            fpath = os.path.join(storage_dir, fname)
+            if os.path.isfile(fpath):
+                stat = os.stat(fpath)
+                entries.append({
+                    "name":  fname,
+                    "size":  stat.st_size,
+                    "mtime": datetime.fromtimestamp(
+                        stat.st_mtime, tz=timezone.utc
+                    ).isoformat(timespec="seconds"),
+                })
+        entries.sort(key=lambda x: x["mtime"], reverse=True)
+        return jsonify({"ok": True, "dir": storage_dir, "files": entries})
+    except Exception as e:
+        logger.exception("scp/files error")
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 # ===========================================================================
@@ -1260,8 +1565,13 @@ def kos_create():
 def on_connect():
     """
     Called automatically whenever a browser opens a WebSocket connection.
-    We send it the current listener states so it can show the right buttons.
+    We reject the connection if users exist but the client is not logged in.
+    Otherwise we send the current listener states so it can show the right buttons.
     """
+    if has_users() and not session.get("username"):
+        logger.warning("Rejected unauthenticated WebSocket connection from %s",
+                       request.remote_addr)
+        return False  # Returning False disconnects the client
     logger.info("Browser connected via WebSocket")
     scp_running = bool(_scp_listener and _scp_listener.running)
     hl7_running = bool(_hl7_listener and _hl7_listener.running)

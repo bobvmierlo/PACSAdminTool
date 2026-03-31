@@ -22,4 +22,9 @@ VOLUME ["/data"]
 
 EXPOSE 5000
 
+# Use the existing /api/health endpoint to let Docker detect an unhealthy container.
+# Interval: check every 30 s; allow 10 s to respond; retry 3 times before marking unhealthy.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')" || exit 1
+
 CMD ["python", "webmain.py"]
