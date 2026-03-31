@@ -20,7 +20,7 @@ simple-websocket~=1.0
 
 # System tray icon
 pystray~=0.19
-Pillow~=10.0
+Pillow~=12.1
 
 # Build desktop .exe (optional, Windows only)
 pyinstaller~=6.0
