@@ -1617,29 +1617,32 @@ def _safe_str(val):
 # Utility: convert a pydicom Dataset to a list of tag dicts for JSON
 # ===========================================================================
 
-def _dataset_to_tag_list(dataset, prefix=""):
+def _dataset_to_tag_list(dataset):
     """
-    Walk every element in a pydicom Dataset and return a flat list of dicts:
-      [{ tag, keyword, vr, value }, ...]
+    Walk every element in a pydicom Dataset and return a list of tag dicts:
+      [{ tag, keyword, vr, value, children? }, ...]
 
-    Sequences (nested datasets) are expanded recursively with an indented
-    prefix so you can see the hierarchy in the UI.
+    Sequence elements (VR == "SQ") include a ``children`` key containing a
+    list of items, each item being its own list of tag dicts.  All other
+    elements have no ``children`` key.  The browser uses ``children`` to
+    render collapsible sequence sections.
     """
     rows = []
     try:
         for elem in dataset:
             tag_str = f"({elem.tag.group:04X},{elem.tag.element:04X})"
-            keyword = (prefix + elem.keyword) if elem.keyword else prefix + tag_str
+            keyword = elem.keyword if elem.keyword else tag_str
             vr      = elem.VR or ""
             try:
                 if elem.VR == "SQ":
-                    # Sequence: add a header row then recurse into each item
-                    rows.append({"tag": tag_str, "keyword": keyword,
-                                 "vr": vr, "value": f"<Sequence: {len(elem.value)} item(s)>"})
-                    for i, item in enumerate(elem.value):
-                        rows.extend(_dataset_to_tag_list(item, prefix=f"  [{i}] "))
+                    rows.append({
+                        "tag":      tag_str,
+                        "keyword":  keyword,
+                        "vr":       vr,
+                        "value":    f"Sequence ({len(elem.value)} item(s))",
+                        "children": [_dataset_to_tag_list(item) for item in elem.value],
+                    })
                 elif elem.VR in ("OB", "OW", "OF", "OD", "OL", "UN"):
-                    # Binary data – don't try to display it
                     rows.append({"tag": tag_str, "keyword": keyword,
                                  "vr": vr, "value": f"<Binary: {len(elem.value)} bytes>"})
                 else:
