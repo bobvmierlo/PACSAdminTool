@@ -619,6 +619,12 @@ class SCPListener:
                 except Exception:
                     pass
 
+        # Storage Commitment N-EVENT-REPORT callback: a remote SCP opens a new
+        # association back to our port to deliver the commit result.
+        # We must advertise StorageCommitmentPushModel as a supported context
+        # so the association negotiation succeeds.
+        ae.add_supported_context(StorageCommitmentPushModel)
+
         storage_dir = self.storage_dir
         log_fn = self._log
 
@@ -644,9 +650,33 @@ class SCPListener:
             log_fn(f"C-ECHO from {event.assoc.requestor.ae_title.strip()}")
             return 0x0000
 
+        def handle_n_event_report(event):
+            """Receive async Storage Commitment result from remote SCP."""
+            try:
+                identifier = event.attribute_list
+                failed = getattr(identifier, "FailedSOPSequence", []) or []
+                success = getattr(identifier, "ReferencedSOPSequence", []) or []
+                log_fn(
+                    f"Storage Commitment result: committed={len(success)}, "
+                    f"failed={len(failed)}"
+                )
+                if failed:
+                    for item in failed:
+                        reason = getattr(item, "FailureReason", "unknown")
+                        log_fn(
+                            f"  Failed UID: {getattr(item, 'ReferencedSOPInstanceUID', '?')} "
+                            f"reason=0x{reason:04X}" if isinstance(reason, int)
+                            else f"  Failed UID: {getattr(item, 'ReferencedSOPInstanceUID', '?')} "
+                                 f"reason={reason}"
+                        )
+            except Exception as exc:
+                log_fn(f"N-EVENT-REPORT handler error: {exc}")
+            return 0x0000, None
+
         handlers = [
             (evt.EVT_C_STORE, handle_store),
             (evt.EVT_C_ECHO, handle_echo),
+            (evt.EVT_N_EVENT_REPORT, handle_n_event_report),
         ]
 
         self._ae = ae
