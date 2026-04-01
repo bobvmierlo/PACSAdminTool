@@ -341,9 +341,14 @@
     "note":          "Resultaat wordt als ZIP gedownload. Originelen worden niet gewijzigd."
   },
   "dicomdir": {
-    "title": "DICOMDIR Lezer",
-    "parse": "DICOMDIR verwerken",
-    "tree":  "Mapinhoud"
+    "title":          "DICOMDIR Lezer",
+    "parse":          "DICOMDIR verwerken",
+    "tree":           "Mapinhoud",
+    "generate_title": "DICOMDIR Genereren",
+    "generate_hint":  "Selecteer losse DICOM-bestanden of een volledige map. Er wordt een ZIP gedownload met de DICOMDIR-index en alle geordende bestanden.",
+    "pick_files":     "Bestanden selecteren\u2026",
+    "pick_folder":    "Map selecteren\u2026",
+    "generate_btn":   "Genereren & ZIP downloaden"
   },
   "about": {
     "title": "PACS Admin Tool",

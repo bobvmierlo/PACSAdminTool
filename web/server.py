@@ -1172,9 +1172,80 @@ def dicom_dicomdir():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
-# ===========================================================================
-# API: DICOM Anonymizer  –  strip PHI and return anonymised files as a ZIP
-# ===========================================================================
+@app.route("/api/dicom/dicomdir/generate", methods=["POST"])
+@require_login
+def dicom_dicomdir_generate():
+    """
+    Accept one or more DICOM files and return a ZIP containing a proper
+    DICOM File Set (DICOMDIR + organised instance files).
+    """
+    files = request.files.getlist("files[]")
+    if not files or all(not f.filename for f in files):
+        return jsonify({"ok": False, "error": "No files provided."}), 400
+    try:
+        import io
+        import os
+        import tempfile
+        import zipfile
+
+        import pydicom
+        from pydicom import FileSet
+
+        with tempfile.TemporaryDirectory() as work_dir:
+            input_dir  = os.path.join(work_dir, "input")
+            output_dir = os.path.join(work_dir, "output")
+            os.makedirs(input_dir)
+            os.makedirs(output_dir)
+
+            fs     = FileSet()
+            added  = 0
+            skipped: list[str] = []
+
+            for f in files:
+                if not f.filename:
+                    continue
+                safe_name = os.path.basename(f.filename) or "file"
+                dest = os.path.join(input_dir, safe_name)
+                # Avoid name collisions when multiple files share a basename
+                if os.path.exists(dest):
+                    base, ext = os.path.splitext(safe_name)
+                    dest = os.path.join(input_dir, f"{base}_{added}{ext}")
+                f.save(dest)
+                try:
+                    fs.add(dest)
+                    added += 1
+                except Exception as exc:
+                    skipped.append(f"{f.filename}: {exc}")
+
+            if added == 0:
+                msg = "No valid DICOM files found."
+                if skipped:
+                    msg += " Errors: " + "; ".join(skipped[:3])
+                return jsonify({"ok": False, "error": msg}), 400
+
+            fs.write(output_dir)
+
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                for root, _dirs, fnames in os.walk(output_dir):
+                    for fname in sorted(fnames):
+                        fpath   = os.path.join(root, fname)
+                        arcname = os.path.relpath(fpath, output_dir)
+                        zf.write(fpath, arcname)
+            buf.seek(0)
+
+            return send_file(
+                buf,
+                mimetype="application/zip",
+                as_attachment=True,
+                download_name="DICOMDIR_set.zip",
+            )
+    except Exception as e:
+        logger.exception("DICOMDIR generate error")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+
 
 # Tags cleared in the Basic profile (patient identifiers + institution info)
 _ANON_BASIC = [
