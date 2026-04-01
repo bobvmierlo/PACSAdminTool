@@ -176,6 +176,11 @@ set_language(config.get("language", "en"))
 _hl7_listener = None          # HL7Listener instance or None
 _scp_listener = None          # SCPListener instance or None
 _listener_lock = threading.Lock()   # guards _hl7_listener and _scp_listener
+_last_scp_storage_dir: str | None = None  # updated whenever SCP starts; used by cleanup
+
+# How long to keep received DICOM files before auto-deletion (hours).
+# Patient data should not linger — keep this value low.
+_SCP_RETENTION_HOURS = 24
 
 
 # ===========================================================================
@@ -1879,7 +1884,7 @@ def hl7_listener_status():
 @app.route("/api/scp/start", methods=["POST"])
 def scp_start():
     """Start the DICOM Storage SCP (the 'DICOM Receiver')."""
-    global _scp_listener
+    global _scp_listener, _last_scp_storage_dir
     d        = request.get_json(silent=True) or {}
     ae_title = d.get("ae_title", _local_ae())
     try:
@@ -1915,6 +1920,7 @@ def scp_start():
                                     n_event_callback=on_commit)
         try:
             _scp_listener.start()
+            _last_scp_storage_dir = save_dir
             logger.debug("SCP started as %s on port %d, saving to %s", ae_title, port, save_dir)
             _audit("scp.start", ip=_req_ip(), user=_req_user(),
                    detail={"ae_title": ae_title, "port": port, "save_dir": save_dir})
@@ -1993,9 +1999,137 @@ def scp_files():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
-# ===========================================================================
-# API: DICOM SR Viewer  –  parse a DICOM Structured Report
-# ===========================================================================
+def _scp_storage_dir() -> str | None:
+    """Return the current SCP storage directory, or None if not available."""
+    with _listener_lock:
+        scp = _scp_listener
+    if scp:
+        return scp.storage_dir
+    if _last_scp_storage_dir and os.path.isdir(_last_scp_storage_dir):
+        return _last_scp_storage_dir
+    default = os.path.normpath(os.path.expanduser("~/DICOM_Received"))
+    return default if os.path.isdir(default) else None
+
+
+def _cleanup_scp_storage(max_age_hours: int = _SCP_RETENTION_HOURS) -> tuple[int, int]:
+    """
+    Delete files in the SCP storage directory older than *max_age_hours*.
+    Returns (deleted_count, error_count).
+    """
+    storage_dir = _scp_storage_dir()
+    if not storage_dir:
+        return 0, 0
+    cutoff = datetime.now().timestamp() - max_age_hours * 3600
+    deleted = errors = 0
+    try:
+        for fname in os.listdir(storage_dir):
+            fpath = os.path.join(storage_dir, fname)
+            if not os.path.isfile(fpath):
+                continue
+            try:
+                if os.stat(fpath).st_mtime < cutoff:
+                    os.remove(fpath)
+                    deleted += 1
+            except Exception:
+                errors += 1
+    except Exception:
+        pass
+    if deleted or errors:
+        logger.info("SCP auto-cleanup: deleted=%d errors=%d dir=%s",
+                    deleted, errors, storage_dir)
+        _audit("scp.auto_cleanup",
+               detail={"deleted": deleted, "errors": errors,
+                       "max_age_hours": max_age_hours, "dir": storage_dir})
+    return deleted, errors
+
+
+def _schedule_nightly_cleanup() -> None:
+    """Background thread: run _cleanup_scp_storage() daily at 01:00."""
+    import time as _time
+
+    def _loop():
+        while True:
+            now  = datetime.now()
+            next_run = now.replace(hour=1, minute=0, second=0, microsecond=0)
+            if next_run <= now:
+                next_run += timedelta(days=1)
+            _time.sleep((next_run - now).total_seconds())
+            try:
+                deleted, errors = _cleanup_scp_storage()
+                logger.info("Nightly SCP cleanup complete: deleted=%d errors=%d",
+                            deleted, errors)
+            except Exception:
+                logger.exception("Nightly SCP cleanup failed")
+
+    threading.Thread(target=_loop, daemon=True, name="scp-nightly-cleanup").start()
+
+
+# Run once at startup (catches data left from a previous session) then
+# schedule the daily 01:00 run.
+_cleanup_scp_storage()
+_schedule_nightly_cleanup()
+
+
+@app.route("/api/scp/files/inspect", methods=["GET"])
+@require_login
+def scp_files_inspect():
+    """
+    Read a DICOM file from the SCP storage directory and return its tag list.
+    Query param: ?name=<filename>   (basename only — no path traversal)
+    """
+    fname = request.args.get("name", "").strip()
+    if not fname or os.sep in fname or "/" in fname or ".." in fname:
+        return _bad_request("Invalid filename.")
+    storage_dir = _scp_storage_dir()
+    if not storage_dir:
+        return jsonify({"ok": False, "error": "SCP storage directory not found."}), 404
+    fpath = os.path.join(storage_dir, fname)
+    if not os.path.isfile(fpath):
+        return jsonify({"ok": False, "error": "File not found."}), 404
+    try:
+        import pydicom
+        ds = pydicom.dcmread(fpath)
+        meta = {
+            "SOPClassUID":    str(getattr(ds, "SOPClassUID",    "")),
+            "SOPInstanceUID": str(getattr(ds, "SOPInstanceUID", "")),
+            "Modality":       str(getattr(ds, "Modality",       "")),
+            "PatientID":      _safe_str(getattr(ds, "PatientID",   "")),
+            "PatientName":    _safe_str(getattr(ds, "PatientName", "")),
+            "StudyDate":      _safe_str(getattr(ds, "StudyDate",   "")),
+        }
+        return jsonify({"ok": True, "tags": _dataset_to_tag_list(ds), "meta": meta})
+    except Exception as e:
+        logger.exception("scp/files/inspect error")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/scp/files/delete", methods=["POST"])
+@require_login
+def scp_files_delete():
+    """
+    Delete one file from the SCP storage directory.
+    Body: { "name": "<basename>" }
+    """
+    d     = request.get_json(silent=True) or {}
+    fname = str(d.get("name", "")).strip()
+    if not fname or os.sep in fname or "/" in fname or ".." in fname:
+        return _bad_request("Invalid filename.")
+    storage_dir = _scp_storage_dir()
+    if not storage_dir:
+        return jsonify({"ok": False, "error": "SCP storage directory not found."}), 404
+    fpath = os.path.join(storage_dir, fname)
+    if not os.path.isfile(fpath):
+        return jsonify({"ok": False, "error": "File not found."}), 404
+    try:
+        os.remove(fpath)
+        _audit("scp.file_delete", ip=_req_ip(), user=_req_user(),
+               detail={"file": fname})
+        return jsonify({"ok": True})
+    except Exception as e:
+        logger.exception("scp/files/delete error")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 
 @app.route("/api/dicom/sr/read", methods=["POST"])
 def sr_read():

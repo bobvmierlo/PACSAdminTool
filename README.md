@@ -11,18 +11,25 @@ Can also be run locally with Python and pip, or deployed as a Docker container.
 
 ## Features
 
+### Web UI Tabs
+
 | Tab | Functionality |
 |-----|--------------|
-| **C-FIND / Q-R** | Patient/Study/Series/Image level C-FIND, C-ECHO, C-MOVE with query builder |
+| **Dashboard** | AE connectivity health check (batch C-ECHO all presets at once), service status, recent audit activity |
+| **C-FIND / Q-R** | Patient/Study/Series/Image level C-FIND with query builder; multi-select results with checkboxes; bulk C-MOVE or C-GET retrieve |
 | **C-STORE** | Send single files or entire folder trees to any Storage SCP |
 | **DMWL** | Full Modality Worklist query with export to CSV |
-| **Storage Commit** | Send N-ACTION storage commitment requests; receive N-EVENT-REPORT responses |
+| **Storage Commit** | Send N-ACTION storage commitment requests; receive async N-EVENT-REPORT responses with committed/failed breakdown |
 | **IOCM** | Send Instance Availability Notifications (delete/change notifications) |
 | **HL7** | Send/receive HL7 v2 messages over MLLP; built-in templates for ORM, ORU, ADT, SIU, OML, QBP |
-| **DICOM Receiver** | Embedded DICOM SCP — receive C-STORE and C-ECHO; auto-saves received DICOM files |
+| **DICOM Receiver** | Embedded DICOM SCP — receive C-STORE and C-ECHO; auto-saves files; inspect tags or delete files per-row; auto-purges files older than 24 h |
+| **DICOM Inspector** | Upload any `.dcm` file and browse all DICOM tags in a searchable, collapsible tree |
+| **Anonymizer** | Strip PHI from one or more DICOM files using a Basic or Full profile; download result as a ZIP |
+| **DICOMDIR** | Read a DICOMDIR file and browse the Patient → Study → Series → Instance hierarchy; or generate a standards-compliant DICOMDIR from uploaded files/folder and download as ZIP |
 | **SR Viewer** | Parse and display any DICOM Structured Report in a human-readable format |
 | **KOS Creator** | Build a DICOM Key Object Selection document (XDS-I manifest) from existing DICOM files |
 | **Settings** | Manage local AE title/port, remote AE presets, HL7 defaults, language, log level |
+| **Logs** | Live view of application logs from `~/.pacs_admin_tool/logs/` |
 
 ---
 
@@ -226,10 +233,17 @@ The UI supports English and Dutch. Switch languages in the **Settings** tab.
 - Supports Patient Root and Study Root query models
 - Query levels: PATIENT, STUDY, SERIES, IMAGE
 - Wildcard matching supported (e.g. `SMITH*` for patient name)
+- Results shown in a table with checkboxes for bulk selection
 
 ### C-MOVE
-- Select a result row from C-FIND, specify destination AE title
+- Retrieve one or more C-FIND results to a destination AE
 - Destination must have your local AE registered as a known source
+- Bulk mode: select multiple rows and retrieve sequentially
+
+### C-GET
+- Alternative to C-MOVE — pulls files directly into the application without requiring an inbound port on the destination
+- Not supported by all PACS systems (optional per DICOM standard)
+- See the **Help** tab for a full C-MOVE vs C-GET comparison
 
 ### C-STORE
 - Sends files using all common Storage SOP classes
@@ -242,8 +256,8 @@ The UI supports English and Dutch. Switch languages in the **Settings** tab.
 
 ### Storage Commitment
 - Sends N-ACTION with a list of SOP Class/Instance UID pairs
-- Displays N-EVENT-REPORT response (committed / failed)
-- Load references directly from DICOM files
+- Async N-EVENT-REPORT arrives on a separate inbound association (requires the DICOM Receiver to be running)
+- Displays committed/failed counts and per-UID failure reason codes
 
 ### IOCM
 - Sends Instance Availability Notification (N-CREATE)
@@ -252,8 +266,25 @@ The UI supports English and Dutch. Switch languages in the **Settings** tab.
 
 ### DICOM Receiver (SCP Listener)
 - Runs a DICOM SCP in the background
-- Accepts C-STORE (all common modalities) and C-ECHO
+- Accepts C-STORE (all common modalities), C-ECHO, and Storage Commitment N-EVENT-REPORT callbacks
 - Saves received files to a configurable directory
+- Per-file Inspect (full tag browser) and Delete actions in the Files on Disk table
+- **Auto-purge**: files older than 24 hours are deleted on startup and nightly at 01:00 to prevent patient data from lingering
+
+### DICOM Inspector
+- Upload any `.dcm` file and browse all tags in a searchable, collapsible tree
+- Sequence (SQ) elements expand inline; binary data shown as byte-length summary
+
+### Anonymizer
+- Upload one or more DICOM files
+- **Basic profile**: removes patient identifiers and institution details
+- **Full profile**: additionally removes study/series descriptions and other potentially identifying fields
+- Replacement patient name and ID can be specified
+- Output downloaded as a ZIP archive
+
+### DICOMDIR
+- **Reader**: upload a DICOMDIR file to browse the Patient → Study → Series → Instance hierarchy
+- **Generator**: upload individual DICOM files or an entire folder; a standards-compliant DICOM File Set (DICOMDIR + organised instance files) is generated using `pydicom.FileSet` and returned as a downloadable ZIP
 
 ### SR Viewer
 Reads and displays any DICOM Structured Report in a readable, indented format.
@@ -316,19 +347,19 @@ All templates are editable before sending. Raw HL7 text can also be pasted direc
 
 **Desktop version:**
 - Python 3.10+
-- pynetdicom >= 2.0
-- pydicom >= 2.4
-- hl7 >= 0.4
+- pynetdicom
+- pydicom
+- hl7
 
 **Optional:**
-- pystray >= 0.19 (system tray icon)
-- Pillow >= 10.0 (icon rendering for tray)
-- PyInstaller >= 6.0 (build only)
+- pystray (system tray icon)
+- Pillow (icon rendering for tray)
+- PyInstaller (build only)
 
 **Web version (additional):**
-- flask >= 3.0
-- flask-socketio >= 5.3
-- simple-websocket >= 1.0
+- flask
+- flask-socketio
+- simple-websocket
 
 The compiled `.exe` has **no runtime requirements**.
 

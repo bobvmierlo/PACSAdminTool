@@ -738,6 +738,7 @@
             <th data-i18n="scp.file_name">Filename</th>
             <th data-i18n="scp.file_size">Size</th>
             <th data-i18n="scp.file_mtime">Modified</th>
+            <th data-i18n="common.actions">Actions</th>
           </tr></thead>
           <tbody id="scp-disk-tbody"></tbody>
         </table>
@@ -2270,15 +2271,76 @@ async function loadSCPFiles() {
     if (!data.files.length) { wrap.style.display = "none"; return; }
     tbody.innerHTML = "";
     data.files.forEach(f => {
-      const tr = document.createElement("tr");
-      const kb = (f.size / 1024).toFixed(1);
-      tr.innerHTML = `<td>${f.name}</td><td>${kb} KB</td><td>${f.mtime.replace("T", " ").replace("+00:00","")}</td>`;
+      const tr  = document.createElement("tr");
+      const kb  = (f.size / 1024).toFixed(1);
+      const mtime = f.mtime.replace("T", " ").replace("+00:00", "");
+      const nameCel = document.createElement("td");
+      nameCel.textContent = f.name;
+      const sizeCel = document.createElement("td");
+      sizeCel.textContent = `${kb} KB`;
+      const mtimeCel = document.createElement("td");
+      mtimeCel.textContent = mtime;
+      const actCel = document.createElement("td");
+      actCel.style.whiteSpace = "nowrap";
+
+      const inspBtn = document.createElement("button");
+      inspBtn.className = "btn";
+      inspBtn.style.cssText = "font-size:11px; padding:2px 8px; margin-right:4px";
+      inspBtn.textContent = "Inspect";
+      inspBtn.onclick = () => scpFileInspect(f.name);
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "btn";
+      delBtn.style.cssText = "font-size:11px; padding:2px 8px; color:#dc2626; border-color:#fca5a5";
+      delBtn.textContent = "Delete";
+      delBtn.onclick = () => scpFileDelete(f.name, tr);
+
+      actCel.appendChild(inspBtn);
+      actCel.appendChild(delBtn);
+      tr.appendChild(nameCel);
+      tr.appendChild(sizeCel);
+      tr.appendChild(mtimeCel);
+      tr.appendChild(actCel);
       tbody.appendChild(tr);
     });
     wrap.style.display = "";
   } catch (e) {
     info.textContent = `Error: ${e.message}`;
     wrap.style.display = "none";
+  }
+}
+
+async function scpFileInspect(name) {
+  try {
+    const res  = await fetch(`/api/scp/files/inspect?name=${encodeURIComponent(name)}`);
+    const data = await res.json();
+    if (!data.ok) { alert("Error: " + data.error); return; }
+    showTagModal(name, data.tags);
+  } catch (e) {
+    alert("Error: " + e);
+  }
+}
+
+async function scpFileDelete(name, rowEl) {
+  if (!confirm(`Delete "${name}"?\nThis cannot be undone.`)) return;
+  try {
+    const res  = await fetch("/api/scp/files/delete",
+                             { method: "POST",
+                               headers: { "Content-Type": "application/json" },
+                               body: JSON.stringify({ name }) });
+    const data = await res.json();
+    if (!data.ok) { alert("Error: " + data.error); return; }
+    rowEl.remove();
+    // Update the count in the info line
+    const info = document.getElementById("scp-disk-info");
+    const m = info.textContent.match(/\((\d+) file/);
+    if (m) {
+      const n = Math.max(0, parseInt(m[1]) - 1);
+      info.textContent = info.textContent.replace(/\(\d+ file\(s\)\)/, `(${n} file(s))`);
+      if (n === 0) document.getElementById("scp-disk-wrap").style.display = "none";
+    }
+  } catch (e) {
+    alert("Error: " + e);
   }
 }
 
