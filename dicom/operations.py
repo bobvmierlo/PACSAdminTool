@@ -445,7 +445,7 @@ def storage_commitment_request(local_ae_title: str, remote_host: str,
     commit_result = {"received": False, "success": False, "details": ""}
 
     def handle_n_event(event):
-        identifier = event.attribute_list
+        identifier = event.event_information
         commit_result["received"] = True
         failed_seq = getattr(identifier, "FailedSOPSequence", [])
         success_seq = getattr(identifier, "ReferencedSOPSequence", [])
@@ -658,7 +658,7 @@ class SCPListener:
         def handle_n_event_report(event):
             """Receive async Storage Commitment result from remote SCP."""
             try:
-                identifier = event.attribute_list
+                identifier = event.event_information
                 failed = getattr(identifier, "FailedSOPSequence", []) or []
                 success = getattr(identifier, "ReferencedSOPSequence", []) or []
                 caller = event.assoc.requestor.ae_title.strip()
