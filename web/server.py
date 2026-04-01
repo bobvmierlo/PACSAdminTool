@@ -38,7 +38,7 @@ from logging.handlers import TimedRotatingFileHandler
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
 
-from flask import Flask, request, jsonify, send_from_directory, session, redirect
+from flask import Flask, request, jsonify, send_from_directory, send_file, session, redirect
 from flask_socketio import SocketIO, emit
 
 from config.manager import load_config, save_config, APP_DIR, LOG_DIR
