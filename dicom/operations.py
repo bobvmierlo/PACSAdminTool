@@ -539,13 +539,17 @@ class SCPListener:
 
     def __init__(self, ae_title: str, port: int,
                  storage_dir: str = None,
-                 log_callback: Optional[Callable] = None):
+                 log_callback: Optional[Callable] = None,
+                 n_event_callback: Optional[Callable] = None):
         self.ae_title = ae_title
         self.port = port
         self.storage_dir = storage_dir or os.path.normpath(
             os.path.join(os.path.expanduser("~"), "pacs_received")
         )
         self.log_callback = log_callback
+        # Optional separate callback for Storage Commitment N-EVENT-REPORT results.
+        # If None, results fall through to log_callback instead.
+        self.n_event_callback = n_event_callback
         self._ae = None
         self._server = None
         self._thread = None
@@ -627,6 +631,7 @@ class SCPListener:
 
         storage_dir = self.storage_dir
         log_fn = self._log
+        commit_fn = self.n_event_callback or self._log
 
         def handle_store(event):
             ds = event.dataset
@@ -656,21 +661,24 @@ class SCPListener:
                 identifier = event.attribute_list
                 failed = getattr(identifier, "FailedSOPSequence", []) or []
                 success = getattr(identifier, "ReferencedSOPSequence", []) or []
-                log_fn(
-                    f"Storage Commitment result: committed={len(success)}, "
-                    f"failed={len(failed)}"
+                caller = event.assoc.requestor.ae_title.strip()
+                status_word = "All committed" if not failed else f"{len(failed)} failed"
+                commit_fn(
+                    f"N-EVENT-REPORT from {caller}: committed={len(success)}, "
+                    f"failed={len(failed)} — {status_word}"
                 )
                 if failed:
                     for item in failed:
                         reason = getattr(item, "FailureReason", "unknown")
-                        log_fn(
-                            f"  Failed UID: {getattr(item, 'ReferencedSOPInstanceUID', '?')} "
-                            f"reason=0x{reason:04X}" if isinstance(reason, int)
-                            else f"  Failed UID: {getattr(item, 'ReferencedSOPInstanceUID', '?')} "
-                                 f"reason={reason}"
+                        reason_str = (f"0x{reason:04X}" if isinstance(reason, int)
+                                      else str(reason))
+                        commit_fn(
+                            f"  Failed UID: "
+                            f"{getattr(item, 'ReferencedSOPInstanceUID', '?')} "
+                            f"reason={reason_str}"
                         )
             except Exception as exc:
-                log_fn(f"N-EVENT-REPORT handler error: {exc}")
+                commit_fn(f"N-EVENT-REPORT handler error: {exc}")
             return 0x0000, None
 
         handlers = [

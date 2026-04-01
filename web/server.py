@@ -1834,8 +1834,14 @@ def scp_start():
         def on_log(msg):
             _log("scp", msg)
 
+        def on_commit(msg):
+            # Route Storage Commitment N-EVENT-REPORT results to the commit
+            # activity channel so they appear in the commit UI panel.
+            _log("commit", msg)
+
         _scp_listener = SCPListener(ae_title=ae_title, port=port,
-                                    storage_dir=save_dir, log_callback=on_log)
+                                    storage_dir=save_dir, log_callback=on_log,
+                                    n_event_callback=on_commit)
         try:
             _scp_listener.start()
             logger.debug("SCP started as %s on port %d, saving to %s", ae_title, port, save_dir)
