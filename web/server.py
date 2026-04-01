@@ -1189,7 +1189,7 @@ def dicom_dicomdir_generate():
         import zipfile
 
         import pydicom
-        from pydicom import FileSet
+        from pydicom.fileset import FileSet
 
         with tempfile.TemporaryDirectory() as work_dir:
             input_dir  = os.path.join(work_dir, "input")
