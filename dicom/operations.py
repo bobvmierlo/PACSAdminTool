@@ -445,10 +445,19 @@ def storage_commitment_request(local_ae_title: str, remote_host: str,
     commit_result = {"received": False, "success": False, "details": ""}
 
     def handle_n_event(event):
-        identifier = event.event_information
+        identifier = None
+        for getter in (lambda: event.event_information,
+                       lambda: event.request.EventInformation):
+            try:
+                identifier = getter()
+                break
+            except Exception:
+                pass
+        if identifier is None:
+            identifier = Dataset()
         commit_result["received"] = True
-        failed_seq = getattr(identifier, "FailedSOPSequence", [])
-        success_seq = getattr(identifier, "ReferencedSOPSequence", [])
+        failed_seq = getattr(identifier, "FailedSOPSequence", None) or []
+        success_seq = getattr(identifier, "ReferencedSOPSequence", None) or []
         commit_result["success"] = len(failed_seq) == 0
         commit_result["details"] = (
             f"Committed: {len(success_seq)}, Failed: {len(failed_seq)}"
@@ -658,25 +667,47 @@ class SCPListener:
         def handle_n_event_report(event):
             """Receive async Storage Commitment result from remote SCP."""
             try:
-                identifier = event.event_information
-                failed = getattr(identifier, "FailedSOPSequence", []) or []
-                success = getattr(identifier, "ReferencedSOPSequence", []) or []
-                caller = event.assoc.requestor.ae_title.strip()
+                # Access the N-EVENT-REPORT dataset. Try the modern property
+                # first (pynetdicom ≥2.0), then fall back to the raw request
+                # attribute for older builds.
+                identifier = None
+                for getter in (
+                    lambda: event.event_information,
+                    lambda: event.request.EventInformation,
+                ):
+                    try:
+                        identifier = getter()
+                        break
+                    except Exception:
+                        pass
+                if identifier is None:
+                    identifier = Dataset()
+
+                failed = getattr(identifier, "FailedSOPSequence", None) or []
+                success = getattr(identifier, "ReferencedSOPSequence", None) or []
+                caller = getattr(
+                    getattr(event, "assoc", None),
+                    "requestor", type("", (), {"ae_title": b"?"})()
+                ).ae_title
+                if isinstance(caller, bytes):
+                    caller = caller.decode(errors="replace").strip()
+                else:
+                    caller = str(caller).strip()
+
                 status_word = "All committed" if not failed else f"{len(failed)} failed"
                 commit_fn(
-                    f"N-EVENT-REPORT from {caller}: committed={len(success)}, "
-                    f"failed={len(failed)} — {status_word}"
+                    f"N-EVENT-REPORT from {caller}: "
+                    f"committed={len(success)}, failed={len(failed)} — {status_word}"
                 )
-                if failed:
-                    for item in failed:
-                        reason = getattr(item, "FailureReason", "unknown")
-                        reason_str = (f"0x{reason:04X}" if isinstance(reason, int)
-                                      else str(reason))
-                        commit_fn(
-                            f"  Failed UID: "
-                            f"{getattr(item, 'ReferencedSOPInstanceUID', '?')} "
-                            f"reason={reason_str}"
-                        )
+                for item in failed:
+                    reason = getattr(item, "FailureReason", "unknown")
+                    reason_str = (f"0x{reason:04X}" if isinstance(reason, int)
+                                  else str(reason))
+                    commit_fn(
+                        f"  Failed UID: "
+                        f"{getattr(item, 'ReferencedSOPInstanceUID', '?')} "
+                        f"reason={reason_str}"
+                    )
             except Exception as exc:
                 commit_fn(f"N-EVENT-REPORT handler error: {exc}")
             return 0x0000, None
