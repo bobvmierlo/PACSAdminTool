@@ -11,6 +11,7 @@
     "ready": "Gereed"
   },
   "tabs": {
+    "dashboard": "Dashboard",
     "cfind": "C-FIND / Q-R",
     "cstore": "C-STORE",
     "dmwl": "Werklijst (DMWL)",
@@ -20,6 +21,9 @@
     "scp": "DICOM Ontvanger",
     "sr_viewer": "SR Viewer",
     "kos_creator": "KOS Maker",
+    "inspector": "DICOM Inspector",
+    "anonymizer": "Anonimiseerder",
+    "dicomdir": "DICOMDIR",
     "settings": "Instellingen",
     "help": "Help",
     "about": "Over"
@@ -89,7 +93,11 @@
     "no_results": "Geen resultaten om te exporteren.",
     "results_count": "{n} resultaat/resultaten",
     "query_history": "Recente zoekopdrachten",
-    "clear_history": "Geschiedenis wissen"
+    "clear_history": "Geschiedenis wissen",
+    "retrieve": "Ophalen",
+    "cget_dest": "Opslaan in map",
+    "cget_btn": "C-GET Geselecteerde",
+    "retrieve_method": "Ophaalm methode"
   },
   "cstore": {
     "storage_scp": "Storage SCP (bestemming)",
@@ -228,7 +236,9 @@
     "files_on_disk": "Bestanden op schijf",
     "file_name": "Bestandsnaam",
     "file_size": "Grootte",
-    "file_mtime": "Gewijzigd"
+    "file_mtime": "Gewijzigd",
+    "stats":         "Statistieken ontvangen bestanden",
+    "stats_refresh": "Analyseren"
   },
   "settings": {
     "local_ae": "Lokale AE-configuratie",
@@ -293,7 +303,47 @@
     "body_receiver": "Start een C-STORE SCP en sla DICOM-bestanden op.\n\n─── Configuratie ─────────────────────────────────────────\nAE Title, Poort, opslagmap\n\n─── Werking ──────────────────────────────────────────────\nBestanden worden opgeslagen als <SOPInstanceUID>.dcm\n\n─── Tips ────────────────────────────────────────────────\nControleer poort en routing.",
     "body_settings": "Configureer netwerkidentiteit.\n\n─── AE Config ───────────────────────────────────────────\nAE Title en poort\n\n─── Presets ─────────────────────────────────────────────\nHerbruikbare configuraties\n\n─── Logs ────────────────────────────────────────────────\nWorden automatisch geroteerd.",
     "body_sr_viewer": "Parse en toon DICOM SR-bestanden.\n\n─── Wat is SR ───────────────────────────────────────────\nGestructureerde rapporten.\n\n─── Workflow ────────────────────────────────────────────\nBestand kiezen → Parse → bekijken\n\n─── Tips ───────────────────────────────────────────────\nMenselijk leesbaar + debugopties.",
-    "body_kos_creator": "Maak een DICOM KOS-document.\n\n─── Wat is KOS ──────────────────────────────────────────\nVerwijst naar geselecteerde beelden.\n\n─── Workflow ────────────────────────────────────────────\nBestanden laden → metadata → opslaan/verzenden\n\n─── Formaat ─────────────────────────────────────────────\nSeriesUID | SOPClassUID | SOPInstanceUID\n\n─── Titels ──────────────────────────────────────────────\nOf Interest, Best In Set, Teaching, etc."
+    "body_kos_creator": "Maak een DICOM KOS-document.\n\n─── Wat is KOS ──────────────────────────────────────────\nVerwijst naar geselecteerde beelden.\n\n─── Workflow ────────────────────────────────────────────\nBestanden laden → metadata → opslaan/verzenden\n\n─── Formaat ─────────────────────────────────────────────\nSeriesUID | SOPClassUID | SOPInstanceUID\n\n─── Titels ──────────────────────────────────────────────\nOf Interest, Best In Set, Teaching, etc.",
+
+    "section_cget":       "C-MOVE vs C-GET",
+    "body_cget":          "Zie de Engelstalige help voor een volledige vergelijking van C-MOVE en C-GET.\n\nKort samengevat:\n• C-MOVE instrueert een PACS om bestanden naar een derde AE te sturen.\n• C-GET haalt bestanden rechtstreeks op naar deze applicatie, zonder dat een apart inkomend poort nodig is.",
+    "section_inspector":  "DICOM Bestandsinspector",
+    "body_inspector":     "Inspecteer DICOM-tags van elk .dcm-bestand zonder PACS-verbinding.\n\nWorkflow: bestand kiezen → Parse & Inspect → alle tags bekijken.",
+    "section_anonymizer": "DICOM Anonimiseerder",
+    "body_anonymizer":    "Verwijder of vervang PHI in DICOM-bestanden.\n\nProfielen: Basis (patiëntidentifiers) of Volledig (inclusief beschrijvingen).\nResultaat wordt als ZIP gedownload. Originelen worden niet gewijzigd.",
+    "section_dicomdir":   "DICOMDIR Lezer",
+    "body_dicomdir":      "Bekijk de inhoud van een DICOMDIR-indexbestand (van cd/dvd).\n\nWorkflow: bestand kiezen → Parse DICOMDIR → boomstructuur bekijken.",
+    "section_dashboard":  "Dashboard",
+    "body_dashboard":     "Overzicht van de huidige status.\n\n• Services: toont of SCP en HL7-ontvanger draaien.\n• AE Connectiviteit: ping alle opgeslagen AE-presets tegelijk.\n• Recente activiteit: laatste 20 auditlogregels."
+  },
+  "dashboard": {
+    "services":        "Services",
+    "ae_health":       "AE Connectiviteit",
+    "test_all":        "Alle AEs testen",
+    "recent_activity": "Recente activiteit",
+    "no_presets":      "Geen externe AE-presets geconfigureerd. Voeg ze toe in Instellingen."
+  },
+  "inspector": {
+    "title":    "DICOM Bestandsinspector",
+    "parse":    "Parse & Inspecteren",
+    "metadata": "Bestandsmetadata",
+    "all_tags": "Alle DICOM-tags bekijken"
+  },
+  "anonymizer": {
+    "title":         "DICOM Anonimiseerder",
+    "profile":       "Anonimisatieprofiel",
+    "profile_label": "Profiel",
+    "basic":         "Basis – patiëntidentifiers & instelling",
+    "full":          "Volledig – alle PHI inclusief beschrijvingen",
+    "replace_name":  "Patiëntnaam vervangen door",
+    "replace_id":    "Patiënt-ID vervangen door",
+    "download":      "Anonimiseren & ZIP downloaden",
+    "note":          "Resultaat wordt als ZIP gedownload. Originelen worden niet gewijzigd."
+  },
+  "dicomdir": {
+    "title": "DICOMDIR Lezer",
+    "parse": "DICOMDIR verwerken",
+    "tree":  "Mapinhoud"
   },
   "about": {
     "title": "PACS Admin Tool",

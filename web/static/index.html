@@ -168,6 +168,16 @@
     .log-info { color: #2b6cb0; }
     .log-dim  { color: #888; }
 
+    /* C-FIND row selection: clear left-border stripe + blue tint */
+    #cfind-tbody tr { cursor: pointer; }
+    #cfind-tbody tr:hover { background: #f0f7ff; }
+    #cfind-tbody tr.selected { background: #dbeafe !important; box-shadow: inset 3px 0 0 #2b6cb0; }
+
+    /* Badge colours for dashboard AE status */
+    .badge-ok  { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; background:#dcfce7; color:#15803d; }
+    .badge-err { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; background:#fee2e2; color:#dc2626; }
+    .badge-pending { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; background:#f3f4f6; color:#888; }
+
     /* ── Result tables ────────────────────────────────────────────── */
     .result-table-wrap {
       overflow-x: auto;
@@ -332,7 +342,8 @@
      TAB BAR
 ══════════════════════════════════════════════════════════════════ -->
 <div id="tab-bar">
-  <button class="tab-btn active" onclick="showTab('cfind')" data-i18n="tabs.cfind">C-FIND / Q-R</button>
+  <button class="tab-btn active" onclick="showTab('dashboard')" data-i18n="tabs.dashboard">Dashboard</button>
+  <button class="tab-btn" onclick="showTab('cfind')" data-i18n="tabs.cfind">C-FIND / Q-R</button>
   <button class="tab-btn" onclick="showTab('cstore')" data-i18n="tabs.cstore">C-STORE</button>
   <button class="tab-btn" onclick="showTab('dmwl')" data-i18n="tabs.dmwl">Worklist (DMWL)</button>
   <button class="tab-btn" onclick="showTab('commit')" data-i18n="tabs.commit">Storage Commit</button>
@@ -341,6 +352,9 @@
   <button class="tab-btn" onclick="showTab('scp')" data-i18n="tabs.scp">DICOM Receiver</button>
   <button class="tab-btn" onclick="showTab('sr_viewer')" data-i18n="tabs.sr_viewer">SR Viewer</button>
   <button class="tab-btn" onclick="showTab('kos_creator')" data-i18n="tabs.kos_creator">KOS Creator</button>
+  <button class="tab-btn" onclick="showTab('inspector')" data-i18n="tabs.inspector">DICOM Inspector</button>
+  <button class="tab-btn" onclick="showTab('anonymizer')" data-i18n="tabs.anonymizer">Anonymizer</button>
+  <button class="tab-btn" onclick="showTab('dicomdir')" data-i18n="tabs.dicomdir">DICOMDIR</button>
   <button class="tab-btn" onclick="showTab('settings')" data-i18n="tabs.settings">Settings</button>
   <button class="tab-btn" onclick="showTab('logs')">Logs</button>
   <button class="tab-btn" onclick="showTab('help')" data-i18n="tabs.help">Help</button>
@@ -352,8 +366,68 @@
 ══════════════════════════════════════════════════════════════════ -->
 <div id="tab-content">
 
+  <!-- ── Dashboard ────────────────────────────────────────────────── -->
+  <div id="tab-dashboard" class="tab-panel active">
+    <!-- Services row -->
+    <div class="card">
+      <h3 data-i18n="dashboard.services">Services</h3>
+      <div style="display:flex; gap:24px; flex-wrap:wrap; font-size:13px">
+        <div>
+          <span style="color:#888">DICOM Receiver (SCP):</span>
+          <span id="dash-scp-status" class="badge-pending" style="margin-left:6px">–</span>
+        </div>
+        <div>
+          <span style="color:#888">HL7 Listener:</span>
+          <span id="dash-hl7-status" class="badge-pending" style="margin-left:6px">–</span>
+        </div>
+      </div>
+    </div>
+    <!-- AE Health -->
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+        <h3 data-i18n="dashboard.ae_health">AE Connectivity</h3>
+        <button class="btn primary" style="font-size:12px; padding:4px 12px"
+                onclick="doBatchEcho()" id="batch-echo-btn"
+                data-i18n="dashboard.test_all">Test All AEs</button>
+      </div>
+      <div id="dash-no-presets" style="font-size:13px; color:#888; display:none"
+           data-i18n="dashboard.no_presets">
+        No remote AE presets configured. Add them in Settings.
+      </div>
+      <div class="result-table-wrap" id="dash-ae-wrap" style="display:none">
+        <table>
+          <thead><tr>
+            <th data-i18n="common.name">Name</th>
+            <th data-i18n="common.ae_title">AE Title</th>
+            <th data-i18n="common.host">Host</th>
+            <th data-i18n="common.port">Port</th>
+            <th>Status</th>
+            <th>Message</th>
+          </tr></thead>
+          <tbody id="dash-ae-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <!-- Recent activity -->
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+        <h3 data-i18n="dashboard.recent_activity">Recent Activity</h3>
+        <button class="btn" style="font-size:12px; padding:3px 10px"
+                onclick="loadDashboard()" data-i18n="common.refresh">Refresh</button>
+      </div>
+      <div class="result-table-wrap" id="dash-audit-wrap">
+        <table>
+          <thead><tr>
+            <th>Time</th><th>User</th><th>IP</th><th>Event</th><th>Result</th>
+          </tr></thead>
+          <tbody id="dash-audit-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- ── C-FIND / Query-Retrieve ─────────────────────────────────── -->
-  <div id="tab-cfind" class="tab-panel active">
+  <div id="tab-cfind" class="tab-panel">
     <div class="card">
       <h3 data-i18n="common.remote_ae">Remote AE</h3>
       <div id="ae-cfind"></div><!-- filled by buildAESelector() -->
@@ -394,24 +468,48 @@
     </div>
 
     <div class="card">
-      <h3 data-i18n="cfind.cmove">C-MOVE</h3>
-      <div class="btn-row">
-        <div class="field" style="width:200px">
+      <h3 data-i18n="cfind.retrieve">Retrieve</h3>
+      <!-- Method toggle -->
+      <div class="btn-row" style="margin-bottom:10px; gap:16px">
+        <label style="font-size:13px; cursor:pointer">
+          <input type="radio" name="cfind-method" id="cfind-method-move" value="move" checked onchange="cfindMethodChanged()">
+          C-MOVE
+        </label>
+        <label style="font-size:13px; cursor:pointer">
+          <input type="radio" name="cfind-method" id="cfind-method-get" value="get" onchange="cfindMethodChanged()">
+          C-GET
+        </label>
+      </div>
+      <!-- C-MOVE destination -->
+      <div id="cfind-move-row" class="btn-row">
+        <div class="field" style="width:220px">
           <label data-i18n="cfind.cmove_dest_short">Move Destination AE</label>
           <input id="cfind-movedest" value="PACSADMIN">
         </div>
-        <button class="btn success" onclick="doCMove()" style="margin-top:20px" data-i18n="cfind.cmove_selected">C-MOVE Selected</button>
+        <button class="btn success" onclick="doRetrieve()" style="margin-top:20px" id="cfind-retrieve-btn" data-i18n="cfind.cmove_selected">C-MOVE Selected</button>
+      </div>
+      <!-- C-GET save directory (hidden until C-GET selected) -->
+      <div id="cfind-get-row" class="btn-row" style="display:none">
+        <div class="field" style="min-width:280px; flex:1">
+          <label data-i18n="cfind.cget_dest">Save to Directory</label>
+          <input id="cfind-getdir" value="~/DICOM_Received">
+        </div>
+        <button class="btn success" onclick="doRetrieve()" style="margin-top:20px" data-i18n="cfind.cget_btn">C-GET Selected</button>
       </div>
     </div>
 
     <div class="card">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
         <h3 data-i18n="cfind.results_web">Results &mdash; click a row to see all DICOM tags</h3>
-        <button class="btn" style="font-size:12px; padding:3px 10px" onclick="exportCFindCSV()" data-i18n="cfind.export_csv">Export CSV</button>
+        <div style="display:flex; gap:6px; align-items:center">
+          <span id="cfind-sel-count" style="font-size:12px; color:#888"></span>
+          <button class="btn" style="font-size:12px; padding:3px 10px" onclick="exportCFindCSV()" data-i18n="cfind.export_csv">Export CSV</button>
+        </div>
       </div>
       <div class="result-table-wrap">
         <table id="cfind-table">
           <thead><tr>
+            <th style="width:32px; text-align:center"><input type="checkbox" id="cfind-chk-all" title="Select all" onchange="cfindSelectAll(this.checked)"></th>
             <th data-i18n="cfind.col_patient_id">Patient ID</th><th data-i18n="cfind.col_patient_name">Patient Name</th><th data-i18n="cfind.col_study_date">Study Date</th>
             <th data-i18n="cfind.col_modality">Modality</th><th data-i18n="cfind.col_accession">Accession</th><th data-i18n="cfind.col_description">Description</th><th data-i18n="cfind.col_study_uid">Study UID</th>
           </tr></thead>
@@ -645,7 +743,119 @@
         </table>
       </div>
     </div>
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+        <h3 data-i18n="scp.stats">Received File Statistics</h3>
+        <button class="btn" style="font-size:12px; padding:3px 10px" onclick="loadSCPStats()"
+                data-i18n="scp.stats_refresh">Analyse</button>
+      </div>
+      <div id="scp-stats-info" style="font-size:12px; color:#888; margin-bottom:8px"></div>
+      <div style="display:flex; gap:16px; flex-wrap:wrap">
+        <div id="scp-stats-modality" style="flex:1; min-width:160px"></div>
+        <div id="scp-stats-date"     style="flex:1; min-width:160px"></div>
+      </div>
+    </div>
     <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-scp"></div></div>
+  </div>
+
+  <!-- ── DICOM Inspector ──────────────────────────────────────────── -->
+  <div id="tab-inspector" class="tab-panel">
+    <div class="card">
+      <h3 data-i18n="inspector.title">DICOM File Inspector</h3>
+      <div class="btn-row">
+        <input type="file" id="inspector-file-input" accept=".dcm,*" style="display:none"
+               onchange="inspectorFileSelected()">
+        <button class="btn" onclick="document.getElementById('inspector-file-input').click()"
+                data-i18n="common.browse">Browse…</button>
+        <span id="inspector-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
+              text-overflow:ellipsis; white-space:nowrap"></span>
+        <button class="btn primary" onclick="doInspect()" data-i18n="inspector.parse">Parse &amp; Inspect</button>
+      </div>
+    </div>
+    <div class="card" id="inspector-meta-card" style="display:none">
+      <h3 data-i18n="inspector.metadata">File Metadata</h3>
+      <div id="inspector-meta-grid" class="field-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px,1fr))"></div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn primary" onclick="inspectorShowTags()" data-i18n="inspector.all_tags">View All DICOM Tags</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DICOM Anonymizer ──────────────────────────────────────────── -->
+  <div id="tab-anonymizer" class="tab-panel">
+    <div class="card">
+      <h3 data-i18n="anonymizer.title">DICOM Anonymizer</h3>
+      <div class="btn-row">
+        <input type="file" id="anon-file-input" accept=".dcm,*" multiple style="display:none"
+               onchange="anonFilesSelected()">
+        <button class="btn" onclick="document.getElementById('anon-file-input').click()"
+                data-i18n="cstore.add_files">Add Files…</button>
+        <button class="btn" onclick="anonClearFiles()" data-i18n="common.clear">Clear</button>
+        <span id="anon-count" style="font-size:13px; color:#888">0 files selected</span>
+      </div>
+      <div id="anon-filelist"
+           style="margin-top:8px; max-height:120px; overflow-y:auto; font-family:Consolas;
+                  font-size:12px; border:1px solid #e0e0e0; border-radius:3px;
+                  padding:6px; background:#fff; color:#555"></div>
+    </div>
+    <div class="card">
+      <h3 data-i18n="anonymizer.profile">Anonymisation Profile</h3>
+      <div class="field-grid">
+        <div class="field">
+          <label data-i18n="anonymizer.profile_label">Profile</label>
+          <select id="anon-profile">
+            <option value="basic" data-i18n="anonymizer.basic">Basic – patient identifiers &amp; institution</option>
+            <option value="full" data-i18n="anonymizer.full">Full – all PHI including descriptions</option>
+          </select>
+        </div>
+        <div class="field">
+          <label data-i18n="anonymizer.replace_name">Replace Patient Name with</label>
+          <input id="anon-patient-name" value="Anonymous">
+        </div>
+        <div class="field">
+          <label data-i18n="anonymizer.replace_id">Replace Patient ID with</label>
+          <input id="anon-patient-id" value="ANON">
+        </div>
+      </div>
+      <p style="font-size:12px; color:#888; margin-top:8px" data-i18n="anonymizer.note">
+        Result is downloaded as a ZIP archive. Original files are not modified.
+      </p>
+    </div>
+    <div class="card">
+      <div class="btn-row">
+        <button class="btn primary" onclick="doAnonymize()" data-i18n="anonymizer.download">
+          Anonymise &amp; Download ZIP
+        </button>
+        <span id="anon-status" style="font-size:13px; color:#888"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DICOMDIR Reader ───────────────────────────────────────────── -->
+  <div id="tab-dicomdir" class="tab-panel">
+    <div class="card">
+      <h3 data-i18n="dicomdir.title">DICOMDIR Reader</h3>
+      <div class="btn-row">
+        <input type="file" id="dicomdir-file-input" style="display:none"
+               onchange="dicomdirFileSelected()">
+        <button class="btn" onclick="document.getElementById('dicomdir-file-input').click()"
+                data-i18n="common.browse">Browse…</button>
+        <span id="dicomdir-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
+              text-overflow:ellipsis; white-space:nowrap"></span>
+        <button class="btn primary" onclick="doDicomDir()" data-i18n="dicomdir.parse">Parse DICOMDIR</button>
+      </div>
+    </div>
+    <div class="card" id="dicomdir-result-card" style="display:none">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px">
+        <h3 style="margin:0" data-i18n="dicomdir.tree">Directory Contents</h3>
+        <span id="dicomdir-summary" style="font-size:12px; color:#888"></span>
+      </div>
+      <div id="dicomdir-tree"
+           style="font-family:Consolas,monospace; font-size:12px;
+                  border:1px solid #e0e0e0; border-radius:3px;
+                  padding:8px; background:#fff;
+                  max-height:600px; overflow-y:auto"></div>
+    </div>
   </div>
 
   <!-- ── Settings ────────────────────────────────────────────────── -->
@@ -1137,7 +1347,8 @@ function showTab(name) {
     if (b.getAttribute("onclick") === `showTab('${name}')`) b.classList.add("active");
   });
 
-  if (name === "logs") initLogViewer();
+  if (name === "logs")      initLogViewer();
+  if (name === "dashboard") loadDashboard();
 }
 
 function showHL7Tab(sub) {
@@ -1398,13 +1609,37 @@ async function doEcho(prefix) {
 // 6. C-FIND
 // ─────────────────────────────────────────────────────────────────
 
-let cfindResults = [];  // keep results for C-MOVE and detail popup
+let cfindResults = [];  // keep results for retrieve and detail popup
+
+function cfindMethodChanged() {
+  const method = document.querySelector('input[name="cfind-method"]:checked').value;
+  document.getElementById("cfind-move-row").style.display = method === "move" ? "" : "none";
+  document.getElementById("cfind-get-row").style.display  = method === "get"  ? "" : "none";
+}
+
+function cfindSelectAll(checked) {
+  document.querySelectorAll("#cfind-tbody input[type=checkbox]").forEach(cb => {
+    cb.checked = checked;
+    cb.closest("tr").classList.toggle("selected", checked);
+  });
+  cfindUpdateSelCount();
+}
+
+function cfindUpdateSelCount() {
+  const n = document.querySelectorAll("#cfind-tbody input[type=checkbox]:checked").length;
+  document.getElementById("cfind-sel-count").textContent = n > 0 ? `${n} selected` : "";
+  // Keep the header select-all checkbox in sync
+  const total = document.querySelectorAll("#cfind-tbody input[type=checkbox]").length;
+  const allChk = document.getElementById("cfind-chk-all");
+  if (allChk) allChk.checked = total > 0 && n === total;
+}
 
 async function doCFind() {
   const ae = getAE("cfind");
   if (!ae) return;
   clearTable("cfind-tbody");
   cfindResults = [];
+  cfindUpdateSelCount();
   appendLog("log-cfind", now(), `C-FIND → ${ae.ae_title}@${ae.host}:${ae.port}`);
 
   const res  = await fetch("/api/dicom/find", {
@@ -1427,51 +1662,87 @@ async function doCFind() {
 
   cfindResults = data.results || [];
   if (data.ok) _cfindHistorySave();
-  const tbody  = document.getElementById("cfind-tbody");
+  const tbody = document.getElementById("cfind-tbody");
   cfindResults.forEach((r, i) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${r.PatientID}</td><td>${r.PatientName}</td><td>${r.StudyDate}</td>
-      <td>${r.Modality}</td><td>${r.Accession}</td><td>${r.Description}</td>
-      <td style="font-family:Consolas;font-size:11px">${r.StudyUID}</td>`;
-    tr.onclick = () => showTagModal("C-FIND Result", r.tags);
+    const tr  = document.createElement("tr");
+    const chk = document.createElement("input");
+    chk.type  = "checkbox";
+    chk.style.cursor = "pointer";
+    chk.addEventListener("change", () => {
+      tr.classList.toggle("selected", chk.checked);
+      cfindUpdateSelCount();
+    });
+    const tdChk = document.createElement("td");
+    tdChk.style.cssText = "text-align:center; width:32px";
+    tdChk.appendChild(chk);
+    tr.appendChild(tdChk);
+
+    const cells = [
+      r.PatientID, r.PatientName, r.StudyDate, r.Modality,
+      r.Accession, r.Description,
+    ];
+    cells.forEach(v => {
+      const td = document.createElement("td");
+      td.textContent = v;
+      tr.appendChild(td);
+    });
+    const tdUid = document.createElement("td");
+    tdUid.style.cssText = "font-family:Consolas;font-size:11px";
+    tdUid.textContent = r.StudyUID;
+    tr.appendChild(tdUid);
+
+    // Click on the row (not the checkbox) → show tag modal
+    tr.addEventListener("click", e => {
+      if (e.target.type === "checkbox") return;
+      showTagModal("C-FIND Result", r.tags);
+    });
     tbody.appendChild(tr);
   });
 }
 
-async function doCMove() {
-  const sel = document.querySelector("#cfind-tbody tr.selected");
-  // Find selected row index
-  const rows = document.querySelectorAll("#cfind-tbody tr");
-  let idx = -1;
-  rows.forEach((r, i) => { if (r.classList.contains("selected")) idx = i; });
-  if (idx === -1) { alert(i18n("cfind.select_row_first")); return; }
-
-  const ae   = getAE("cfind");
+// Unified retrieve: handles both C-MOVE (single or bulk) and C-GET
+async function doRetrieve() {
+  const method = document.querySelector('input[name="cfind-method"]:checked').value;
+  const ae     = getAE("cfind");
   if (!ae) return;
-  const dest = document.getElementById("cfind-movedest").value.trim();
-  const uid  = cfindResults[idx].StudyUID;
-  appendLog("log-cfind", now(), `C-MOVE → dest=${dest}  study=${uid}`);
 
-  await fetch("/api/dicom/move", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...ae, study_uid: uid, move_dest: dest,
-                           query_model: document.getElementById("cfind-model").value }),
+  // Collect selected study UIDs
+  const uids = [];
+  document.querySelectorAll("#cfind-tbody input[type=checkbox]:checked").forEach(cb => {
+    const idx = [...cb.closest("tbody").querySelectorAll("input[type=checkbox]")].indexOf(cb);
+    if (cfindResults[idx]) uids.push(cfindResults[idx].StudyUID);
   });
+  if (uids.length === 0) { alert(i18n("cfind.select_row_first")); return; }
+
+  const model = document.getElementById("cfind-model").value;
+
+  if (method === "move") {
+    const dest = document.getElementById("cfind-movedest").value.trim();
+    appendLog("log-cfind", now(),
+              `C-MOVE → dest=${dest}  studies=${uids.length}`);
+    for (const uid of uids) {
+      fetch("/api/dicom/move", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...ae, study_uid: uid, move_dest: dest, query_model: model }),
+      });
+    }
+  } else {
+    const saveDir = document.getElementById("cfind-getdir").value.trim();
+    appendLog("log-cfind", now(),
+              `C-GET → save_dir=${saveDir}  studies=${uids.length}`);
+    for (const uid of uids) {
+      fetch("/api/dicom/get", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...ae, study_uid: uid, save_dir: saveDir, query_model: model }),
+      });
+    }
+  }
 }
 
-// Make rows selectable (click once to highlight, click again deselects)
-document.getElementById("cfind-tbody").addEventListener("click", e => {
-  const tr = e.target.closest("tr");
-  if (!tr) return;
-  // Show tag detail on click
-  const idx = [...tr.parentElement.children].indexOf(tr);
-  if (cfindResults[idx]) showTagModal("C-FIND Result", cfindResults[idx].tags);
-  // Toggle selected highlight
-  document.querySelectorAll("#cfind-tbody tr").forEach(r => r.classList.remove("selected"));
-  tr.classList.add("selected");
-  tr.style.background = "#eff6ff";
-});
+// Keep old name as alias (in case any other code calls it)
+async function doCMove() { return doRetrieve(); }
 
 // ── C-FIND: CSV export ──────────────────────────────────────────
 function exportCFindCSV() {
@@ -1752,6 +2023,9 @@ function updateTemplateDesc() {
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("hl7-template")
     .addEventListener("change", updateTemplateDesc);
+
+  // Load dashboard data on first open (it is the default active tab)
+  loadDashboard();
 
   // Fetch app version from the server and display it in the About tab
   // Fetch app version and data paths from the server
@@ -2190,6 +2464,17 @@ const HELP_SECTIONS = [
     {label: "DICOM PS3.3 §C.17.6 – Key Object Selection Document IOD (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_C.17.6"},
     {label: "IHE RAD TF Vol. 1 – XDS-I.b Integration Profile (IHE)", url: "https://www.ihe.net/uploadedFiles/Documents/Radiology/IHE_RAD_TF_Vol1.pdf"},
   ]],
+
+  ["help.section_cget", "help.body_cget",
+  [
+    {label: "DICOM PS3.4 §C.4.3 – C-GET Service (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#sect_C.4.3"},
+    {label: "DICOM PS3.4 §C.4.2 – C-MOVE Service (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#sect_C.4.2"},
+  ]],
+
+  ["help.section_inspector", "help.body_inspector", []],
+  ["help.section_anonymizer", "help.body_anonymizer", []],
+  ["help.section_dicomdir",   "help.body_dicomdir",   []],
+  ["help.section_dashboard",  "help.body_dashboard",  []],
 ];
 
 function buildHelp() {
@@ -2706,6 +2991,324 @@ async function loadLogContent() {
 function scheduleLogRefresh() {
   clearTimeout(_logRefreshTimer);
   _logRefreshTimer = setTimeout(loadLogContent, 400);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Dashboard
+// ─────────────────────────────────────────────────────────────────
+
+async function loadDashboard() {
+  try {
+    const res  = await fetch("/api/dashboard");
+    const data = await res.json();
+    if (!data.ok) return;
+
+    // Services
+    const scpEl  = document.getElementById("dash-scp-status");
+    const hl7El  = document.getElementById("dash-hl7-status");
+    scpEl.className = data.scp_running ? "badge-ok" : "badge-err";
+    scpEl.textContent = data.scp_running
+      ? `Running (${data.scp_ae || ""})`
+      : "Stopped";
+    hl7El.className   = data.hl7_running ? "badge-ok" : "badge-err";
+    hl7El.textContent = data.hl7_running ? "Running" : "Stopped";
+
+    // AE table — prepopulate rows with "–" state
+    const tbody = document.getElementById("dash-ae-tbody");
+    tbody.innerHTML = "";
+    const noPresets = document.getElementById("dash-no-presets");
+    const wrap      = document.getElementById("dash-ae-wrap");
+
+    if (!data.remote_aes || data.remote_aes.length === 0) {
+      noPresets.style.display = "";
+      wrap.style.display      = "none";
+    } else {
+      noPresets.style.display = "none";
+      wrap.style.display      = "";
+      data.remote_aes.forEach(ae => {
+        const tr = document.createElement("tr");
+        tr.id    = `dash-ae-row-${ae.ae_title}`;
+        tr.innerHTML = `
+          <td>${ae.name || ""}</td>
+          <td>${ae.ae_title}</td>
+          <td>${ae.host}</td>
+          <td>${ae.port}</td>
+          <td><span class="badge-pending" id="dash-ae-badge-${ae.ae_title}">–</span></td>
+          <td id="dash-ae-msg-${ae.ae_title}" style="font-size:12px; color:#888"></td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Recent audit
+    const auditTbody = document.getElementById("dash-audit-tbody");
+    auditTbody.innerHTML = "";
+    (data.recent_audit || []).forEach(entry => {
+      const tr  = document.createElement("tr");
+      const ts  = (entry.ts || "").replace("T", " ").substring(0, 19);
+      const res = entry.result || "";
+      tr.innerHTML = `
+        <td style="white-space:nowrap;font-size:11px">${ts}</td>
+        <td>${entry.user || "–"}</td>
+        <td style="font-size:11px">${entry.ip || ""}</td>
+        <td>${entry.event || ""}</td>
+        <td><span class="${res === "ok" ? "badge-ok" : "badge-err"}">${res}</span></td>`;
+      auditTbody.appendChild(tr);
+    });
+  } catch (e) {
+    console.error("Dashboard load error:", e);
+  }
+}
+
+async function doBatchEcho() {
+  const btn = document.getElementById("batch-echo-btn");
+  btn.disabled = true;
+  btn.textContent = "Testing…";
+  // Clear existing results
+  document.querySelectorAll("[id^='dash-ae-badge-']").forEach(el => {
+    el.className   = "badge-pending";
+    el.textContent = "…";
+  });
+  try {
+    await fetch("/api/dicom/echo/batch", { method: "POST" });
+  } finally {
+    // btn re-enabled when batch_echo_done fires
+  }
+}
+
+// SocketIO handlers for batch echo results
+socket.on("batch_echo_result", data => {
+  const badge = document.getElementById(`dash-ae-badge-${data.ae_title}`);
+  const msg   = document.getElementById(`dash-ae-msg-${data.ae_title}`);
+  if (badge) {
+    badge.className   = data.ok ? "badge-ok" : "badge-err";
+    badge.textContent = data.ok ? "OK" : "Fail";
+  }
+  if (msg) msg.textContent = data.message || "";
+});
+
+socket.on("batch_echo_done", () => {
+  const btn = document.getElementById("batch-echo-btn");
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = i18n("dashboard.test_all") || "Test All AEs";
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// DICOM File Inspector
+// ─────────────────────────────────────────────────────────────────
+
+let _inspectorTags = [];
+
+function inspectorFileSelected() {
+  const f = document.getElementById("inspector-file-input").files[0];
+  document.getElementById("inspector-filename").textContent = f ? f.name : "";
+  document.getElementById("inspector-meta-card").style.display = "none";
+}
+
+async function doInspect() {
+  const input = document.getElementById("inspector-file-input");
+  if (!input.files || !input.files[0]) {
+    alert("Select a DICOM file first.");
+    return;
+  }
+  const fd = new FormData();
+  fd.append("file", input.files[0]);
+  try {
+    const res  = await fetch("/api/dicom/inspect", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!data.ok) { alert("Error: " + data.error); return; }
+
+    _inspectorTags = data.tags || [];
+    const grid = document.getElementById("inspector-meta-grid");
+    grid.innerHTML = "";
+    const m = data.meta || {};
+    [
+      ["Filename",          m.filename],
+      ["Patient Name",      m.PatientName],
+      ["Patient ID",        m.PatientID],
+      ["Modality",          m.Modality],
+      ["Study Date",        m.StudyDate],
+      ["SOP Class UID",     m.SOPClassUID],
+      ["Transfer Syntax",   m.TransferSyntaxUID],
+    ].forEach(([label, val]) => {
+      if (!val) return;
+      const div = document.createElement("div");
+      div.className = "field";
+      div.innerHTML = `<label style="color:#888;font-size:11px">${label}</label>
+                       <span style="font-size:13px">${val}</span>`;
+      grid.appendChild(div);
+    });
+    document.getElementById("inspector-meta-card").style.display = "";
+  } catch (e) {
+    alert("Error: " + e);
+  }
+}
+
+function inspectorShowTags() {
+  showTagModal("DICOM Inspector", _inspectorTags);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// DICOM Anonymizer
+// ─────────────────────────────────────────────────────────────────
+
+let _anonFiles = [];
+
+function anonFilesSelected() {
+  const input = document.getElementById("anon-file-input");
+  _anonFiles  = Array.from(input.files || []);
+  renderAnonList();
+}
+
+function anonClearFiles() {
+  _anonFiles = [];
+  document.getElementById("anon-file-input").value = "";
+  renderAnonList();
+}
+
+function renderAnonList() {
+  const box = document.getElementById("anon-filelist");
+  const cnt = document.getElementById("anon-count");
+  cnt.textContent = `${_anonFiles.length} file(s) selected`;
+  box.innerHTML = _anonFiles.map(f => f.name).join("<br>");
+}
+
+async function doAnonymize() {
+  if (_anonFiles.length === 0) { alert("Add at least one DICOM file first."); return; }
+  const status = document.getElementById("anon-status");
+  status.textContent = "Anonymising…";
+
+  const fd = new FormData();
+  _anonFiles.forEach(f => fd.append("files[]", f));
+  fd.append("profile",      document.getElementById("anon-profile").value);
+  fd.append("patient_name", document.getElementById("anon-patient-name").value);
+  fd.append("patient_id",   document.getElementById("anon-patient-id").value);
+
+  try {
+    const res = await fetch("/api/dicom/anonymize", { method: "POST", body: fd });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      status.textContent = "Error: " + (err.error || res.statusText);
+      return;
+    }
+    const blob = await res.blob();
+    const cd   = res.headers.get("Content-Disposition") || "";
+    const fnM  = cd.match(/filename="?([^";\n]+)"?/);
+    const fn   = fnM ? fnM[1] : "anonymised.zip";
+    const a    = document.createElement("a");
+    a.href     = URL.createObjectURL(blob);
+    a.download = fn;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    status.textContent = `Done — downloaded ${fn}`;
+  } catch (e) {
+    status.textContent = "Error: " + e;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// DICOMDIR Reader
+// ─────────────────────────────────────────────────────────────────
+
+function dicomdirFileSelected() {
+  const f = document.getElementById("dicomdir-file-input").files[0];
+  document.getElementById("dicomdir-filename").textContent = f ? f.name : "";
+  document.getElementById("dicomdir-result-card").style.display = "none";
+}
+
+async function doDicomDir() {
+  const input = document.getElementById("dicomdir-file-input");
+  if (!input.files || !input.files[0]) { alert("Select a DICOMDIR file first."); return; }
+  const fd = new FormData();
+  fd.append("file", input.files[0]);
+  try {
+    const res  = await fetch("/api/dicom/dicomdir", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!data.ok) { alert("Error: " + data.error); return; }
+
+    document.getElementById("dicomdir-summary").textContent =
+      `${data.total_patients} patient(s) · ${data.total_instances} instance(s)`;
+
+    const tree = document.getElementById("dicomdir-tree");
+    tree.innerHTML = "";
+    (data.patients || []).forEach(pat => {
+      tree.appendChild(_ddNode(`👤 ${pat.PatientName || "(no name)"}  [${pat.PatientID}]`, 0, true));
+      (pat.studies || []).forEach(stu => {
+        const studyLabel = `📋 ${stu.StudyDate || "?"}  ${stu.StudyDescription || ""}  `
+                         + `ACC: ${stu.AccessionNumber || "–"}`;
+        tree.appendChild(_ddNode(studyLabel, 1, true));
+        (stu.series || []).forEach(ser => {
+          const serLabel = `🔷 Series ${ser.SeriesNumber || "?"}  ${ser.Modality || ""}  `
+                         + `${ser.SeriesDescription || ""}`;
+          tree.appendChild(_ddNode(serLabel, 2, true));
+          (ser.instances || []).forEach(inst => {
+            const instLabel = `  ${inst.type}  #${inst.InstanceNumber || "?"}  ${inst.SOPInstanceUID}`;
+            tree.appendChild(_ddNode(instLabel, 3, false));
+          });
+        });
+      });
+    });
+    document.getElementById("dicomdir-result-card").style.display = "";
+  } catch (e) {
+    alert("Error: " + e);
+  }
+}
+
+function _ddNode(text, indent, bold) {
+  const div = document.createElement("div");
+  div.style.cssText = `padding:2px 0 2px ${indent * 20}px; ${bold ? "font-weight:600" : "color:#555"}`;
+  div.textContent   = text;
+  return div;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// SCP Statistics
+// ─────────────────────────────────────────────────────────────────
+
+async function loadSCPStats() {
+  const info = document.getElementById("scp-stats-info");
+  const modEl = document.getElementById("scp-stats-modality");
+  const dateEl = document.getElementById("scp-stats-date");
+  info.textContent = "Loading…";
+  modEl.innerHTML = "";
+  dateEl.innerHTML = "";
+  try {
+    const res  = await fetch("/api/scp/stats");
+    const data = await res.json();
+    if (!data.ok) { info.textContent = "Error: " + data.error; return; }
+
+    const kb = data.total_bytes < 1048576
+      ? (data.total_bytes / 1024).toFixed(1) + " KB"
+      : (data.total_bytes / 1048576).toFixed(1) + " MB";
+    info.textContent = `${data.total} file(s)  ·  ${kb} total`
+      + (data.sampled < data.total ? `  (showing stats for ${data.sampled} most-recent)` : "");
+
+    // Modality breakdown
+    const mods = Object.entries(data.by_modality || {});
+    if (mods.length) {
+      modEl.innerHTML = `<div style="font-weight:600;font-size:12px;color:#888;margin-bottom:4px">By Modality</div>`
+        + mods.map(([m, n]) =>
+            `<div style="display:flex;justify-content:space-between;font-size:12px;padding:1px 0">
+               <span>${m}</span><span style="color:#555">${n}</span></div>`
+          ).join("");
+    }
+
+    // Date breakdown
+    const dates = Object.entries(data.by_date || {});
+    if (dates.length) {
+      dateEl.innerHTML = `<div style="font-weight:600;font-size:12px;color:#888;margin-bottom:4px">By Study Date (most recent)</div>`
+        + dates.map(([d, n]) => {
+            const fmt = d.length === 8
+              ? `${d.substring(0,4)}-${d.substring(4,6)}-${d.substring(6,8)}`
+              : d;
+            return `<div style="display:flex;justify-content:space-between;font-size:12px;padding:1px 0">
+                      <span>${fmt}</span><span style="color:#555">${n}</span></div>`;
+          }).join("");
+    }
+  } catch (e) {
+    info.textContent = "Error: " + e;
+  }
 }
 
 </script>

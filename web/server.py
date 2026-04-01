@@ -945,6 +945,472 @@ def dicom_move():
 
 
 # ===========================================================================
+# API: C-GET (retrieve files directly to this server, no destination AE needed)
+# ===========================================================================
+
+@app.route("/api/dicom/get", methods=["POST"])
+@require_login
+def dicom_get():
+    """
+    Trigger a C-GET.
+    Browser sends: { ae_title, host, port, study_uid, save_dir, query_model }
+    Unlike C-MOVE no destination AE is needed — files are pulled directly
+    into save_dir on this server within the same DICOM association.
+    """
+    d = request.get_json(silent=True)
+    err = _require_dicom_fields(d)
+    if err:
+        return err
+    save_dir = os.path.normpath(os.path.expanduser(
+        d.get("save_dir", "~/DICOM_Received")
+    ))
+    try:
+        from dicom.operations import c_get
+        from pydicom.dataset import Dataset
+
+        ds = Dataset()
+        ds.QueryRetrieveLevel = "STUDY"
+        ds.StudyInstanceUID   = d.get("study_uid", "")
+
+        def run():
+            ok, msg = c_get(
+                _local_ae(), d["host"], int(d["port"]), d["ae_title"],
+                ds, save_dir,
+                d.get("query_model", "STUDY"),
+                callback=lambda m: _log("cfind", m))
+            _log("cfind", msg, "ok" if ok else "err")
+
+        threading.Thread(target=run, daemon=True).start()
+        _audit("dicom.c_get", ip=_req_ip(), user=_req_user(),
+               detail={"ae_title": d["ae_title"], "study_uid": d.get("study_uid"),
+                       "save_dir": save_dir})
+        return jsonify({"ok": True, "message": "C-GET started"})
+    except Exception as e:
+        logger.exception("C-GET setup error")
+        return jsonify({"ok": False, "message": str(e)}), 500
+
+
+# ===========================================================================
+# API: Batch C-ECHO  –  ping all saved remote AE presets
+# ===========================================================================
+
+@app.route("/api/dicom/echo/batch", methods=["POST"])
+@require_login
+def dicom_echo_batch():
+    """
+    Run C-ECHO against every remote AE preset in the config.
+    Returns immediately; results are streamed to the browser via SocketIO
+    as 'batch_echo_result' events, followed by a 'batch_echo_done' event.
+    """
+    remote_aes = config.get("remote_aes", [])
+    if not remote_aes:
+        return jsonify({"ok": True,
+                        "message": "No remote AE presets configured.",
+                        "total": 0})
+
+    def run():
+        from dicom.operations import c_echo
+        for ae_cfg in remote_aes:
+            name = ae_cfg.get("name") or ae_cfg.get("ae_title", "?")
+            try:
+                ok, msg = c_echo(
+                    _local_ae(),
+                    ae_cfg["host"], int(ae_cfg["port"]), ae_cfg["ae_title"])
+            except Exception as exc:
+                ok, msg = False, str(exc)
+            socketio.emit("batch_echo_result", {
+                "name":     name,
+                "ae_title": ae_cfg.get("ae_title", ""),
+                "host":     ae_cfg.get("host", ""),
+                "port":     ae_cfg.get("port", 0),
+                "ok":       ok,
+                "message":  msg,
+            })
+        socketio.emit("batch_echo_done", {"total": len(remote_aes)})
+
+    threading.Thread(target=run, daemon=True).start()
+    return jsonify({"ok": True,
+                    "message": f"Testing {len(remote_aes)} AE(s)…",
+                    "total": len(remote_aes)})
+
+
+# ===========================================================================
+# API: DICOM File Inspector  –  upload any .dcm and return its full tag tree
+# ===========================================================================
+
+@app.route("/api/dicom/inspect", methods=["POST"])
+@require_login
+def dicom_inspect():
+    """
+    Accept a single uploaded DICOM file and return its complete tag tree
+    plus a short metadata summary.  The tag-tree format is the same as
+    C-FIND results so the existing tag-modal in the browser can render it.
+    """
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"ok": False, "error": "No file provided."}), 400
+    try:
+        import io
+        import pydicom
+        ds   = pydicom.dcmread(io.BytesIO(f.read()))
+        tags = _dataset_to_tag_list(ds)
+        ts_uid = ""
+        if hasattr(ds, "file_meta") and ds.file_meta:
+            ts_uid = _safe_str(getattr(ds.file_meta, "TransferSyntaxUID", ""))
+        meta = {
+            "filename":           f.filename or "",
+            "PatientName":        _safe_str(getattr(ds, "PatientName",  "")),
+            "PatientID":          _safe_str(getattr(ds, "PatientID",    "")),
+            "Modality":           _safe_str(getattr(ds, "Modality",     "")),
+            "StudyDate":          _safe_str(getattr(ds, "StudyDate",    "")),
+            "SOPClassUID":        _safe_str(getattr(ds, "SOPClassUID",  "")),
+            "TransferSyntaxUID":  ts_uid,
+        }
+        return jsonify({"ok": True, "meta": meta, "tags": tags})
+    except Exception as e:
+        logger.exception("DICOM inspect error")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ===========================================================================
+# API: DICOMDIR Reader  –  parse and return a patient/study/series/instance tree
+# ===========================================================================
+
+@app.route("/api/dicom/dicomdir", methods=["POST"])
+@require_login
+def dicom_dicomdir():
+    """
+    Accept an uploaded DICOMDIR file and return a structured hierarchy as JSON.
+    """
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"ok": False, "error": "No file provided."}), 400
+    try:
+        import io
+        import pydicom
+        ds = pydicom.dcmread(io.BytesIO(f.read()))
+        if not hasattr(ds, "DirectoryRecordSequence"):
+            return jsonify({"ok": False,
+                            "error": "Not a valid DICOMDIR "
+                                     "(DirectoryRecordSequence not found)."}), 400
+
+        # Walk the flat record list and rebuild the hierarchy.
+        # Records appear in parent-first order in a well-formed DICOMDIR.
+        pat_order: list[dict] = []
+        cur_pat:   dict | None = None
+        cur_stu:   dict | None = None
+        cur_ser:   dict | None = None
+
+        for rec in ds.DirectoryRecordSequence:
+            rt = _safe_str(getattr(rec, "DirectoryRecordType", "")).upper()
+
+            if rt == "PATIENT":
+                entry = {
+                    "PatientID":   _safe_str(getattr(rec, "PatientID",   "")),
+                    "PatientName": _safe_str(getattr(rec, "PatientName", "")),
+                    "studies": [],
+                }
+                pat_order.append(entry)
+                cur_pat = entry
+                cur_stu = None
+                cur_ser = None
+
+            elif rt == "STUDY":
+                s = {
+                    "StudyDate":        _safe_str(getattr(rec, "StudyDate",        "")),
+                    "StudyDescription": _safe_str(getattr(rec, "StudyDescription", "")),
+                    "StudyInstanceUID": _safe_str(getattr(rec, "StudyInstanceUID", "")),
+                    "AccessionNumber":  _safe_str(getattr(rec, "AccessionNumber",  "")),
+                    "series": [],
+                }
+                if cur_pat is not None:
+                    cur_pat["studies"].append(s)
+                cur_stu = s
+                cur_ser = None
+
+            elif rt == "SERIES":
+                ser = {
+                    "Modality":          _safe_str(getattr(rec, "Modality",          "")),
+                    "SeriesNumber":      _safe_str(getattr(rec, "SeriesNumber",       "")),
+                    "SeriesDescription": _safe_str(getattr(rec, "SeriesDescription",  "")),
+                    "SeriesInstanceUID": _safe_str(getattr(rec, "SeriesInstanceUID",  "")),
+                    "instances": [],
+                }
+                if cur_stu is not None:
+                    cur_stu["series"].append(ser)
+                cur_ser = ser
+
+            else:
+                # Leaf record: IMAGE, SR DOCUMENT, RT DOSE, ENCAP DOC, etc.
+                inst = {
+                    "type":           rt,
+                    "InstanceNumber": _safe_str(getattr(rec, "InstanceNumber", "")),
+                    "SOPInstanceUID": _safe_str(
+                        getattr(rec, "ReferencedSOPInstanceUIDInFile", "")),
+                    "SOPClassUID":    _safe_str(
+                        getattr(rec, "ReferencedSOPClassUIDInFile", "")),
+                    "ReferencedFileID": "/".join(
+                        list(getattr(rec, "ReferencedFileID", []) or [])),
+                }
+                if cur_ser is not None:
+                    cur_ser["instances"].append(inst)
+
+        total_instances = sum(
+            len(ser["instances"])
+            for p in pat_order
+            for stu in p["studies"]
+            for ser in stu["series"]
+        )
+        return jsonify({
+            "ok":              True,
+            "patients":        pat_order,
+            "total_patients":  len(pat_order),
+            "total_instances": total_instances,
+        })
+    except Exception as e:
+        logger.exception("DICOMDIR parse error")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ===========================================================================
+# API: DICOM Anonymizer  –  strip PHI and return anonymised files as a ZIP
+# ===========================================================================
+
+# Tags cleared in the Basic profile (patient identifiers + institution info)
+_ANON_BASIC = [
+    (0x0008, 0x0050),  # AccessionNumber
+    (0x0008, 0x0080),  # InstitutionName
+    (0x0008, 0x0081),  # InstitutionAddress
+    (0x0008, 0x0090),  # ReferringPhysicianName
+    (0x0008, 0x1010),  # StationName
+    (0x0008, 0x1048),  # PhysiciansOfRecord
+    (0x0008, 0x1070),  # OperatorsName
+    (0x0010, 0x0030),  # PatientBirthDate
+    (0x0010, 0x0040),  # PatientSex
+    (0x0010, 0x1000),  # OtherPatientIDs
+    (0x0010, 0x1010),  # PatientAge
+    (0x0010, 0x1020),  # PatientSize
+    (0x0010, 0x1030),  # PatientWeight
+    (0x0010, 0x1040),  # PatientAddress
+    (0x0010, 0x2160),  # EthnicGroup
+    (0x0010, 0x21B0),  # AdditionalPatientHistory
+    (0x0020, 0x0010),  # StudyID
+    (0x0032, 0x1032),  # RequestingPhysician
+    (0x0032, 0x1060),  # RequestedProcedureDescription
+]
+
+# Full profile adds study/series context strings
+_ANON_FULL = _ANON_BASIC + [
+    (0x0008, 0x1030),  # StudyDescription
+    (0x0008, 0x103E),  # SeriesDescription
+    (0x0018, 0x1030),  # ProtocolName
+    (0x0032, 0x1070),  # RequestedContrastAgent
+    (0x0040, 0x0006),  # ScheduledPerformingPhysicianName
+    (0x0040, 0x0007),  # ScheduledProcedureStepDescription
+    (0x0040, 0x0009),  # ScheduledProcedureStepID
+]
+
+
+@app.route("/api/dicom/anonymize", methods=["POST"])
+@require_login
+def dicom_anonymize():
+    """
+    Accept uploaded DICOM files, anonymise them, and return a ZIP archive.
+
+    Form data:
+      files[]       – one or more .dcm files  (required)
+      profile       – "basic" | "full"         (default: "basic")
+      patient_name  – replacement PatientName  (default: "Anonymous")
+      patient_id    – replacement PatientID    (default: "ANON")
+    """
+    import io
+    import zipfile
+    import pydicom
+
+    files = request.files.getlist("files[]")
+    if not files:
+        return jsonify({"ok": False, "error": "No files provided."}), 400
+
+    profile   = request.form.get("profile",      "basic")
+    repl_name = request.form.get("patient_name", "Anonymous")
+    repl_id   = request.form.get("patient_id",   "ANON")
+    phi_tags  = _ANON_FULL if profile == "full" else _ANON_BASIC
+
+    zip_buf = io.BytesIO()
+    count   = 0
+    errors: list[str] = []
+
+    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in files:
+            try:
+                ds = pydicom.dcmread(io.BytesIO(f.read()))
+
+                # Replace identity fields
+                ds.PatientName = repl_name
+                ds.PatientID   = repl_id
+
+                # Remove all other PHI tags present in the dataset
+                for group, elem in phi_tags:
+                    tag = pydicom.tag.Tag(group, elem)
+                    if tag in ds:
+                        del ds[tag]
+
+                out = io.BytesIO()
+                try:
+                    ds.save_as(out, enforce_file_format=True)
+                except TypeError:
+                    ds.save_as(out, write_like_original=False)
+                out.seek(0)
+
+                fname = f.filename if f.filename else f"anon_{count}.dcm"
+                zf.writestr(fname, out.read())
+                count += 1
+            except Exception as exc:
+                errors.append(f"{f.filename or '?'}: {exc}")
+
+    if count == 0:
+        return jsonify({"ok": False,
+                        "error": "No files could be anonymised. " +
+                                 "; ".join(errors)}), 400
+
+    _audit("dicom.anonymize", ip=_req_ip(), user=_req_user(),
+           detail={"profile": profile, "count": count})
+
+    zip_buf.seek(0)
+    from flask import send_file as _send_file
+    return _send_file(
+        zip_buf,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"anonymised_{count}_files.zip",
+    )
+
+
+# ===========================================================================
+# API: SCP Statistics  –  breakdown of received files by modality / date
+# ===========================================================================
+
+@app.route("/api/scp/stats", methods=["GET"])
+@require_login
+def scp_stats():
+    """
+    Scan the SCP storage directory and return a summary:
+      total       – total .dcm files found
+      total_bytes – combined file size in bytes
+      sampled     – how many headers were read (up to 500 most recent)
+      by_modality – { Modality: count }
+      by_date     – { YYYYMMDD: count } (10 most-recent dates)
+    """
+    import pydicom
+
+    with _listener_lock:
+        storage_dir = _scp_listener.storage_dir if _scp_listener else None
+
+    if not storage_dir:
+        storage_dir = os.path.normpath(os.path.expanduser("~/DICOM_Received"))
+
+    if not os.path.isdir(storage_dir):
+        return jsonify({"ok": True, "total": 0, "total_bytes": 0,
+                        "sampled": 0, "by_modality": {}, "by_date": {},
+                        "dir": storage_dir})
+
+    try:
+        all_files = [f for f in os.listdir(storage_dir)
+                     if f.lower().endswith(".dcm")]
+    except OSError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+    total_bytes = 0
+    for fname in all_files:
+        try:
+            total_bytes += os.path.getsize(os.path.join(storage_dir, fname))
+        except OSError:
+            pass
+
+    # Read DICOM headers of up to 500 most-recent files
+    sample = sorted(
+        all_files,
+        key=lambda f: os.path.getmtime(os.path.join(storage_dir, f)),
+        reverse=True,
+    )[:500]
+
+    by_modality: dict[str, int] = {}
+    by_date:     dict[str, int] = {}
+
+    for fname in sample:
+        path = os.path.join(storage_dir, fname)
+        try:
+            ds   = pydicom.dcmread(path, stop_before_pixels=True,
+                                   specific_tags=["Modality", "StudyDate"])
+            mod  = _safe_str(getattr(ds, "Modality",  "")) or "Unknown"
+            date = _safe_str(getattr(ds, "StudyDate", ""))[:8] or "Unknown"
+        except Exception:
+            mod, date = "Unknown", "Unknown"
+        by_modality[mod]  = by_modality.get(mod,  0) + 1
+        by_date[date]     = by_date.get(date, 0) + 1
+
+    top_dates = dict(sorted(by_date.items(), reverse=True)[:10])
+
+    return jsonify({
+        "ok":          True,
+        "total":       len(all_files),
+        "total_bytes": total_bytes,
+        "sampled":     len(sample),
+        "by_modality": dict(sorted(by_modality.items())),
+        "by_date":     top_dates,
+        "dir":         storage_dir,
+    })
+
+
+# ===========================================================================
+# API: Dashboard  –  aggregate snapshot for the dashboard tab
+# ===========================================================================
+
+@app.route("/api/dashboard", methods=["GET"])
+@require_login
+def dashboard():
+    """
+    Return a combined status snapshot:
+      recent_audit – last 20 audit log entries (newest first)
+      scp_running  – bool
+      scp_ae       – running AE title (or null)
+      hl7_running  – bool
+      remote_aes   – list of configured remote AE presets
+    """
+    import json as _json
+
+    recent_audit: list[dict] = []
+    audit_path = os.path.join(LOG_DIR, "audit.log")
+    if os.path.isfile(audit_path):
+        try:
+            with open(audit_path, "r", encoding="utf-8", errors="replace") as fh:
+                lines = fh.readlines()
+            for line in reversed(lines[-20:]):
+                line = line.strip()
+                if line:
+                    try:
+                        recent_audit.append(_json.loads(line))
+                    except Exception:
+                        pass
+        except OSError:
+            pass
+
+    with _listener_lock:
+        scp_running = bool(_scp_listener and _scp_listener.running)
+        scp_ae      = _scp_listener.ae_title if _scp_listener else None
+        hl7_running = bool(_hl7_listener and _hl7_listener.running)
+
+    return jsonify({
+        "ok":           True,
+        "recent_audit": recent_audit,
+        "scp_running":  scp_running,
+        "scp_ae":       scp_ae,
+        "hl7_running":  hl7_running,
+        "remote_aes":   config.get("remote_aes", []),
+    })
+
+
+# ===========================================================================
 # API: C-STORE (upload files from the browser and send them via DICOM)
 # ===========================================================================
 
