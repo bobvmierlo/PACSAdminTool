@@ -1993,9 +1993,76 @@ def scp_files():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
-# ===========================================================================
-# API: DICOM SR Viewer  –  parse a DICOM Structured Report
-# ===========================================================================
+def _scp_storage_dir() -> str | None:
+    """Return the current SCP storage directory, or None if not configured."""
+    with _listener_lock:
+        scp = _scp_listener
+    if scp:
+        return scp.storage_dir
+    default = os.path.normpath(os.path.expanduser("~/DICOM_Received"))
+    return default if os.path.isdir(default) else None
+
+
+@app.route("/api/scp/files/inspect", methods=["GET"])
+@require_login
+def scp_files_inspect():
+    """
+    Read a DICOM file from the SCP storage directory and return its tag list.
+    Query param: ?name=<filename>   (basename only — no path traversal)
+    """
+    fname = request.args.get("name", "").strip()
+    if not fname or os.sep in fname or "/" in fname or ".." in fname:
+        return _bad_request("Invalid filename.")
+    storage_dir = _scp_storage_dir()
+    if not storage_dir:
+        return jsonify({"ok": False, "error": "SCP storage directory not found."}), 404
+    fpath = os.path.join(storage_dir, fname)
+    if not os.path.isfile(fpath):
+        return jsonify({"ok": False, "error": "File not found."}), 404
+    try:
+        import pydicom
+        ds = pydicom.dcmread(fpath)
+        meta = {
+            "SOPClassUID":    str(getattr(ds, "SOPClassUID",    "")),
+            "SOPInstanceUID": str(getattr(ds, "SOPInstanceUID", "")),
+            "Modality":       str(getattr(ds, "Modality",       "")),
+            "PatientID":      _safe_str(getattr(ds, "PatientID",   "")),
+            "PatientName":    _safe_str(getattr(ds, "PatientName", "")),
+            "StudyDate":      _safe_str(getattr(ds, "StudyDate",   "")),
+        }
+        return jsonify({"ok": True, "tags": _dataset_to_tag_list(ds), "meta": meta})
+    except Exception as e:
+        logger.exception("scp/files/inspect error")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/scp/files/delete", methods=["POST"])
+@require_login
+def scp_files_delete():
+    """
+    Delete one file from the SCP storage directory.
+    Body: { "name": "<basename>" }
+    """
+    d     = request.get_json(silent=True) or {}
+    fname = str(d.get("name", "")).strip()
+    if not fname or os.sep in fname or "/" in fname or ".." in fname:
+        return _bad_request("Invalid filename.")
+    storage_dir = _scp_storage_dir()
+    if not storage_dir:
+        return jsonify({"ok": False, "error": "SCP storage directory not found."}), 404
+    fpath = os.path.join(storage_dir, fname)
+    if not os.path.isfile(fpath):
+        return jsonify({"ok": False, "error": "File not found."}), 404
+    try:
+        os.remove(fpath)
+        _audit("scp.file_delete", ip=_req_ip(), user=_req_user(),
+               detail={"file": fname})
+        return jsonify({"ok": True})
+    except Exception as e:
+        logger.exception("scp/files/delete error")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 
 @app.route("/api/dicom/sr/read", methods=["POST"])
 def sr_read():
