@@ -1,9 +1,10 @@
 """
 DICOM networking operations using pynetdicom.
-Covers: C-FIND, C-STORE, C-MOVE, DMWL, Storage Commitment, IOCM (N-ACTION/N-EVENT-REPORT),
+Covers: C-FIND, C-STORE, C-MOVE, C-GET, DMWL, Storage Commitment, IOCM,
         and a simple SCP listener for receiving.
 """
 
+import os
 import threading
 import logging
 from datetime import datetime
@@ -186,6 +187,112 @@ def c_move(local_ae_title: str, remote_host: str, remote_port: int,
                           f"Failed instances may be unsupported SOP classes on the destination SCP.")
         return True, f"C-MOVE done — completed: {completed}, warning: {warning}."
     return False, "Failed to establish association."
+
+
+# ---------------------------------------------------------------------------
+# C-GET (retrieve directly into this application)
+# ---------------------------------------------------------------------------
+
+def c_get(local_ae_title: str, remote_host: str, remote_port: int,
+          remote_ae_title: str, query_dataset: "Dataset",
+          storage_dir: str, query_model: str = "STUDY",
+          callback: Optional[Callable] = None) -> tuple[bool, str]:
+    """
+    Perform a C-GET, pulling files directly to this application.
+
+    Unlike C-MOVE (which instructs a third-party AE to receive the files),
+    C-GET delivers all SOP instances back within the same association.
+    No separate destination AE or open inbound port is required on a
+    firewall — the SCU receives data on the outbound connection it opened.
+
+    Note: C-GET is optional per the DICOM standard and is not supported
+    by all PACS systems. If the remote PACS rejects it, use C-MOVE instead.
+
+    Args:
+        storage_dir: Local directory where received files are saved.
+        callback:    Optional progress function called with status strings.
+    """
+    check_available()
+    os.makedirs(storage_dir, exist_ok=True)
+
+    if query_model == "PATIENT":
+        get_sop = PatientRootQueryRetrieveInformationModelGet
+    else:
+        get_sop = StudyRootQueryRetrieveInformationModelGet
+
+    ae = AE(ae_title=local_ae_title)
+    ae.add_requested_context(get_sop)
+
+    # Negotiate storage contexts so the SCP can push files back to us.
+    for sop in STORAGE_SOPS:
+        ae.add_requested_context(sop)
+    try:
+        from pynetdicom.presentation import AllStoragePresentationContexts
+        for cx in AllStoragePresentationContexts:
+            try:
+                ae.add_requested_context(cx.abstract_syntax)
+            except Exception:
+                pass
+    except ImportError:
+        pass
+
+    received: list[str] = []
+
+    def handle_store(event):
+        ds = event.dataset
+        ds.file_meta = event.file_meta
+        sop_uid = getattr(ds, "SOPInstanceUID",
+                          datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
+        fname = os.path.join(storage_dir, f"{sop_uid}.dcm")
+        try:
+            ds.save_as(fname, enforce_file_format=True)
+        except TypeError:
+            ds.save_as(fname, write_like_original=False)
+        received.append(fname)
+        if callback:
+            callback(f"C-GET received: {os.path.basename(fname)}")
+        return 0x0000
+
+    assoc = ae.associate(remote_host, remote_port,
+                         ae_title=remote_ae_title,
+                         evt_handlers=[(evt.EVT_C_STORE, handle_store)])
+    if not assoc.is_established:
+        return False, "Failed to establish association."
+
+    responses = assoc.send_c_get(query_dataset, get_sop)
+    completed = 0
+    failed    = 0
+    warning   = 0
+    for status, identifier in responses:
+        if status:
+            s = status.Status
+            if s in (0xFF00, 0xFF01):
+                if callback:
+                    callback(f"C-GET pending… (received so far: {len(received)})")
+            elif s == 0x0000:
+                pass  # Final success
+            elif s == 0xB000:
+                comp = getattr(status, "NumberOfCompletedSuboperations", None)
+                fail = getattr(status, "NumberOfFailedSuboperations",    None)
+                warn = getattr(status, "NumberOfWarningSuboperations",   None)
+                if comp is not None: completed = int(comp)
+                if fail is not None: failed    = int(fail)
+                if warn is not None: warning   = int(warn)
+                if callback:
+                    callback(f"C-GET partial: completed={completed} "
+                             f"failed={failed} warning={warning}")
+            else:
+                failed += 1
+                logger.warning("C-GET sub-op status: 0x%04X", s)
+                if callback:
+                    callback(f"C-GET sub-op failed: 0x{s:04X}")
+    assoc.release()
+    if failed:
+        return True, (f"C-GET done — received: {len(received)}, "
+                      f"failed: {failed}, warning: {warning}. "
+                      f"Files saved to: {storage_dir}")
+    return True, (f"C-GET done — {len(received)} file(s) received. "
+                  f"Saved to: {storage_dir}")
 
 
 # ---------------------------------------------------------------------------
