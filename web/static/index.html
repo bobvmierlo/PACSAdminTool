@@ -845,6 +845,26 @@
         <button class="btn primary" onclick="doDicomDir()" data-i18n="dicomdir.parse">Parse DICOMDIR</button>
       </div>
     </div>
+    <div class="card">
+      <h3 data-i18n="dicomdir.generate_title">Generate DICOMDIR</h3>
+      <p style="font-size:13px;color:#555;margin:0 0 10px" data-i18n="dicomdir.generate_hint">
+        Select individual DICOM files or an entire folder. A ZIP containing the
+        DICOMDIR index and all organised instance files will be downloaded.
+      </p>
+      <div class="btn-row" style="flex-wrap:wrap; gap:6px">
+        <input type="file" id="dd-gen-files-input" multiple style="display:none"
+               onchange="ddGenFilesSelected('files')">
+        <input type="file" id="dd-gen-folder-input" style="display:none"
+               webkitdirectory mozdirectory onchange="ddGenFilesSelected('folder')">
+        <button class="btn" onclick="document.getElementById('dd-gen-files-input').click()"
+                data-i18n="dicomdir.pick_files">Select Files…</button>
+        <button class="btn" onclick="document.getElementById('dd-gen-folder-input').click()"
+                data-i18n="dicomdir.pick_folder">Select Folder…</button>
+        <span id="dd-gen-count" style="font-size:13px;color:#555;flex:1"></span>
+        <button class="btn primary" onclick="doGenerateDicomDir()"
+                data-i18n="dicomdir.generate_btn">Generate &amp; Download ZIP</button>
+      </div>
+    </div>
     <div class="card" id="dicomdir-result-card" style="display:none">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px">
         <h3 style="margin:0" data-i18n="dicomdir.tree">Directory Contents</h3>
@@ -3260,6 +3280,73 @@ function _ddNode(text, indent, bold) {
   div.style.cssText = `padding:2px 0 2px ${indent * 20}px; ${bold ? "font-weight:600" : "color:#555"}`;
   div.textContent   = text;
   return div;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// DICOMDIR Generator
+// ─────────────────────────────────────────────────────────────────
+
+// Track which input is active so we always read from the right one
+let _ddGenSource = null;
+
+function ddGenFilesSelected(source) {
+  _ddGenSource = source;
+  const input = document.getElementById(
+    source === "folder" ? "dd-gen-folder-input" : "dd-gen-files-input"
+  );
+  const n = input.files ? input.files.length : 0;
+  document.getElementById("dd-gen-count").textContent =
+    n ? `${n} file(s) selected` : "";
+}
+
+async function doGenerateDicomDir() {
+  // Pick whichever input was used last; fall back to checking both
+  let input = null;
+  if (_ddGenSource === "folder") {
+    input = document.getElementById("dd-gen-folder-input");
+  } else if (_ddGenSource === "files") {
+    input = document.getElementById("dd-gen-files-input");
+  } else {
+    // Nothing chosen yet — check both
+    const fi = document.getElementById("dd-gen-files-input");
+    const di = document.getElementById("dd-gen-folder-input");
+    input = (fi.files && fi.files.length) ? fi
+          : (di.files && di.files.length) ? di
+          : null;
+  }
+  if (!input || !input.files || !input.files.length) {
+    alert("Select files or a folder first.");
+    return;
+  }
+  const fd = new FormData();
+  for (const f of input.files) fd.append("files[]", f);
+  const btn = document.querySelector("[onclick='doGenerateDicomDir()']");
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Generating…";
+  try {
+    const res = await fetch("/api/dicom/dicomdir/generate",
+                            { method: "POST", body: fd });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      alert("Error: " + (d.error || res.statusText));
+      return;
+    }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = "DICOMDIR_set.zip";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert("Error: " + e);
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = orig;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────

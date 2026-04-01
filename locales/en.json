@@ -345,9 +345,14 @@
     "note":          "Result is downloaded as a ZIP archive. Original files are not modified."
   },
   "dicomdir": {
-    "title": "DICOMDIR Reader",
-    "parse": "Parse DICOMDIR",
-    "tree":  "Directory Contents"
+    "title":          "DICOMDIR Reader",
+    "parse":          "Parse DICOMDIR",
+    "tree":           "Directory Contents",
+    "generate_title": "Generate DICOMDIR",
+    "generate_hint":  "Select individual DICOM files or an entire folder. A ZIP containing the DICOMDIR index and all organised instance files will be downloaded.",
+    "pick_files":     "Select Files\u2026",
+    "pick_folder":    "Select Folder\u2026",
+    "generate_btn":   "Generate & Download ZIP"
   },
   "about": {
     "title": "PACS Admin Tool",
