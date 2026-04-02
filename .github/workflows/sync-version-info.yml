@@ -1,0 +1,34 @@
+name: Sync version info files
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "__version__.py"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Update version info files
+        run: python update_version_info.py
+
+      - name: Commit updated version info files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version_info_gui.py version_info_web.py
+          git diff --cached --quiet || git commit -m "chore: sync version info files from __version__.py [skip ci]"
+          git push
