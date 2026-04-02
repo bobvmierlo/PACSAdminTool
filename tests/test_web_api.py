@@ -33,10 +33,15 @@ def app(tmp_path):
     # Point all persistent files to a throw-away temp directory
     os.environ["PACS_DATA_DIR"] = str(tmp_path)
 
-    # Import server after setting the env var so APP_DIR is picked up
+    # Reload in dependency order so every module-level path constant
+    # (APP_DIR, USERS_PATH, CONFIG_PATH …) is re-evaluated against tmp_path.
     import importlib
+    import config.manager as config_mod
+    import web.auth as auth_mod
     import web.server as server_mod
-    importlib.reload(server_mod)   # re-evaluate module-level state with new env
+    importlib.reload(config_mod)
+    importlib.reload(auth_mod)
+    importlib.reload(server_mod)
 
     app = server_mod.app
     app.config["TESTING"] = True
