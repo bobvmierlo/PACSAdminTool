@@ -1,8 +1,10 @@
 """Tests for port-validation helpers used in the web UI and GUI."""
 
+import importlib
 import json
 import os
 import sys
+import tempfile
 
 import pytest
 
@@ -17,12 +19,20 @@ class TestWebValidationHelpers:
     """
 
     @pytest.fixture()
-    def client(self):
-        # Import lazily so tests that don't need Flask still pass
-        from web.server import app
+    def client(self, tmp_path):
+        # Use an isolated temp dir so no real users.json is picked up
+        os.environ["PACS_DATA_DIR"] = str(tmp_path)
+        import config.manager as config_mod
+        import web.auth as auth_mod
+        import web.server as server_mod
+        importlib.reload(config_mod)
+        importlib.reload(auth_mod)
+        importlib.reload(server_mod)
+        app = server_mod.app
         app.config["TESTING"] = True
         with app.test_client() as c:
             yield c
+        os.environ.pop("PACS_DATA_DIR", None)
 
     def test_health_endpoint(self, client):
         resp = client.get("/api/health")
