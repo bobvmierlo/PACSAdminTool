@@ -12,7 +12,16 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [1/3] Installing dependencies...
+echo [1/4] Syncing version info files...
+python update_version_info.py
+if errorlevel 1 (
+    echo ERROR: version sync failed.
+    pause
+    exit /b 1
+)
+
+echo.
+echo [2/4] Installing dependencies...
 pip install -r requirements.txt
 if errorlevel 1 (
     echo ERROR: pip install failed.
@@ -21,7 +30,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [2/3] Building executable with PyInstaller...
+echo [3/4] Building executable with PyInstaller...
 pyinstaller pacs_tool.spec --clean --noconfirm
 if errorlevel 1 (
     echo ERROR: PyInstaller build failed.
@@ -30,7 +39,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [3/3] Done!
+echo [4/4] Done!
 echo.
 echo Output: dist\PacsAdminTool.exe
 echo.
