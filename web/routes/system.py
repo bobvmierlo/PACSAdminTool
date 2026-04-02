@@ -61,9 +61,9 @@ def favicon():
 
 @bp.route("/api/openapi.json", methods=["GET"])
 def openapi_spec():
-    """Serve the OpenAPI spec (YAML content, readable by Swagger UI)."""
+    """Serve the OpenAPI spec. text/plain ensures browsers render it inline."""
     return send_from_directory(current_app.static_folder, "openapi.yaml",
-                               mimetype="application/yaml")
+                               mimetype="text/plain")
 
 
 @bp.route("/api/docs", methods=["GET"])
