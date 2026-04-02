@@ -598,7 +598,7 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [ae_title, host, port, files[]]
+              required: [ae_title, host, port, "files[]"]
               properties:
                 ae_title:
                   type: string
