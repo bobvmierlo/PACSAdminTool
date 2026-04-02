@@ -31,6 +31,12 @@ class TestWebValidationHelpers:
         app = server_mod.app
         app.config["TESTING"] = True
         with app.test_client() as c:
+            # Create first admin so the server is past the "not configured" gate
+            c.post(
+                "/setup",
+                data=json.dumps({"username": "admin", "password": "testpass1"}),
+                content_type="application/json",
+            )
             yield c
         os.environ.pop("PACS_DATA_DIR", None)
 
