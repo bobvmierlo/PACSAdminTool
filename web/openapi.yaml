@@ -1,0 +1,1442 @@
+openapi: 3.0.3
+
+info:
+  title: PACS Admin Tool API
+  version: "2.3.0"
+  description: |
+    REST API for the PACS Admin Tool web server.
+
+    **Authentication** is session-based (cookie). Call `POST /login` or `POST /setup`
+    to obtain a session, then include the session cookie in all subsequent requests.
+
+    Public endpoints (no auth required):
+    - `GET /api/health`
+    - `GET /login`, `POST /login`
+    - `GET /setup`, `POST /setup`
+
+servers:
+  - url: /
+    description: Local server
+
+tags:
+  - name: System
+    description: Health check, version, API documentation
+  - name: Auth
+    description: Login, logout, first-run setup
+  - name: Users
+    description: User management (admin only)
+  - name: Config
+    description: Application configuration
+  - name: Logs
+    description: Log file viewer
+  - name: Locale
+    description: Language and translation management
+  - name: DICOM
+    description: DICOM operations (C-ECHO, C-FIND, C-MOVE, C-GET, C-STORE, DMWL, …)
+  - name: SCP
+    description: DICOM Storage SCP (receiver) management and file access
+  - name: HL7
+    description: HL7 v2 messaging over MLLP
+
+paths:
+
+  # ── System ──────────────────────────────────────────────────────────────────
+
+  /api/health:
+    get:
+      tags: [System]
+      summary: Health check
+      description: Always public. Used by load-balancers and Docker HEALTHCHECK.
+      security: []
+      responses:
+        "200":
+          description: Server is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  scp_running:
+                    type: boolean
+                  hl7_listener_running:
+                    type: boolean
+
+  /api/version:
+    get:
+      tags: [System]
+      summary: Application version and paths
+      responses:
+        "200":
+          description: Version info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                    example: "2.3.0"
+                  app_dir:
+                    type: string
+                  log_dir:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/docs:
+    get:
+      tags: [System]
+      summary: Swagger UI browser interface
+      security: []
+      responses:
+        "200":
+          description: HTML page with embedded Swagger UI
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /api/openapi.json:
+    get:
+      tags: [System]
+      summary: OpenAPI specification (this document)
+      security: []
+      responses:
+        "200":
+          description: OpenAPI 3.0 specification
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # ── Auth ────────────────────────────────────────────────────────────────────
+
+  /login:
+    post:
+      tags: [Auth]
+      summary: Log in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /logout:
+    post:
+      tags: [Auth]
+      summary: Log out and clear session
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /setup:
+    post:
+      tags: [Auth]
+      summary: First-run setup — create the initial admin account
+      description: Only available before any users exist. Blocked (403) afterwards.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Admin created and session started
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/OkResponse"
+                  - type: object
+                    properties:
+                      user:
+                        $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/me:
+    get:
+      tags: [Auth]
+      summary: Return the currently authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/OkResponse"
+                  - type: object
+                    properties:
+                      username:
+                        type: string
+                      role:
+                        type: string
+                        enum: [admin, user]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Users ────────────────────────────────────────────────────────────────────
+
+  /api/users:
+    get:
+      tags: [Users]
+      summary: List all users (admin only)
+      responses:
+        "200":
+          description: User list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/OkResponse"
+                  - type: object
+                    properties:
+                      users:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+    post:
+      tags: [Users]
+      summary: Create a user (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/OkResponse"
+                  - type: object
+                    properties:
+                      user:
+                        $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: Username already exists
+
+  /api/users/{username}:
+    delete:
+      tags: [Users]
+      summary: Delete a user (admin only, cannot delete self)
+      parameters:
+        - in: path
+          name: username
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/users/{username}/password:
+    post:
+      tags: [Users]
+      summary: Change a user's password (admin can change anyone, user can change own)
+      parameters:
+        - in: path
+          name: username
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+                  minLength: 8
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Config ───────────────────────────────────────────────────────────────────
+
+  /api/config:
+    get:
+      tags: [Config]
+      summary: Return the current configuration
+      responses:
+        "200":
+          description: Config object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Config"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      tags: [Config]
+      summary: Save updated configuration (partial update — only sent keys are changed)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Config"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  # ── Logs ─────────────────────────────────────────────────────────────────────
+
+  /api/logs/files:
+    get:
+      tags: [Logs]
+      summary: List available log files
+      responses:
+        "200":
+          description: Log file list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  files:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        size:
+                          type: integer
+                        mtime:
+                          type: string
+                          format: date-time
+
+  /api/logs/content:
+    get:
+      tags: [Logs]
+      summary: Return the last N lines of a log file
+      parameters:
+        - in: query
+          name: file
+          required: true
+          schema:
+            type: string
+          description: Basename of the log file
+        - in: query
+          name: lines
+          schema:
+            type: integer
+            default: 200
+            maximum: 5000
+          description: Number of tail lines to return
+        - in: query
+          name: filter
+          schema:
+            type: string
+          description: Case-insensitive substring filter
+      responses:
+        "200":
+          description: Log lines
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  file:
+                    type: string
+                  total:
+                    type: integer
+                  returned:
+                    type: integer
+                  lines:
+                    type: array
+                    items:
+                      type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Locale ───────────────────────────────────────────────────────────────────
+
+  /api/locale/current:
+    get:
+      tags: [Locale]
+      summary: Return the active language code
+      responses:
+        "200":
+          description: Language code
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  language:
+                    type: string
+                    example: en
+
+  /api/locale/languages:
+    get:
+      tags: [Locale]
+      summary: Return all available languages
+      responses:
+        "200":
+          description: Language list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    code:
+                      type: string
+                    name:
+                      type: string
+
+  /api/translations:
+    get:
+      tags: [Locale]
+      summary: Return the full translation dictionary for the current language
+      responses:
+        "200":
+          description: Translation dictionary
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # ── DICOM ────────────────────────────────────────────────────────────────────
+
+  /api/dicom/echo:
+    post:
+      tags: [DICOM]
+      summary: C-ECHO (ping a remote AE)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DicomAE"
+      responses:
+        "200":
+          $ref: "#/components/responses/DicomResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/dicom/echo/batch:
+    post:
+      tags: [DICOM]
+      summary: Batch C-ECHO all saved AE presets (results streamed via WebSocket)
+      responses:
+        "200":
+          description: Batch started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  message:
+                    type: string
+                  total:
+                    type: integer
+
+  /api/dicom/find:
+    post:
+      tags: [DICOM]
+      summary: C-FIND query
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/DicomAE"
+                - type: object
+                  properties:
+                    query_level:
+                      type: string
+                      enum: [PATIENT, STUDY, SERIES, IMAGE]
+                      default: STUDY
+                    query_model:
+                      type: string
+                      enum: [PATIENT, STUDY]
+                      default: STUDY
+                    patient_id:
+                      type: string
+                    patient_name:
+                      type: string
+                    accession:
+                      type: string
+                    study_date:
+                      type: string
+                    modality:
+                      type: string
+                    study_uid:
+                      type: string
+      responses:
+        "200":
+          description: C-FIND results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  message:
+                    type: string
+                  results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/StudyResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/dicom/move:
+    post:
+      tags: [DICOM]
+      summary: C-MOVE (trigger a study retrieval; progress via WebSocket)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/DicomAE"
+                - type: object
+                  properties:
+                    study_uid:
+                      type: string
+                    move_dest:
+                      type: string
+                      description: Destination AE title (defaults to local AE)
+                    query_model:
+                      type: string
+                      default: STUDY
+      responses:
+        "200":
+          $ref: "#/components/responses/DicomResult"
+
+  /api/dicom/get:
+    post:
+      tags: [DICOM]
+      summary: C-GET (pull files directly to save_dir; progress via WebSocket)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/DicomAE"
+                - type: object
+                  properties:
+                    study_uid:
+                      type: string
+                    save_dir:
+                      type: string
+                      default: ~/DICOM_Received
+                    query_model:
+                      type: string
+                      default: STUDY
+      responses:
+        "200":
+          $ref: "#/components/responses/DicomResult"
+
+  /api/dicom/store:
+    post:
+      tags: [DICOM]
+      summary: C-STORE — upload files from browser and send via DICOM
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [ae_title, host, port, files[]]
+              properties:
+                ae_title:
+                  type: string
+                host:
+                  type: string
+                port:
+                  type: integer
+                "files[]":
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        "200":
+          $ref: "#/components/responses/DicomResult"
+
+  /api/dicom/dmwl:
+    post:
+      tags: [DICOM]
+      summary: DMWL — Modality Worklist query
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/DicomAE"
+                - type: object
+                  properties:
+                    patient_id:
+                      type: string
+                    patient_name:
+                      type: string
+                    study_date:
+                      type: string
+                    modality:
+                      type: string
+                    accession:
+                      type: string
+                    station_aet:
+                      type: string
+      responses:
+        "200":
+          description: DMWL results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  message:
+                    type: string
+                  results:
+                    type: array
+                    items:
+                      type: object
+
+  /api/dicom/commit:
+    post:
+      tags: [DICOM]
+      summary: Storage Commitment N-ACTION request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/DicomAE"
+                - type: object
+                  required: [uids]
+                  properties:
+                    uids:
+                      type: array
+                      items:
+                        type: string
+                      description: SOP Instance UIDs to commit
+      responses:
+        "200":
+          $ref: "#/components/responses/DicomResult"
+
+  /api/dicom/iocm:
+    post:
+      tags: [DICOM]
+      summary: IOCM — Instance Availability Notification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/DicomAE"
+                - type: object
+                  properties:
+                    study_uid:
+                      type: string
+                    sop_class_uid:
+                      type: string
+                    sop_inst_uid:
+                      type: string
+                    availability:
+                      type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/DicomResult"
+
+  /api/dicom/inspect:
+    post:
+      tags: [DICOM]
+      summary: DICOM Inspector — upload a .dcm file and return its full tag tree
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Tag tree and metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  meta:
+                    type: object
+                  tags:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DicomTag"
+
+  /api/dicom/anonymize:
+    post:
+      tags: [DICOM]
+      summary: Anonymise uploaded DICOM files and return a ZIP archive
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: ["files[]"]
+              properties:
+                "files[]":
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                profile:
+                  type: string
+                  enum: [basic, full]
+                  default: basic
+                patient_name:
+                  type: string
+                  default: Anonymous
+                patient_id:
+                  type: string
+                  default: ANON
+      responses:
+        "200":
+          description: ZIP archive of anonymised files
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+
+  /api/dicom/dicomdir:
+    post:
+      tags: [DICOM]
+      summary: Parse an uploaded DICOMDIR file and return the hierarchy as JSON
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Patient/Study/Series/Instance hierarchy
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/dicom/dicomdir/generate:
+    post:
+      tags: [DICOM]
+      summary: Generate a DICOM File Set (DICOMDIR + files) from uploaded .dcm files
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: ["files[]"]
+              properties:
+                "files[]":
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        "200":
+          description: ZIP containing the complete DICOM File Set
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+
+  /api/dicom/sr/read:
+    post:
+      tags: [DICOM]
+      summary: Parse a DICOM SR file and return readable report text
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Parsed SR report
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  meta:
+                    type: object
+                  title:
+                    type: string
+                  text:
+                    type: string
+                  flat:
+                    type: array
+                    items:
+                      type: object
+                  errors:
+                    type: array
+                    items:
+                      type: string
+
+  /api/dicom/kos/extract:
+    post:
+      tags: [DICOM]
+      summary: Extract study/series/instance metadata from uploaded DICOM files for KOS creation
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [files]
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        "200":
+          description: Extracted study metadata
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/dicom/kos/create:
+    post:
+      tags: [DICOM]
+      summary: Build a Key Object Selection (KOS) document and return it as a .dcm file
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [study_instance_uid, referenced_series]
+              properties:
+                study_instance_uid:
+                  type: string
+                patient_id:
+                  type: string
+                patient_name:
+                  type: string
+                accession_number:
+                  type: string
+                study_date:
+                  type: string
+                study_description:
+                  type: string
+                institution_name:
+                  type: string
+                doc_title_key:
+                  type: string
+                  default: of_interest
+                referenced_series:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      series_uid:
+                        type: string
+                      instances:
+                        type: array
+                        items:
+                          type: object
+      responses:
+        "200":
+          description: KOS .dcm file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  # ── SCP ──────────────────────────────────────────────────────────────────────
+
+  /api/scp/start:
+    post:
+      tags: [SCP]
+      summary: Start the DICOM Storage SCP (receiver)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ae_title:
+                  type: string
+                port:
+                  type: integer
+                  default: 11112
+                save_dir:
+                  type: string
+                  default: ~/DICOM_Received
+      responses:
+        "200":
+          $ref: "#/components/responses/DicomResult"
+
+  /api/scp/stop:
+    post:
+      tags: [SCP]
+      summary: Stop the DICOM Storage SCP
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /api/scp/status:
+    get:
+      tags: [SCP]
+      summary: Return whether the SCP is running
+      responses:
+        "200":
+          description: SCP running state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  running:
+                    type: boolean
+
+  /api/scp/default_dir:
+    get:
+      tags: [SCP]
+      summary: Return the expanded default save directory path on this server
+      responses:
+        "200":
+          description: Default directory
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path:
+                    type: string
+
+  /api/scp/files:
+    get:
+      tags: [SCP]
+      summary: List received DICOM files (newest first)
+      responses:
+        "200":
+          description: File list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  dir:
+                    type: string
+                  files:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        size:
+                          type: integer
+                        mtime:
+                          type: string
+                          format: date-time
+
+  /api/scp/files/inspect:
+    get:
+      tags: [SCP]
+      summary: Read a received DICOM file and return its tag tree
+      parameters:
+        - in: query
+          name: name
+          required: true
+          schema:
+            type: string
+          description: Basename of the file in the SCP storage directory
+      responses:
+        "200":
+          description: Tags and metadata
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/scp/files/delete:
+    post:
+      tags: [SCP]
+      summary: Delete a received DICOM file
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/scp/stats:
+    get:
+      tags: [SCP]
+      summary: SCP storage statistics (totals, by-modality, by-date)
+      responses:
+        "200":
+          description: Storage statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  total:
+                    type: integer
+                  total_bytes:
+                    type: integer
+                  sampled:
+                    type: integer
+                  by_modality:
+                    type: object
+                  by_date:
+                    type: object
+                  dir:
+                    type: string
+
+  /api/dashboard:
+    get:
+      tags: [SCP]
+      summary: Aggregate dashboard snapshot (audit log, service states, AE presets)
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # ── HL7 ─────────────────────────────────────────────────────────────────────
+
+  /api/hl7/templates:
+    get:
+      tags: [HL7]
+      summary: List available HL7 message templates
+      responses:
+        "200":
+          description: Template list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    description:
+                      type: string
+                    filename:
+                      type: string
+
+  /api/hl7/templates/{filename}:
+    get:
+      tags: [HL7]
+      summary: Return the full body of a specific HL7 template
+      parameters:
+        - in: path
+          name: filename
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Template with body
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  description:
+                    type: string
+                  filename:
+                    type: string
+                  body:
+                    type: string
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/hl7/send:
+    post:
+      tags: [HL7]
+      summary: Send an HL7 v2 message via MLLP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host, port, message]
+              properties:
+                host:
+                  type: string
+                port:
+                  type: integer
+                message:
+                  type: string
+                  description: HL7 v2 message (CR or LF segment separators accepted)
+                debug:
+                  type: boolean
+                  default: false
+                  description: Enable raw-byte logging to the WebSocket log channel
+      responses:
+        "200":
+          description: Send result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  response:
+                    type: string
+                    description: ACK response from the server
+
+  /api/hl7/listener/start:
+    post:
+      tags: [HL7]
+      summary: Start the MLLP listener
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                port:
+                  type: integer
+                  default: 2575
+                debug:
+                  type: boolean
+                  default: false
+      responses:
+        "200":
+          $ref: "#/components/responses/DicomResult"
+
+  /api/hl7/listener/stop:
+    post:
+      tags: [HL7]
+      summary: Stop the MLLP listener
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+
+  /api/hl7/listener/status:
+    get:
+      tags: [HL7]
+      summary: Return whether the HL7 listener is running
+      responses:
+        "200":
+          description: Listener state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  running:
+                    type: boolean
+
+# ── Components ────────────────────────────────────────────────────────────────
+
+components:
+
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+      description: Flask signed-cookie session. Obtain via POST /login or POST /setup.
+
+  security:
+    - sessionCookie: []
+
+  schemas:
+
+    OkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        error:
+          type: string
+          description: Present only on failure
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          minLength: 8
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        role:
+          type: string
+          enum: [admin, user]
+        created_at:
+          type: string
+          format: date-time
+
+    CreateUserRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          minLength: 8
+        role:
+          type: string
+          enum: [admin, user]
+          default: user
+
+    DicomAE:
+      type: object
+      required: [ae_title, host, port]
+      properties:
+        ae_title:
+          type: string
+          maxLength: 16
+        host:
+          type: string
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+
+    StudyResult:
+      type: object
+      properties:
+        PatientID:
+          type: string
+        PatientName:
+          type: string
+        StudyDate:
+          type: string
+        Modality:
+          type: string
+        Accession:
+          type: string
+        Description:
+          type: string
+        StudyUID:
+          type: string
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/DicomTag"
+
+    DicomTag:
+      type: object
+      properties:
+        tag:
+          type: string
+          example: "(0010,0020)"
+        keyword:
+          type: string
+          example: PatientID
+        vr:
+          type: string
+          example: LO
+        value:
+          type: string
+        children:
+          type: array
+          description: Present only for sequence (SQ) elements
+          items:
+            type: array
+            items:
+              $ref: "#/components/schemas/DicomTag"
+
+    Config:
+      type: object
+      description: Partial config update — only include keys you want to change
+      properties:
+        local_ae:
+          type: object
+          properties:
+            ae_title:
+              type: string
+              maxLength: 16
+            port:
+              type: integer
+        remote_aes:
+          type: array
+          items:
+            type: object
+        hl7:
+          type: object
+        query_defaults:
+          type: object
+        web:
+          type: object
+        log_level:
+          type: string
+          enum: [DEBUG, INFO, WARNING, ERROR, CRITICAL]
+        language:
+          type: string
+          example: en
+
+  responses:
+
+    Ok:
+      description: Success
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/OkResponse"
+
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/OkResponse"
+
+    Unauthorized:
+      description: Not authenticated
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/OkResponse"
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/OkResponse"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/OkResponse"
+
+    DicomResult:
+      description: Operation result (async ops return immediately; progress via WebSocket)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok:
+                type: boolean
+              message:
+                type: string
