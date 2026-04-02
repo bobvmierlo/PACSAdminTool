@@ -27,6 +27,9 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Sync version info files
+        run: python update_version_info.py
+
       - name: Build GUI executable
         run: pyinstaller pacs_tool.spec
 
