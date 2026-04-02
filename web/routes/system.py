@@ -3,7 +3,7 @@
 import os
 import sys
 
-from flask import Blueprint, jsonify, make_response, redirect, send_from_directory, current_app
+from flask import Blueprint, jsonify, make_response, send_from_directory, current_app
 
 import web.context as ctx
 from web.auth import require_login
@@ -61,8 +61,9 @@ def favicon():
 
 @bp.route("/api/openapi.json", methods=["GET"])
 def openapi_spec():
-    """Serve the OpenAPI 3.0 specification (YAML served directly from /static/)."""
-    return redirect("/static/openapi.yaml")
+    """Serve the OpenAPI spec (YAML content, readable by Swagger UI)."""
+    return send_from_directory(current_app.static_folder, "openapi.yaml",
+                               mimetype="application/yaml")
 
 
 @bp.route("/api/docs", methods=["GET"])
@@ -81,7 +82,7 @@ def api_docs():
   <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
   <script>
     SwaggerUIBundle({
-      url: "/static/openapi.yaml",
+      url: "/api/openapi.json",
       dom_id: "#swagger-ui",
       presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
       layout: "BaseLayout",
