@@ -17,6 +17,7 @@ hl7~=0.4
 flask~=3.1
 flask-socketio~=5.6
 simple-websocket~=1.1
+pyyaml~=6.0
 
 # System tray icon
 pystray~=0.19
