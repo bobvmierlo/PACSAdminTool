@@ -152,6 +152,53 @@ def scp_files_inspect():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@bp.route("/api/scp/files/preview", methods=["GET"])
+@require_login
+def scp_files_preview():
+    """Render the first frame of a DICOM image from SCP storage and return a PNG."""
+    fname = request.args.get("name", "").strip()
+    if not fname or os.sep in fname or "/" in fname or ".." in fname:
+        return _bad_request("Invalid filename.")
+    storage_dir = _scp_storage_dir()
+    if not storage_dir:
+        return jsonify({"ok": False, "error": "SCP storage directory not found."}), 404
+    fpath = os.path.join(storage_dir, fname)
+    if not os.path.isfile(fpath):
+        return jsonify({"ok": False, "error": "File not found."}), 404
+    try:
+        import io as _io
+        import numpy as np
+        import pydicom
+        from PIL import Image
+        ds = pydicom.dcmread(fpath)
+        if not hasattr(ds, "PixelData"):
+            return jsonify({"ok": False, "error": "No pixel data in this file."}), 400
+        arr = ds.pixel_array.astype(float)
+        # Handle multi-frame: take the middle frame
+        if arr.ndim == 3 and arr.shape[0] > 1:
+            arr = arr[arr.shape[0] // 2]
+        elif arr.ndim == 3:
+            arr = arr[0]
+        # Normalise to 0-255
+        lo, hi = arr.min(), arr.max()
+        if hi > lo:
+            arr = (arr - lo) / (hi - lo) * 255.0
+        arr = arr.astype(np.uint8)
+        img = Image.fromarray(arr).convert("L")
+        buf = _io.BytesIO()
+        img.save(buf, format="PNG")
+        buf.seek(0)
+        from flask import send_file as _send
+        return _send(buf, mimetype="image/png")
+    except ImportError:
+        return jsonify({"ok": False,
+                        "error": "Preview requires numpy and Pillow. "
+                                 "Install them with: pip install numpy pillow"}), 501
+    except Exception as e:
+        logger.exception("scp/files/preview error")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @bp.route("/api/scp/files/delete", methods=["POST"])
 @require_login
 def scp_files_delete():

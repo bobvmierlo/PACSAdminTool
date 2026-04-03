@@ -708,6 +708,16 @@
         </div>
       </div>
       <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-hl7-send"></div></div>
+
+      <!-- Outbound HL7 history -->
+      <div class="card" id="hl7-out-history-card" style="display:none">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+          <h3 style="margin:0">Recent Outbound Messages</h3>
+          <button class="btn danger" style="font-size:12px; padding:3px 10px"
+                  onclick="clearHL7OutHistory()">Clear history</button>
+        </div>
+        <div id="hl7-out-history-list" style="display:flex; flex-direction:column; gap:6px"></div>
+      </div>
     </div>
 
     <div id="hl7-recv-panel" style="display:none">
@@ -736,6 +746,16 @@
         </div>
       </div>
       <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-hl7-recv"></div></div>
+
+      <!-- Inbound HL7 history (persisted) -->
+      <div class="card" id="hl7-in-history-card" style="display:none">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+          <h3 style="margin:0">Recent Inbound Messages (persisted)</h3>
+          <button class="btn danger" style="font-size:12px; padding:3px 10px"
+                  onclick="clearHL7InHistory()">Clear history</button>
+        </div>
+        <div id="hl7-in-history-list" style="display:flex; flex-direction:column; gap:6px"></div>
+      </div>
     </div>
   </div>
 
@@ -816,6 +836,54 @@
       <div id="inspector-meta-grid" class="field-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px,1fr))"></div>
       <div class="btn-row" style="margin-top:12px">
         <button class="btn primary" onclick="inspectorShowTags()" data-i18n="inspector.all_tags">View All DICOM Tags</button>
+        <button class="btn" onclick="openTagEditor()" data-i18n="inspector.edit_tags">Edit Tags…</button>
+      </div>
+    </div>
+
+    <!-- Tag editor (shown when Edit Tags is clicked) -->
+    <div class="card" id="tag-editor-card" style="display:none">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:8px">
+        <h3 style="margin:0">Tag Editor
+          <span id="tag-editor-change-count" style="font-size:12px; color:#2b6cb0; margin-left:8px"></span>
+        </h3>
+        <div style="display:flex; gap:6px; flex-wrap:wrap">
+          <input id="tag-editor-filter" type="text" placeholder="Filter tags…"
+                 style="width:180px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px"
+                 oninput="renderEditTagTable()">
+          <button class="btn" onclick="resetTagEdits()">Reset changes</button>
+        </div>
+      </div>
+      <div class="result-table-wrap" style="max-height:380px; overflow-y:auto">
+        <table id="tag-editor-table">
+          <thead><tr>
+            <th>Tag</th><th>Keyword</th><th>VR</th><th>Value</th><th style="width:60px"></th>
+          </tr></thead>
+          <tbody id="tag-editor-tbody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:14px; border-top:1px solid #e5e7eb; padding-top:12px">
+        <div style="font-size:13px; font-weight:600; margin-bottom:8px; color:#374151">Actions</div>
+        <div class="btn-row" style="flex-wrap:wrap; gap:8px; align-items:flex-end">
+          <button class="btn primary" onclick="downloadEdited()">Download Modified File</button>
+          <span style="color:#bbb; font-size:13px">or</span>
+          <div style="display:flex; align-items:flex-end; gap:6px; flex-wrap:wrap">
+            <div class="field" style="min-width:200px">
+              <label style="font-size:11px; color:#888">Send to Remote AE</label>
+              <select id="tag-editor-ae-select" style="font-size:12px"
+                      onchange="tagEditorAEChanged()">
+                <option value="">Select a preset…</option>
+              </select>
+            </div>
+            <input id="tag-editor-ae-title" placeholder="AE Title"
+                   style="width:110px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
+            <input id="tag-editor-ae-host" placeholder="Host"
+                   style="width:130px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
+            <input id="tag-editor-ae-port" placeholder="Port" type="number" min="1" max="65535"
+                   style="width:70px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
+            <button class="btn success" onclick="sendEditedToPACS()">Send to PACS</button>
+          </div>
+          <span id="tag-editor-status" style="font-size:12px; color:#888"></span>
+        </div>
       </div>
     </div>
   </div>
@@ -838,11 +906,14 @@
                   padding:6px; background:#fff; color:#555"></div>
     </div>
     <div class="card">
-      <h3 data-i18n="anonymizer.profile">Anonymisation Profile</h3>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px">
+        <h3 style="margin:0" data-i18n="anonymizer.profile">Anonymisation Profile</h3>
+        <button class="btn" style="font-size:12px; padding:3px 10px" onclick="openAnonProfileManager()">Manage Profiles…</button>
+      </div>
       <div class="field-grid">
         <div class="field">
           <label data-i18n="anonymizer.profile_label">Profile</label>
-          <select id="anon-profile">
+          <select id="anon-profile" onchange="anonProfileChanged()">
             <option value="basic" data-i18n="anonymizer.basic">Basic – patient identifiers &amp; institution</option>
             <option value="full" data-i18n="anonymizer.full">Full – all PHI including descriptions</option>
           </select>
@@ -861,11 +932,73 @@
       </p>
     </div>
     <div class="card">
-      <div class="btn-row">
+      <div class="btn-row" style="flex-wrap:wrap; gap:8px; align-items:flex-end">
         <button class="btn primary" onclick="doAnonymize()" data-i18n="anonymizer.download">
           Anonymise &amp; Download ZIP
         </button>
-        <span id="anon-status" style="font-size:13px; color:#888"></span>
+        <span style="color:#bbb; font-size:13px">or</span>
+        <div style="display:flex; align-items:flex-end; gap:6px; flex-wrap:wrap">
+          <div class="field" style="min-width:200px">
+            <label style="font-size:11px; color:#888">Send anonymised files to Remote AE</label>
+            <select id="anon-ae-select" style="font-size:12px" onchange="anonAEChanged()">
+              <option value="">Select a preset…</option>
+            </select>
+          </div>
+          <input id="anon-ae-title" placeholder="AE Title"
+                 style="width:110px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
+          <input id="anon-ae-host" placeholder="Host"
+                 style="width:130px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
+          <input id="anon-ae-port" placeholder="Port" type="number" min="1" max="65535"
+                 style="width:70px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
+          <button class="btn success" onclick="doAnonymizeAndSend()">Anonymise &amp; Send</button>
+        </div>
+        <span id="anon-status" style="font-size:13px; color:#888; width:100%"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Custom Anonymisation Profile Manager Modal ─────────────────── -->
+  <div class="modal-backdrop" id="anon-profile-modal" style="display:none; align-items:flex-start; justify-content:center; padding-top:48px"
+       onclick="if(event.target===this)closeAnonProfileManager()">
+    <div style="background:#fff; border-radius:10px; box-shadow:0 8px 32px rgba(0,0,0,.2);
+                width:min(96vw,760px); max-height:85vh; display:flex; flex-direction:column; overflow:hidden">
+      <div style="padding:16px 20px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center">
+        <span style="font-size:16px; font-weight:700">Anonymisation Profiles</span>
+        <button onclick="closeAnonProfileManager()"
+                style="background:none; border:none; font-size:22px; cursor:pointer; color:#6b7280; line-height:1">×</button>
+      </div>
+      <div style="display:flex; flex:1; overflow:hidden; min-height:0">
+        <!-- Profile list -->
+        <div style="width:210px; border-right:1px solid #e5e7eb; overflow-y:auto; padding:10px 8px; flex-shrink:0">
+          <button class="btn primary" style="width:100%; margin-bottom:10px; font-size:12px"
+                  onclick="anonProfileNew()">+ New Profile</button>
+          <div id="anon-profile-list" style="display:flex; flex-direction:column; gap:4px"></div>
+        </div>
+        <!-- Profile editor -->
+        <div id="anon-profile-editor" style="flex:1; padding:16px 20px; overflow-y:auto; display:none">
+          <div class="field" style="margin-bottom:12px">
+            <label style="font-weight:600; font-size:13px">Profile Name</label>
+            <input id="apm-name" style="margin-top:4px; font-size:13px" placeholder="My Custom Profile">
+          </div>
+          <div style="font-size:13px; font-weight:600; margin-bottom:8px; color:#374151">Tags to clear (remove)</div>
+          <div style="font-size:12px; color:#6b7280; margin-bottom:10px">
+            Check the tags that should be blanked/removed from the DICOM files.
+          </div>
+          <input id="apm-tag-filter" type="text" placeholder="Search tags…"
+                 style="width:100%; box-sizing:border-box; margin-bottom:10px; font-size:12px;
+                        padding:5px 8px; border:1px solid #d1d5db; border-radius:4px"
+                 oninput="renderApmTagList()">
+          <div id="apm-tag-list" style="display:flex; flex-direction:column; gap:2px; max-height:340px; overflow-y:auto;
+                border:1px solid #e5e7eb; border-radius:6px; padding:8px; background:#fafafa"></div>
+          <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap">
+            <button class="btn primary" onclick="anonProfileSave()">Save Profile</button>
+            <button class="btn danger" id="apm-delete-btn" onclick="anonProfileDelete()" style="display:none">Delete Profile</button>
+            <button class="btn" onclick="closeAnonProfileManager()">Cancel</button>
+          </div>
+        </div>
+        <div id="anon-profile-placeholder" style="flex:1; padding:40px 20px; color:#9ca3af; text-align:center; font-size:13px">
+          Select a profile on the left, or create a new one.
+        </div>
       </div>
     </div>
   </div>
@@ -1227,6 +1360,25 @@
 
 
 <!-- ══════════════════════════════════════════════════════════════════
+     IMAGE PREVIEW MODAL
+══════════════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="preview-modal" style="display:none; align-items:center; justify-content:center"
+     onclick="if(event.target===this)closePreviewModal()">
+  <div style="background:#1a1a1a; border-radius:8px; padding:16px; max-width:90vw; max-height:90vh;
+              display:flex; flex-direction:column; gap:10px; min-width:300px">
+    <div style="display:flex; justify-content:space-between; align-items:center">
+      <span id="preview-modal-title" style="color:#e5e7eb; font-size:14px; font-weight:600"></span>
+      <button onclick="closePreviewModal()"
+              style="background:none; border:none; color:#9ca3af; font-size:20px; cursor:pointer; line-height:1">×</button>
+    </div>
+    <div style="overflow:auto; display:flex; align-items:center; justify-content:center">
+      <img id="preview-modal-img" style="max-width:80vw; max-height:75vh; display:block; border-radius:4px">
+    </div>
+    <div id="preview-modal-msg" style="color:#9ca3af; font-size:12px; text-align:center; display:none"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
      DICOM TAG DETAIL MODAL
 ══════════════════════════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="tag-modal">
@@ -1384,6 +1536,9 @@ socket.on("hl7_message", data => {
   container.scrollTop = container.scrollHeight;
 
   document.getElementById("hl7-recv-count").textContent = `${count} message(s)`;
+
+  // Persist to inbound history
+  _hl7InHistorySave({ ts: data.ts, from: data.from, message: data.message });
 });
 
 // Server pushes SCP/HL7 status on first connect so buttons show correctly.
@@ -1818,7 +1973,7 @@ function exportCFindCSV() {
 
 // ── C-FIND: query history (LocalStorage) ────────────────────────
 const CFIND_HISTORY_KEY = "pacsadmin_cfind_history";
-const CFIND_HISTORY_MAX = 20;
+const CFIND_HISTORY_MAX = 10;
 
 function _cfindHistorySave() {
   const query = {
@@ -2180,6 +2335,110 @@ async function doHL7Send() {
   appendLog("log-hl7-send", now(),
     data.ok ? `ACK: ${data.response.substring(0,200)}` : `FAILED: ${data.response}`,
     data.ok ? "ok" : "err");
+
+  // Persist to outbound history
+  _hl7OutHistorySave({
+    ts:       new Date().toISOString(),
+    host,
+    port,
+    message:  msg,
+    ok:       data.ok,
+    response: data.response || "",
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────
+// HL7 Message History (localStorage)
+// ─────────────────────────────────────────────────────────────────
+
+const HL7_HIST_OUT_KEY = "pacsadmin_hl7_hist_out";
+const HL7_HIST_IN_KEY  = "pacsadmin_hl7_hist_in";
+const HL7_HIST_MAX     = 10;
+
+function _hl7HistLoad(key) {
+  try { return JSON.parse(localStorage.getItem(key) || "[]"); }
+  catch { return []; }
+}
+
+function _hl7HistSave(key, entry) {
+  const arr = _hl7HistLoad(key);
+  arr.unshift(entry);
+  try { localStorage.setItem(key, JSON.stringify(arr.slice(0, HL7_HIST_MAX))); }
+  catch { /* storage full */ }
+}
+
+function _hl7OutHistorySave(entry) {
+  _hl7HistSave(HL7_HIST_OUT_KEY, entry);
+  renderHL7OutHistory();
+}
+
+function _hl7InHistorySave(entry) {
+  _hl7HistSave(HL7_HIST_IN_KEY, entry);
+  renderHL7InHistory();
+}
+
+function _hl7HistItemEl(item, dir) {
+  const el  = document.createElement("div");
+  el.style.cssText = "border:1px solid #e5e7eb; border-radius:6px; overflow:hidden; background:#fff";
+  const ts  = item.ts ? new Date(item.ts).toLocaleString() : "";
+  const who = dir === "out"
+    ? `To ${item.host}:${item.port}`
+    : `From ${item.from || "?"}`;
+  const ok  = dir === "out" ? item.ok : true;
+  const preview = (item.message || "").substring(0, 120).replace(/\r/g, " ");
+  const detailId = "hl7h-" + Math.random().toString(36).slice(2);
+
+  el.innerHTML =
+    `<div style="display:flex;justify-content:space-between;align-items:center;
+                 padding:6px 10px; background:${ok ? '#f0fdf4' : '#fef2f2'};
+                 border-bottom:1px solid #e5e7eb; cursor:pointer"
+         onclick="document.getElementById('${detailId}').style.display =
+                  document.getElementById('${detailId}').style.display==='none'?'':'none'">
+       <div style="font-size:11px;color:#6b7280">${ts} · <strong>${who}</strong>
+         <span style="margin-left:6px;color:${ok?'#16a34a':'#dc2626'}">${ok?'OK':'FAILED'}</span>
+       </div>
+       <span style="font-size:10px;color:#9ca3af">▼</span>
+     </div>
+     <div style="font-size:11px;color:#555;padding:4px 10px;
+                 white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+          title="${escapeHtml(preview)}">${escapeHtml(preview)}</div>
+     <div id="${detailId}" style="display:none;padding:8px 10px">
+       <pre style="font-size:11px;white-space:pre-wrap;color:#374151;max-height:200px;overflow-y:auto;margin:0">${escapeHtml(item.message || "")}</pre>
+       ${dir === 'out' && item.response
+         ? `<div style="font-size:11px;color:#6b7280;margin-top:6px">ACK: ${escapeHtml(item.response.substring(0,300))}</div>`
+         : ""}
+     </div>`;
+  return el;
+}
+
+function renderHL7OutHistory() {
+  const arr  = _hl7HistLoad(HL7_HIST_OUT_KEY);
+  const card = document.getElementById("hl7-out-history-card");
+  const list = document.getElementById("hl7-out-history-list");
+  if (!arr.length) { card.style.display = "none"; return; }
+  card.style.display = "";
+  list.innerHTML = "";
+  arr.forEach(item => list.appendChild(_hl7HistItemEl(item, "out")));
+}
+
+function renderHL7InHistory() {
+  const arr  = _hl7HistLoad(HL7_HIST_IN_KEY);
+  const card = document.getElementById("hl7-in-history-card");
+  const list = document.getElementById("hl7-in-history-list");
+  if (!arr.length) { card.style.display = "none"; return; }
+  card.style.display = "";
+  list.innerHTML = "";
+  arr.forEach(item => list.appendChild(_hl7HistItemEl(item, "in")));
+}
+
+function clearHL7OutHistory() {
+  localStorage.removeItem(HL7_HIST_OUT_KEY);
+  renderHL7OutHistory();
+}
+
+function clearHL7InHistory() {
+  localStorage.removeItem(HL7_HIST_IN_KEY);
+  renderHL7InHistory();
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -2323,6 +2582,12 @@ async function loadSCPFiles() {
       const actCel = document.createElement("td");
       actCel.style.whiteSpace = "nowrap";
 
+      const prevBtn = document.createElement("button");
+      prevBtn.className = "btn";
+      prevBtn.style.cssText = "font-size:11px; padding:2px 8px; margin-right:4px";
+      prevBtn.textContent = "Preview";
+      prevBtn.onclick = () => scpFilePreview(f.name);
+
       const inspBtn = document.createElement("button");
       inspBtn.className = "btn";
       inspBtn.style.cssText = "font-size:11px; padding:2px 8px; margin-right:4px";
@@ -2335,6 +2600,7 @@ async function loadSCPFiles() {
       delBtn.textContent = "Delete";
       delBtn.onclick = () => scpFileDelete(f.name, tr);
 
+      actCel.appendChild(prevBtn);
       actCel.appendChild(inspBtn);
       actCel.appendChild(delBtn);
       tr.appendChild(nameCel);
@@ -2359,6 +2625,38 @@ async function scpFileInspect(name) {
   } catch (e) {
     alert("Error: " + e);
   }
+}
+
+async function scpFilePreview(name) {
+  const modal    = document.getElementById("preview-modal");
+  const titleEl  = document.getElementById("preview-modal-title");
+  const imgEl    = document.getElementById("preview-modal-img");
+  const msgEl    = document.getElementById("preview-modal-msg");
+  titleEl.textContent = name;
+  imgEl.style.display = "none";
+  msgEl.style.display = "block";
+  msgEl.textContent   = "Loading…";
+  modal.style.display = "flex";
+  try {
+    const res = await fetch(`/api/scp/files/preview?name=${encodeURIComponent(name)}`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      msgEl.textContent = "Cannot preview: " + (data.error || res.statusText);
+      return;
+    }
+    const blob = await res.blob();
+    imgEl.src = URL.createObjectURL(blob);
+    imgEl.onload = () => URL.revokeObjectURL(imgEl.src);
+    imgEl.style.display = "block";
+    msgEl.style.display = "none";
+  } catch (e) {
+    msgEl.textContent = "Error: " + e;
+  }
+}
+
+function closePreviewModal() {
+  document.getElementById("preview-modal").style.display = "none";
+  document.getElementById("preview-modal-img").src = "";
 }
 
 async function scpFileDelete(name, rowEl) {
@@ -2809,11 +3107,21 @@ async function doLogout() {
   // Load config from server and populate all fields
   await loadConfig();
 
+  // Populate AE dropdowns that depend on config
+  _populateAnonAEDropdown();
+
+  // Load custom anonymisation profiles
+  await _loadAnonProfilesFromServer();
+
   // Build the help topic list
   buildHelp();
 
   // Restore C-FIND query history
   renderCFindHistory();
+
+  // Restore HL7 message histories
+  renderHL7OutHistory();
+  renderHL7InHistory();
 
   // Show username + logout button (if auth is active)
   initAuthUI();
@@ -3234,6 +3542,9 @@ async function doInspect() {
     alert("Select a DICOM file first.");
     return;
   }
+  _inspectorSetFile(input.files[0]);
+  document.getElementById("tag-editor-card").style.display = "none";
+  _tagEdits = {};
   const fd = new FormData();
   fd.append("file", input.files[0]);
   try {
@@ -3271,6 +3582,168 @@ function inspectorShowTags() {
   showTagModal("DICOM Inspector", _inspectorTags);
 }
 
+// ── Tag Editor ────────────────────────────────────────────────────
+
+let _tagEdits       = {};  // { "(GGGG,EEEE)": newValue }
+let _inspectorFile  = null; // the raw File object for the inspector
+
+// Called after a successful doInspect()
+function _inspectorSetFile(file) { _inspectorFile = file; }
+
+function openTagEditor() {
+  if (!_inspectorTags.length) { alert("Parse a DICOM file first."); return; }
+  _tagEdits = {};
+  _populateTagEditorAEDropdown();
+  document.getElementById("tag-editor-card").style.display = "";
+  document.getElementById("tag-editor-filter").value = "";
+  renderEditTagTable();
+  document.getElementById("tag-editor-card").scrollIntoView({ behavior: "smooth" });
+}
+
+function resetTagEdits() {
+  _tagEdits = {};
+  renderEditTagTable();
+  document.getElementById("tag-editor-change-count").textContent = "";
+}
+
+function _populateTagEditorAEDropdown() {
+  const sel = document.getElementById("tag-editor-ae-select");
+  const aes = (appConfig.remote_aes || []);
+  sel.innerHTML = '<option value="">Select a preset…</option>';
+  aes.forEach((ae, i) => {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = `${ae.name || ae.ae_title} (${ae.ae_title}@${ae.host}:${ae.port})`;
+    sel.appendChild(opt);
+  });
+}
+
+function tagEditorAEChanged() {
+  const sel = document.getElementById("tag-editor-ae-select");
+  const idx = parseInt(sel.value);
+  if (isNaN(idx)) return;
+  const ae = (appConfig.remote_aes || [])[idx];
+  if (!ae) return;
+  document.getElementById("tag-editor-ae-title").value = ae.ae_title || "";
+  document.getElementById("tag-editor-ae-host").value  = ae.host     || "";
+  document.getElementById("tag-editor-ae-port").value  = ae.port     || "";
+}
+
+// Flatten tag tree to a flat list for the editor (skip SQ children)
+function _flatTagsForEditor(rows) {
+  const out = [];
+  rows.forEach(r => {
+    out.push(r);
+    // We intentionally skip sequence children — they're not editable here
+  });
+  return out;
+}
+
+function renderEditTagTable() {
+  const q      = (document.getElementById("tag-editor-filter").value || "").toLowerCase();
+  const tbody  = document.getElementById("tag-editor-tbody");
+  const flat   = _flatTagsForEditor(_inspectorTags);
+  const shown  = q ? flat.filter(r =>
+    [r.tag, r.keyword, r.vr, r.value].some(v => String(v).toLowerCase().includes(q))
+  ) : flat;
+
+  tbody.innerHTML = "";
+  shown.forEach(r => {
+    if (r.children) return; // skip SQ headers
+    const edited    = Object.prototype.hasOwnProperty.call(_tagEdits, r.tag);
+    const dispValue = edited ? _tagEdits[r.tag] : r.value;
+    const tr = document.createElement("tr");
+    if (edited) tr.style.background = "#fffbeb";
+    tr.innerHTML =
+      `<td style="font-family:Consolas;font-size:11px">${r.tag}</td>` +
+      `<td style="font-size:12px">${escapeHtml(r.keyword)}</td>` +
+      `<td style="font-size:11px;color:#6b7280">${r.vr}</td>` +
+      `<td id="tev-${r.tag}" style="max-width:320px;word-break:break-all;font-size:12px">${escapeHtml(dispValue)}</td>` +
+      `<td><button class="btn" style="font-size:10px;padding:1px 7px" onclick="editTagInline('${r.tag}','${r.vr}')">Edit</button></td>`;
+    tbody.appendChild(tr);
+  });
+
+  const n = Object.keys(_tagEdits).length;
+  document.getElementById("tag-editor-change-count").textContent =
+    n ? `${n} change${n > 1 ? "s" : ""} pending` : "";
+}
+
+function editTagInline(tag, vr) {
+  const cell = document.getElementById("tev-" + tag);
+  if (!cell) return;
+  if (cell.querySelector("input")) return; // already editing
+  const current = cell.textContent;
+  cell.innerHTML = "";
+  const input = document.createElement("input");
+  input.value = current;
+  input.style.cssText = "width:100%; font-size:12px; padding:2px 4px; box-sizing:border-box";
+  const save = () => {
+    _tagEdits[tag] = input.value;
+    renderEditTagTable();
+  };
+  input.addEventListener("blur", save);
+  input.addEventListener("keydown", e => { if (e.key === "Enter") { input.blur(); } });
+  cell.appendChild(input);
+  input.focus();
+}
+
+async function downloadEdited() {
+  if (!_inspectorFile) { alert("No file loaded in the Inspector."); return; }
+  const status = document.getElementById("tag-editor-status");
+  status.textContent = "Preparing…";
+  const fd = new FormData();
+  fd.append("file", _inspectorFile);
+  fd.append("edits", JSON.stringify(
+    Object.entries(_tagEdits).map(([tag, value]) => ({ tag, value }))
+  ));
+  try {
+    const res = await fetch("/api/dicom/edit", { method: "POST", body: fd });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      status.textContent = "Error: " + (err.error || res.statusText);
+      return;
+    }
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href     = URL.createObjectURL(blob);
+    a.download = _inspectorFile.name || "edited.dcm";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    status.textContent = "Downloaded.";
+  } catch (e) {
+    status.textContent = "Error: " + e;
+  }
+}
+
+async function sendEditedToPACS() {
+  if (!_inspectorFile) { alert("No file loaded in the Inspector."); return; }
+  const aeTitle = document.getElementById("tag-editor-ae-title").value.trim();
+  const host    = document.getElementById("tag-editor-ae-host").value.trim();
+  const portStr = document.getElementById("tag-editor-ae-port").value.trim();
+  const port    = parsePort(portStr);
+  if (!aeTitle || !host || port === null) {
+    alert("Fill in AE Title, Host, and a valid Port before sending.");
+    return;
+  }
+  const status = document.getElementById("tag-editor-status");
+  status.textContent = "Sending…";
+  const fd = new FormData();
+  fd.append("file",     _inspectorFile);
+  fd.append("edits",    JSON.stringify(
+    Object.entries(_tagEdits).map(([tag, value]) => ({ tag, value }))
+  ));
+  fd.append("ae_title", aeTitle);
+  fd.append("host",     host);
+  fd.append("port",     port);
+  try {
+    const res  = await fetch("/api/dicom/edit-and-store", { method: "POST", body: fd });
+    const data = await res.json();
+    status.textContent = data.ok ? `Sent: ${data.message}` : `Error: ${data.error || data.message}`;
+  } catch (e) {
+    status.textContent = "Error: " + e;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────
 // DICOM Anonymizer
 // ─────────────────────────────────────────────────────────────────
@@ -3296,17 +3769,52 @@ function renderAnonList() {
   box.innerHTML = _anonFiles.map(f => f.name).join("<br>");
 }
 
+// ── Anonymizer: "Send to PACS" AE helpers ────────────────────────
+function _populateAnonAEDropdown() {
+  const sel = document.getElementById("anon-ae-select");
+  const aes = (appConfig.remote_aes || []);
+  sel.innerHTML = '<option value="">Select a preset…</option>';
+  aes.forEach((ae, i) => {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = `${ae.name || ae.ae_title} (${ae.ae_title}@${ae.host}:${ae.port})`;
+    sel.appendChild(opt);
+  });
+}
+
+function anonAEChanged() {
+  const sel = document.getElementById("anon-ae-select");
+  const idx = parseInt(sel.value);
+  if (isNaN(idx)) return;
+  const ae = (appConfig.remote_aes || [])[idx];
+  if (!ae) return;
+  document.getElementById("anon-ae-title").value = ae.ae_title || "";
+  document.getElementById("anon-ae-host").value  = ae.host     || "";
+  document.getElementById("anon-ae-port").value  = ae.port     || "";
+}
+
+function anonProfileChanged() {
+  // Nothing dynamic to do here; custom_tags are embedded at send time
+}
+
+function _buildAnonFD() {
+  const profile = document.getElementById("anon-profile").value;
+  const fd = new FormData();
+  _anonFiles.forEach(f => fd.append("files[]", f));
+  fd.append("profile",      profile);
+  fd.append("patient_name", document.getElementById("anon-patient-name").value);
+  fd.append("patient_id",   document.getElementById("anon-patient-id").value);
+  if (profile === "custom") {
+    fd.append("custom_tags", JSON.stringify(_anonCustomTags));
+  }
+  return fd;
+}
+
 async function doAnonymize() {
   if (_anonFiles.length === 0) { alert("Add at least one DICOM file first."); return; }
   const status = document.getElementById("anon-status");
   status.textContent = "Anonymising…";
-
-  const fd = new FormData();
-  _anonFiles.forEach(f => fd.append("files[]", f));
-  fd.append("profile",      document.getElementById("anon-profile").value);
-  fd.append("patient_name", document.getElementById("anon-patient-name").value);
-  fd.append("patient_id",   document.getElementById("anon-patient-id").value);
-
+  const fd = _buildAnonFD();
   try {
     const res = await fetch("/api/dicom/anonymize", { method: "POST", body: fd });
     if (!res.ok) {
@@ -3328,6 +3836,277 @@ async function doAnonymize() {
     status.textContent = "Error: " + e;
   }
 }
+
+async function doAnonymizeAndSend() {
+  if (_anonFiles.length === 0) { alert("Add at least one DICOM file first."); return; }
+  const aeTitle = document.getElementById("anon-ae-title").value.trim();
+  const host    = document.getElementById("anon-ae-host").value.trim();
+  const portStr = document.getElementById("anon-ae-port").value.trim();
+  const port    = parsePort(portStr);
+  if (!aeTitle || !host || port === null) {
+    alert("Fill in AE Title, Host, and a valid Port before sending."); return;
+  }
+  const status = document.getElementById("anon-status");
+  status.textContent = "Anonymising and sending…";
+  // Anonymise → blob → files → C-STORE (we download internally to get the zip,
+  // then re-send each file from the browser using C-STORE endpoint)
+  const fd = _buildAnonFD();
+  try {
+    const res = await fetch("/api/dicom/anonymize", { method: "POST", body: fd });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      status.textContent = "Error: " + (err.error || res.statusText); return;
+    }
+    const blob = await res.blob();
+    // Unzip in-browser using DecompressionStream isn't universally available;
+    // easier: re-upload the zip to a helper, or re-send individual files via
+    // a second anonymize-and-store call for each file.
+    // We'll send files individually for reliability.
+    let sent = 0;
+    for (const f of _anonFiles) {
+      const fd2 = new FormData();
+      fd2.append("files[]", f);
+      fd2.append("profile",      document.getElementById("anon-profile").value);
+      fd2.append("patient_name", document.getElementById("anon-patient-name").value);
+      fd2.append("patient_id",   document.getElementById("anon-patient-id").value);
+      if (document.getElementById("anon-profile").value === "custom") {
+        fd2.append("custom_tags", JSON.stringify(_anonCustomTags));
+      }
+      fd2.append("ae_title", aeTitle);
+      fd2.append("host",     host);
+      fd2.append("port",     port);
+      const r2 = await fetch("/api/dicom/anonymize-and-store", { method: "POST", body: fd2 });
+      const d2 = await r2.json().catch(() => ({}));
+      if (d2.ok) sent++;
+    }
+    status.textContent = `Sent ${sent} of ${_anonFiles.length} file(s).`;
+  } catch (e) {
+    status.textContent = "Error: " + e;
+  }
+}
+
+// ── Anonymisation Profile Manager ─────────────────────────────────
+
+let _anonCustomProfiles = {};  // loaded from server
+let _anonCustomTags     = [];  // tags for the currently selected custom profile
+let _apmEditingKey      = null; // name of profile being edited
+
+// List of common PHI tags grouped by category, used in the profile editor
+const _APM_KNOWN_TAGS = [
+  { group: "Patient Identity", tags: [
+    { tag: "(0010,0010)", label: "Patient Name" },
+    { tag: "(0010,0020)", label: "Patient ID" },
+    { tag: "(0010,0030)", label: "Patient Birth Date" },
+    { tag: "(0010,0040)", label: "Patient Sex" },
+    { tag: "(0010,1000)", label: "Other Patient IDs" },
+    { tag: "(0010,1010)", label: "Patient Age" },
+    { tag: "(0010,1020)", label: "Patient Size" },
+    { tag: "(0010,1030)", label: "Patient Weight" },
+    { tag: "(0010,1040)", label: "Patient Telephone Numbers" },
+    { tag: "(0010,2160)", label: "Ethnic Group" },
+    { tag: "(0010,21B0)", label: "Additional Patient History" },
+  ]},
+  { group: "Referring / Operators", tags: [
+    { tag: "(0008,0090)", label: "Referring Physician Name" },
+    { tag: "(0008,1048)", label: "Physician(s) of Record" },
+    { tag: "(0008,1070)", label: "Operators Name" },
+  ]},
+  { group: "Institution", tags: [
+    { tag: "(0008,0080)", label: "Institution Name" },
+    { tag: "(0008,0081)", label: "Institution Address" },
+    { tag: "(0008,1010)", label: "Station Name" },
+  ]},
+  { group: "Study & Order Info", tags: [
+    { tag: "(0008,0050)", label: "Accession Number" },
+    { tag: "(0020,0010)", label: "Study ID" },
+    { tag: "(0032,1032)", label: "Requesting Physician" },
+    { tag: "(0032,1060)", label: "Requested Procedure Description" },
+    { tag: "(0032,1070)", label: "Requested Contrast Agent" },
+  ]},
+  { group: "Descriptions", tags: [
+    { tag: "(0008,1030)", label: "Study Description" },
+    { tag: "(0008,103E)", label: "Series Description" },
+    { tag: "(0018,1030)", label: "Protocol Name" },
+  ]},
+  { group: "Scheduled Procedure", tags: [
+    { tag: "(0040,0006)", label: "Scheduled Performing Physician Name" },
+    { tag: "(0040,0007)", label: "Scheduled Procedure Step Description" },
+    { tag: "(0040,0009)", label: "Scheduled Procedure Step ID" },
+  ]},
+];
+
+async function _loadAnonProfilesFromServer() {
+  try {
+    const res  = await fetch("/api/dicom/anon_profiles");
+    const data = await res.json();
+    if (data.ok) _anonCustomProfiles = data.profiles || {};
+  } catch { _anonCustomProfiles = {}; }
+  _rebuildAnonProfileDropdown();
+}
+
+function _rebuildAnonProfileDropdown() {
+  const sel = document.getElementById("anon-profile");
+  // Remove any custom options (keep basic and full)
+  Array.from(sel.options).forEach(o => {
+    if (o.value !== "basic" && o.value !== "full") sel.removeChild(o);
+  });
+  const names = Object.keys(_anonCustomProfiles);
+  if (names.length) {
+    const sep = document.createElement("option");
+    sep.disabled = true;
+    sep.textContent = "── Custom Profiles ──";
+    sel.appendChild(sep);
+    names.forEach(n => {
+      const opt = document.createElement("option");
+      opt.value = "custom:" + n;
+      opt.textContent = n;
+      sel.appendChild(opt);
+    });
+  }
+}
+
+function openAnonProfileManager() {
+  _apmEditingKey = null;
+  renderApmProfileList();
+  document.getElementById("anon-profile-editor").style.display = "none";
+  document.getElementById("anon-profile-placeholder").style.display = "";
+  document.getElementById("anon-profile-modal").style.display = "flex";
+}
+
+function closeAnonProfileManager() {
+  document.getElementById("anon-profile-modal").style.display = "none";
+}
+
+function renderApmProfileList() {
+  const list = document.getElementById("anon-profile-list");
+  list.innerHTML = "";
+  const names = Object.keys(_anonCustomProfiles);
+  if (!names.length) {
+    list.innerHTML = '<div style="color:#9ca3af;font-size:12px;text-align:center;padding:8px">No custom profiles yet.</div>';
+    return;
+  }
+  names.forEach(n => {
+    const btn = document.createElement("button");
+    btn.style.cssText = "text-align:left; padding:6px 8px; border-radius:4px; border:1px solid transparent; background:none; cursor:pointer; font-size:12px; width:100%";
+    btn.textContent = n;
+    if (n === _apmEditingKey) {
+      btn.style.background = "#eff6ff";
+      btn.style.borderColor = "#bfdbfe";
+      btn.style.color = "#1d4ed8";
+    }
+    btn.onclick = () => apmEditProfile(n);
+    list.appendChild(btn);
+  });
+}
+
+function apmEditProfile(name) {
+  _apmEditingKey = name;
+  const p = _anonCustomProfiles[name] || { name, tags: [] };
+  document.getElementById("apm-name").value = p.name || name;
+  document.getElementById("apm-delete-btn").style.display = "";
+  document.getElementById("anon-profile-editor").style.display = "";
+  document.getElementById("anon-profile-placeholder").style.display = "none";
+  document.getElementById("apm-tag-filter").value = "";
+  renderApmTagList();
+  renderApmProfileList();
+}
+
+function anonProfileNew() {
+  _apmEditingKey = null;
+  document.getElementById("apm-name").value = "";
+  document.getElementById("apm-delete-btn").style.display = "none";
+  document.getElementById("anon-profile-editor").style.display = "";
+  document.getElementById("anon-profile-placeholder").style.display = "none";
+  document.getElementById("apm-tag-filter").value = "";
+  renderApmTagList();
+}
+
+function renderApmTagList() {
+  const q = (document.getElementById("apm-tag-filter").value || "").toLowerCase();
+  const container = document.getElementById("apm-tag-list");
+  const currentTags = _apmEditingKey
+    ? ((_anonCustomProfiles[_apmEditingKey] || {}).tags || [])
+    : [];
+  const checked = new Set(currentTags);
+
+  container.innerHTML = "";
+  _APM_KNOWN_TAGS.forEach(group => {
+    const filteredTags = group.tags.filter(t =>
+      !q || t.label.toLowerCase().includes(q) || t.tag.includes(q)
+    );
+    if (!filteredTags.length) return;
+
+    const hdr = document.createElement("div");
+    hdr.style.cssText = "font-size:11px; font-weight:700; color:#6b7280; padding:6px 4px 2px; text-transform:uppercase; letter-spacing:.04em";
+    hdr.textContent = group.group;
+    container.appendChild(hdr);
+
+    filteredTags.forEach(t => {
+      const row = document.createElement("label");
+      row.style.cssText = "display:flex; align-items:center; gap:8px; padding:3px 4px; cursor:pointer; border-radius:3px; font-size:12px";
+      row.innerHTML =
+        `<input type="checkbox" value="${t.tag}" ${checked.has(t.tag) ? "checked" : ""}>` +
+        `<span style="flex:1">${t.label}</span>` +
+        `<span style="font-family:Consolas; font-size:10px; color:#9ca3af">${t.tag}</span>`;
+      row.onmouseover = () => row.style.background = "#f3f4f6";
+      row.onmouseout  = () => row.style.background = "";
+      container.appendChild(row);
+    });
+  });
+}
+
+async function anonProfileSave() {
+  const name = document.getElementById("apm-name").value.trim();
+  if (!name) { alert("Enter a profile name."); return; }
+  const tags = Array.from(
+    document.querySelectorAll("#apm-tag-list input[type=checkbox]:checked")
+  ).map(cb => cb.value);
+  try {
+    const res  = await fetch("/api/dicom/anon_profiles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, tags }),
+    });
+    const data = await res.json();
+    if (!data.ok) { alert("Error saving: " + data.error); return; }
+    if (_apmEditingKey && _apmEditingKey !== name) {
+      // Name changed — delete old key
+      await fetch(`/api/dicom/anon_profiles/${encodeURIComponent(_apmEditingKey)}`,
+                  { method: "DELETE" });
+    }
+    await _loadAnonProfilesFromServer();
+    _apmEditingKey = name;
+    renderApmProfileList();
+    apmEditProfile(name);
+  } catch (e) { alert("Error: " + e); }
+}
+
+async function anonProfileDelete() {
+  if (!_apmEditingKey) return;
+  if (!confirm(`Delete profile "${_apmEditingKey}"?`)) return;
+  try {
+    await fetch(`/api/dicom/anon_profiles/${encodeURIComponent(_apmEditingKey)}`,
+                { method: "DELETE" });
+    _apmEditingKey = null;
+    await _loadAnonProfilesFromServer();
+    renderApmProfileList();
+    document.getElementById("anon-profile-editor").style.display = "none";
+    document.getElementById("anon-profile-placeholder").style.display = "";
+  } catch (e) { alert("Error: " + e); }
+}
+
+// Wire up profile selection → set _anonCustomTags when a custom profile is chosen
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("anon-profile").addEventListener("change", () => {
+    const v = document.getElementById("anon-profile").value;
+    if (v.startsWith("custom:")) {
+      const n = v.slice(7);
+      _anonCustomTags = (_anonCustomProfiles[n] || {}).tags || [];
+    } else {
+      _anonCustomTags = [];
+    }
+  });
+});
 
 // ─────────────────────────────────────────────────────────────────
 // DICOMDIR Reader

@@ -2,11 +2,16 @@
 Storage Commitment, IOCM, Inspector, Anonymize, DICOMDIR, SR, KOS."""
 
 import io
+import json
 import logging
 import os
+import re
+import tempfile
 import threading
 
 from flask import Blueprint, jsonify, request, send_file
+
+from config.manager import APP_DIR
 
 import web.context as ctx
 from web.audit import log as _audit
@@ -42,6 +47,31 @@ _ANON_FULL = _ANON_BASIC + [
     (0x0032, 0x1070), (0x0040, 0x0006), (0x0040, 0x0007),
     (0x0040, 0x0009),
 ]
+
+_ANON_PROFILES_PATH = os.path.join(APP_DIR, "anon_profiles.json")
+
+
+def _load_anon_profiles() -> dict:
+    """Load custom anonymisation profiles from disk."""
+    try:
+        with open(_ANON_PROFILES_PATH, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _save_anon_profiles(profiles: dict) -> None:
+    os.makedirs(APP_DIR, exist_ok=True)
+    with open(_ANON_PROFILES_PATH, "w", encoding="utf-8") as fh:
+        json.dump(profiles, fh, indent=2)
+
+
+def _tag_str_to_tuple(tag_str: str) -> tuple[int, int] | None:
+    """Convert '(GGGG,EEEE)' string to (group, elem) int tuple."""
+    m = re.match(r"\(?([0-9a-fA-F]{4})[, ]([0-9a-fA-F]{4})\)?", tag_str.strip())
+    if m:
+        return int(m.group(1), 16), int(m.group(2), 16)
+    return None
 
 
 # ── C-ECHO ────────────────────────────────────────────────────────────────────
@@ -561,7 +591,18 @@ def dicom_anonymize():
     profile   = request.form.get("profile",      "basic")
     repl_name = request.form.get("patient_name", "Anonymous")
     repl_id   = request.form.get("patient_id",   "ANON")
-    phi_tags  = _ANON_FULL if profile == "full" else _ANON_BASIC
+    if profile == "full":
+        phi_tags = _ANON_FULL
+    elif profile == "basic":
+        phi_tags = _ANON_BASIC
+    else:
+        # Custom profile: tags sent as JSON array of "(GGGG,EEEE)" strings
+        custom_raw = request.form.get("custom_tags", "[]")
+        try:
+            custom_list = json.loads(custom_raw)
+        except Exception:
+            custom_list = []
+        phi_tags = [t for t in (_tag_str_to_tuple(s) for s in custom_list) if t]
 
     zip_buf = io.BytesIO(); count = 0; errors: list[str] = []
     with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -712,3 +753,203 @@ def kos_create():
     except Exception as e:
         logger.exception("KOS create error")
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ── Anonymize + C-STORE ───────────────────────────────────────────────────────
+
+@bp.route("/api/dicom/anonymize-and-store", methods=["POST"])
+@require_login
+def dicom_anonymize_and_store():
+    """Anonymise a single DICOM file and immediately C-STORE it to a remote AE."""
+    import zipfile
+    import pydicom
+
+    files = request.files.getlist("files[]")
+    if not files:
+        return jsonify({"ok": False, "error": "No files provided."}), 400
+
+    d = {k: request.form.get(k, "") for k in ("host", "port", "ae_title")}
+    err = _require_dicom_fields(d)
+    if err:
+        return err
+
+    profile   = request.form.get("profile",      "basic")
+    repl_name = request.form.get("patient_name", "Anonymous")
+    repl_id   = request.form.get("patient_id",   "ANON")
+    if profile == "full":
+        phi_tags = _ANON_FULL
+    elif profile == "basic":
+        phi_tags = _ANON_BASIC
+    else:
+        custom_raw = request.form.get("custom_tags", "[]")
+        try:
+            custom_list = json.loads(custom_raw)
+        except Exception:
+            custom_list = []
+        phi_tags = [t for t in (_tag_str_to_tuple(s) for s in custom_list) if t]
+
+    from dicom.operations import c_store
+    sent = 0
+    errors: list[str] = []
+    with tempfile.TemporaryDirectory() as tmpdir:
+        paths = []
+        for f in files:
+            try:
+                ds = pydicom.dcmread(io.BytesIO(f.read()))
+                ds.PatientName = repl_name
+                ds.PatientID   = repl_id
+                for group, elem in phi_tags:
+                    tag = pydicom.tag.Tag(group, elem)
+                    if tag in ds:
+                        del ds[tag]
+                fpath = os.path.join(tmpdir, f.filename or f"anon_{len(paths)}.dcm")
+                try:
+                    ds.save_as(fpath, enforce_file_format=True)
+                except TypeError:
+                    ds.save_as(fpath, write_like_original=False)
+                paths.append(fpath)
+            except Exception as exc:
+                errors.append(f"{f.filename or '?'}: {exc}")
+        if paths:
+            ok, msg = c_store(_local_ae(), d["host"], int(d["port"]), d["ae_title"], paths)
+            if ok:
+                sent = len(paths)
+            else:
+                errors.append(msg)
+
+    _audit("dicom.anonymize_and_store", ip=_req_ip(), user=_req_user(),
+           detail={"ae_title": d["ae_title"], "sent": sent, "profile": profile})
+    return jsonify({"ok": sent > 0,
+                    "message": f"Sent {sent} file(s)." if sent > 0 else "; ".join(errors)})
+
+
+# ── DICOM Tag Editor ──────────────────────────────────────────────────────────
+
+def _apply_tag_edits(ds, edits: list[dict]) -> None:
+    """Apply a list of {tag, value} edits to a pydicom Dataset in-place."""
+    import pydicom
+    for edit in edits:
+        t = _tag_str_to_tuple(edit.get("tag", ""))
+        if not t:
+            continue
+        tag = pydicom.tag.Tag(*t)
+        if tag not in ds:
+            continue
+        elem = ds[tag]
+        # Sequences are not editable via this endpoint
+        if elem.VR in ("SQ",):
+            continue
+        try:
+            elem.value = edit.get("value", "")
+        except Exception:
+            pass
+
+
+@bp.route("/api/dicom/edit", methods=["POST"])
+@require_login
+def dicom_edit():
+    """Accept a DICOM file + JSON tag edits, return the modified DICOM file."""
+    import pydicom
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"ok": False, "error": "No file provided."}), 400
+    try:
+        edits = json.loads(request.form.get("edits", "[]"))
+    except Exception:
+        return jsonify({"ok": False, "error": "Invalid edits JSON."}), 400
+    try:
+        ds = pydicom.dcmread(io.BytesIO(f.read()))
+        _apply_tag_edits(ds, edits)
+        out = io.BytesIO()
+        try:
+            ds.save_as(out, enforce_file_format=True)
+        except TypeError:
+            ds.save_as(out, write_like_original=False)
+        out.seek(0)
+        fname = f.filename or "edited.dcm"
+        _audit("dicom.edit", ip=_req_ip(), user=_req_user(),
+               detail={"filename": fname, "edits": len(edits)})
+        return send_file(out, mimetype="application/octet-stream",
+                         as_attachment=True, download_name=fname)
+    except Exception as e:
+        logger.exception("DICOM edit error")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@bp.route("/api/dicom/edit-and-store", methods=["POST"])
+@require_login
+def dicom_edit_and_store():
+    """Apply tag edits to an uploaded DICOM file and C-STORE it to a remote AE."""
+    import pydicom
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"ok": False, "error": "No file provided."}), 400
+    d = {k: request.form.get(k, "") for k in ("host", "port", "ae_title")}
+    err = _require_dicom_fields(d)
+    if err:
+        return err
+    try:
+        edits = json.loads(request.form.get("edits", "[]"))
+    except Exception:
+        return jsonify({"ok": False, "error": "Invalid edits JSON."}), 400
+    try:
+        ds = pydicom.dcmread(io.BytesIO(f.read()))
+        _apply_tag_edits(ds, edits)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fpath = os.path.join(tmpdir, f.filename or "edited.dcm")
+            try:
+                ds.save_as(fpath, enforce_file_format=True)
+            except TypeError:
+                ds.save_as(fpath, write_like_original=False)
+            from dicom.operations import c_store
+            ok, msg = c_store(
+                _local_ae(), d["host"], int(d["port"]), d["ae_title"], [fpath]
+            )
+        _audit("dicom.edit_and_store", ip=_req_ip(), user=_req_user(),
+               detail={"ae_title": d["ae_title"], "edits": len(edits)})
+        return jsonify({"ok": ok, "message": msg})
+    except Exception as e:
+        logger.exception("DICOM edit-and-store error")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ── Custom Anonymisation Profiles ─────────────────────────────────────────────
+
+@bp.route("/api/dicom/anon_profiles", methods=["GET"])
+@require_login
+def anon_profiles_get():
+    """Return the list of custom anonymisation profiles."""
+    return jsonify({"ok": True, "profiles": _load_anon_profiles()})
+
+
+@bp.route("/api/dicom/anon_profiles", methods=["POST"])
+@require_login
+def anon_profiles_save():
+    """Create or update a custom anonymisation profile."""
+    body = request.get_json(silent=True) or {}
+    name = body.get("name", "").strip()
+    tags = body.get("tags", [])
+    if not name:
+        return jsonify({"ok": False, "error": "Profile name is required."}), 400
+    if not isinstance(tags, list):
+        return jsonify({"ok": False, "error": "'tags' must be a list."}), 400
+    profiles = _load_anon_profiles()
+    profiles[name] = {"name": name, "tags": tags}
+    _save_anon_profiles(profiles)
+    _audit("dicom.anon_profile.save", ip=_req_ip(), user=_req_user(),
+           detail={"name": name, "tag_count": len(tags)})
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/dicom/anon_profiles/<path:name>", methods=["DELETE"])
+@require_login
+def anon_profiles_delete(name: str):
+    """Delete a custom anonymisation profile by name."""
+    profiles = _load_anon_profiles()
+    if name not in profiles:
+        return jsonify({"ok": False, "error": "Profile not found."}), 404
+    del profiles[name]
+    _save_anon_profiles(profiles)
+    _audit("dicom.anon_profile.delete", ip=_req_ip(), user=_req_user(),
+           detail={"name": name})
+    return jsonify({"ok": True})
