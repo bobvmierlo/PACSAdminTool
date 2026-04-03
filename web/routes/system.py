@@ -59,13 +59,6 @@ def favicon():
     return "", 404
 
 
-@bp.route("/api/openapi.json", methods=["GET"])
-def openapi_spec():
-    """Serve the OpenAPI spec. text/plain ensures browsers render it inline."""
-    return send_from_directory(current_app.static_folder, "openapi.yaml",
-                               mimetype="text/plain")
-
-
 @bp.route("/api/docs", methods=["GET"])
 def api_docs():
     """Serve the Swagger UI browser interface."""
@@ -82,7 +75,7 @@ def api_docs():
   <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
   <script>
     SwaggerUIBundle({
-      url: "/api/openapi.json",
+      url: "/static/openapi.yaml",
       dom_id: "#swagger-ui",
       presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
       layout: "BaseLayout",
