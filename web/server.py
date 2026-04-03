@@ -168,7 +168,7 @@ def _log_outgoing_response(response):
         "script-src 'self' 'unsafe-inline'; "
         "style-src 'self' 'unsafe-inline'; "
         "connect-src 'self' ws: wss:; "
-        "img-src 'self' data:; "
+        "img-src 'self' data: blob:; "
         "object-src 'none'; "
         "frame-ancestors 'none'",
     )
