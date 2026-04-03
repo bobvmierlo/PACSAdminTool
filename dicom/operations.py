@@ -645,15 +645,18 @@ class SCPListener:
         def handle_store(event):
             ds = event.dataset
             ds.file_meta = event.file_meta
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            sop_uid = getattr(ds, "SOPInstanceUID", ts)
-            fname = os.path.join(storage_dir, f"{sop_uid}.dcm")
+            ts      = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            sop_uid = str(getattr(ds, "SOPInstanceUID",     ts)).strip() or ts
+            stu_uid = str(getattr(ds, "StudyInstanceUID",  "unknown_study")).strip()  or "unknown_study"
+            ser_uid = str(getattr(ds, "SeriesInstanceUID", "unknown_series")).strip() or "unknown_series"
+            # Organise into Study/Series subdirectories so stacks land together.
+            series_dir = os.path.join(storage_dir, stu_uid, ser_uid)
+            os.makedirs(series_dir, exist_ok=True)
+            fname = os.path.join(series_dir, f"{sop_uid}.dcm")
             try:
-                # enforce_file_format=True replaces the deprecated write_like_original=False
                 ds.save_as(fname, enforce_file_format=True)
                 log_fn(f"Stored: {fname}")
             except TypeError:
-                # Older pydicom that doesn't have enforce_file_format yet
                 ds.save_as(fname, write_like_original=False)
                 log_fn(f"Stored: {fname}")
             except Exception as e:

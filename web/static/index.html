@@ -785,22 +785,13 @@
                   padding:6px; background:#fff; color:#555"></div>
     </div>
     <div class="card">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
-        <h3 data-i18n="scp.files_on_disk">Files on Disk</h3>
-        <button class="btn" style="font-size:12px; padding:3px 10px" onclick="loadSCPFiles()" data-i18n="common.refresh">Refresh</button>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:6px">
+        <h3 style="margin:0" data-i18n="scp.files_on_disk">Received Studies</h3>
+        <button class="btn" style="font-size:12px; padding:3px 10px"
+                onclick="loadSCPStudies()" data-i18n="common.refresh">Refresh</button>
       </div>
-      <div id="scp-disk-info" style="font-size:12px; color:#888; margin-bottom:6px"></div>
-      <div class="result-table-wrap" id="scp-disk-wrap" style="display:none">
-        <table id="scp-disk-table">
-          <thead><tr>
-            <th data-i18n="scp.file_name">Filename</th>
-            <th data-i18n="scp.file_size">Size</th>
-            <th data-i18n="scp.file_mtime">Modified</th>
-            <th data-i18n="common.actions">Actions</th>
-          </tr></thead>
-          <tbody id="scp-disk-tbody"></tbody>
-        </table>
-      </div>
+      <div id="scp-studies-info" style="font-size:12px; color:#888; margin-bottom:8px"></div>
+      <div id="scp-studies-tree"></div>
     </div>
     <div class="card">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
@@ -1440,6 +1431,20 @@
     </div>
     <div id="preview-modal-msg" style="color:#9ca3af; font-size:12px; text-align:center; padding:20px 0"></div>
 
+    <!-- Frame navigator (hidden in single-image mode) -->
+    <div id="preview-frame-nav" style="display:none; align-items:center; gap:8px; padding:4px 0; background:#111; border-radius:4px; padding:4px 8px">
+      <button id="preview-frame-prev"
+              style="background:none; border:1px solid #4b5563; color:#9ca3af; border-radius:3px; padding:0 7px; font-size:16px; cursor:pointer; line-height:1.4"
+              onclick="previewGotoFrame(_previewFrameIdx - 1)">‹</button>
+      <input type="range" id="preview-frame-slider" min="0" max="0" value="0" style="flex:1; accent-color:#2b6cb0"
+             oninput="previewGotoFrame(+this.value, true)">
+      <span id="preview-frame-label"
+            style="color:#e5e7eb; font-size:11px; white-space:nowrap; min-width:54px; text-align:center">1 / 1</span>
+      <button id="preview-frame-next"
+              style="background:none; border:1px solid #4b5563; color:#9ca3af; border-radius:3px; padding:0 7px; font-size:16px; cursor:pointer; line-height:1.4"
+              onclick="previewGotoFrame(_previewFrameIdx + 1)">›</button>
+    </div>
+
     <!-- Window / Level sliders -->
     <div style="display:flex; gap:16px; align-items:center; padding:4px 0; flex-wrap:wrap">
       <label style="display:flex; align-items:center; gap:8px; color:#9ca3af; font-size:11px; flex:1; min-width:160px">
@@ -1649,6 +1654,7 @@ function showTab(name) {
 
   if (name === "logs")      initLogViewer();
   if (name === "dashboard") loadDashboard();
+  if (name === "scp")       loadSCPStudies();
 }
 
 function showHL7Tab(sub) {
@@ -2608,6 +2614,7 @@ async function toggleSCP() {
 }
 
 // Listen for file-received log messages to update the list
+let _scpStudiesRefreshTimer = null;
 socket.on("log", data => {
   if (data.room === "scp" && data.message.startsWith("Stored:")) {
     scpFileCount++;
@@ -2615,6 +2622,12 @@ socket.on("log", data => {
     const list = document.getElementById("scp-filelist");
     list.innerHTML += data.message.replace("Stored:", "").trim() + "<br>";
     list.scrollTop = list.scrollHeight;
+    // Debounce studies-tree refresh (1.5 s after last store) so rapid series
+    // arrivals don't hammer the server with repeated list requests.
+    if (document.getElementById("tab-scp").classList.contains("active")) {
+      clearTimeout(_scpStudiesRefreshTimer);
+      _scpStudiesRefreshTimer = setTimeout(loadSCPStudies, 1500);
+    }
   }
 });
 
@@ -2711,53 +2724,174 @@ async function scpFileInspect(name) {
   }
 }
 
-async function scpFilePreview(name) {
-  const modal   = document.getElementById("preview-modal");
+// ─────────────────────────────────────────────────────────────────
+// DICOM Viewer state
+// ─────────────────────────────────────────────────────────────────
+// mode 'series'  → navigating through multiple .dcm files in a series
+//      'file'    → navigating frames within a single multi-frame .dcm
+let _previewMode        = null;   // 'series' | 'file' | null
+let _previewStudy       = null;   // StudyInstanceUID  (series mode)
+let _previewSeries      = null;   // SeriesInstanceUID (series mode)
+let _previewFilePath    = null;   // relative path     (file mode)
+let _previewFrameIdx    = 0;      // current frame / instance index
+let _previewTotalFrames = 1;      // total frames / instances
+let _previewLoading     = false;  // guard: prevent concurrent loads
+
+function _previewReset() {
+  _previewMode = null; _previewStudy = null; _previewSeries = null;
+  _previewFilePath = null; _previewFrameIdx = 0; _previewTotalFrames = 1;
+  _previewLoading = false;
+}
+
+function _previewOpenModal(title) {
+  const modal  = document.getElementById("preview-modal");
   const titleEl = document.getElementById("preview-modal-title");
-  const imgEl   = document.getElementById("preview-modal-img");
-  const msgEl   = document.getElementById("preview-modal-msg");
-  const metaEl  = document.getElementById("preview-modal-meta");
-  const brtEl   = document.getElementById("preview-brightness");
-  const ctrEl   = document.getElementById("preview-contrast");
-
-  titleEl.textContent       = name;
-  imgEl.style.display       = "none";
-  msgEl.style.display       = "block";
-  msgEl.textContent         = "Loading…";
-  metaEl.textContent        = "";
-  modal.style.display       = "flex";
-  if (brtEl) brtEl.value   = 100;
-  if (ctrEl) ctrEl.value   = 100;
+  const imgEl  = document.getElementById("preview-modal-img");
+  const msgEl  = document.getElementById("preview-modal-msg");
+  const metaEl = document.getElementById("preview-modal-meta");
+  titleEl.textContent   = title;
+  imgEl.style.display   = "none";
+  imgEl.src             = "";
+  msgEl.style.display   = "block";
+  msgEl.textContent     = "Loading…";
+  metaEl.textContent    = "";
+  modal.style.display   = "flex";
+  document.getElementById("preview-brightness").value = 100;
+  document.getElementById("preview-contrast").value   = 100;
   applyPreviewFilter();
+  document.getElementById("preview-frame-nav").style.display = "none";
+}
 
-  // Use the URL directly — same-origin request carries session cookie,
-  // no blob: URL needed, works with 'self' img-src CSP.
-  const url = `/api/scp/files/preview?name=${encodeURIComponent(name)}&_=${Date.now()}`;
+function _previewShowFrame(url, idx, total) {
+  _previewFrameIdx    = idx;
+  _previewTotalFrames = total;
+  const imgEl  = document.getElementById("preview-modal-img");
+  const msgEl  = document.getElementById("preview-modal-msg");
+  const nav    = document.getElementById("preview-frame-nav");
+  const slider = document.getElementById("preview-frame-slider");
+  const label  = document.getElementById("preview-frame-label");
 
-  imgEl.onload  = () => { imgEl.style.display = "block"; msgEl.style.display = "none"; };
-  imgEl.onerror = async () => {
-    // The server returned a non-image response (JSON error); fetch it to read the message.
+  // Update navigator
+  if (total > 1) {
+    nav.style.display  = "flex";
+    slider.max         = total - 1;
+    slider.value       = idx;
+    label.textContent  = `${idx + 1} / ${total}`;
+  } else {
+    nav.style.display  = "none";
+  }
+
+  msgEl.style.display  = "block";
+  msgEl.textContent    = "Loading…";
+  imgEl.style.display  = "none";
+
+  const newImg = new Image();
+  newImg.onload = () => {
+    imgEl.src          = newImg.src;
+    imgEl.style.display = "block";
+    msgEl.style.display = "none";
+    applyPreviewFilter();
+    _previewLoading    = false;
+  };
+  newImg.onerror = async () => {
     try {
-      const r = await fetch(url.replace(/&_=\d+/, ""));
+      const r = await fetch(url);
       const d = await r.json().catch(() => ({}));
       msgEl.textContent = "Cannot preview: " + (d.error || "Unknown error");
     } catch {
-      msgEl.textContent = "Cannot preview this file (no pixel data or unsupported format).";
+      msgEl.textContent = "Cannot preview (no pixel data or unsupported format).";
     }
+    _previewLoading = false;
   };
-  imgEl.src = url;
+  newImg.src = url + "&_=" + Date.now();
+}
 
-  // Fetch metadata in parallel for the info strip
+// Navigate to frame/instance idx  (fromSlider=true skips re-setting slider)
+async function previewGotoFrame(idx, fromSlider = false) {
+  if (_previewLoading) return;
+  idx = Math.max(0, Math.min(idx, _previewTotalFrames - 1));
+  if (idx === _previewFrameIdx && _previewLoading === false) {
+    // No-op unless first call
+    const label = document.getElementById("preview-frame-label");
+    if (label.textContent !== "") return;
+  }
+  _previewLoading = true;
+
+  let url;
+  if (_previewMode === "series") {
+    url = `/api/scp/series/frame?study=${encodeURIComponent(_previewStudy)}&series=${encodeURIComponent(_previewSeries)}&idx=${idx}`;
+  } else {
+    url = `/api/scp/files/preview?path=${encodeURIComponent(_previewFilePath)}&frame=${idx}`;
+  }
+  _previewShowFrame(url, idx, _previewTotalFrames);
+  if (!fromSlider) {
+    document.getElementById("preview-frame-slider").value = idx;
+    document.getElementById("preview-frame-label").textContent = `${idx + 1} / ${_previewTotalFrames}`;
+  }
+}
+
+// Open the viewer for a single .dcm file (possibly multi-frame)
+async function scpFilePreview(name) {
+  _previewReset();
+  _previewMode     = "file";
+  _previewFilePath = name;
+  _previewOpenModal(name.split("/").pop());
+
+  // Fetch metadata: frame count, W/L
   try {
-    const r = await fetch(`/api/scp/files/inspect?name=${encodeURIComponent(name)}`);
+    const r = await fetch(`/api/scp/files/preview?path=${encodeURIComponent(name)}&info=1`);
     const d = await r.json().catch(() => ({}));
-    if (d.ok && d.meta) {
-      const m = d.meta;
-      metaEl.textContent = [m.PatientName, m.PatientID, m.Modality, m.StudyDate]
+    if (d.ok) {
+      _previewTotalFrames = d.frames || 1;
+      const metaEl = document.getElementById("preview-modal-meta");
+      metaEl.textContent = [d.patient, d.modality, d.study_date].filter(Boolean).join("  ·  ");
+    }
+  } catch { /* non-critical */ }
+
+  previewGotoFrame(0, false);
+}
+
+// Open the viewer for a Study/Series stack
+async function viewSCPSeries(study, series, label) {
+  _previewReset();
+  _previewMode   = "series";
+  _previewStudy  = study;
+  _previewSeries = series;
+  _previewOpenModal(label || series);
+
+  // Fetch metadata for this series
+  try {
+    const r = await fetch(`/api/scp/series/frame?study=${encodeURIComponent(study)}&series=${encodeURIComponent(series)}&idx=0&info=1`);
+    const d = await r.json().catch(() => ({}));
+    if (d.ok) {
+      _previewTotalFrames = d.total_instances || 1;
+      const metaEl = document.getElementById("preview-modal-meta");
+      metaEl.textContent = [d.patient, d.modality, d.series_desc, d.study_date]
         .filter(Boolean).join("  ·  ");
     }
   } catch { /* non-critical */ }
+
+  previewGotoFrame(0, false);
 }
+
+// Mouse-wheel scrolls through frames inside the viewer
+document.getElementById("preview-modal").addEventListener("wheel", e => {
+  if (_previewMode === null) return;
+  e.preventDefault();
+  const dir = e.deltaY > 0 ? 1 : -1;
+  previewGotoFrame(_previewFrameIdx + dir);
+}, { passive: false });
+
+// Keyboard arrow keys for frame navigation when modal is open
+document.addEventListener("keydown", e => {
+  if (document.getElementById("preview-modal").style.display === "none") return;
+  if (_previewMode === null) return;
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+    e.preventDefault(); previewGotoFrame(_previewFrameIdx + 1);
+  } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+    e.preventDefault(); previewGotoFrame(_previewFrameIdx - 1);
+  }
+});
 
 function applyPreviewFilter() {
   const img    = document.getElementById("preview-modal-img");
@@ -2775,6 +2909,186 @@ function applyPreviewFilter() {
 function closePreviewModal() {
   document.getElementById("preview-modal").style.display = "none";
   document.getElementById("preview-modal-img").src = "";
+  _previewReset();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Received Studies tree
+// ─────────────────────────────────────────────────────────────────
+
+async function loadSCPStudies() {
+  const treeEl = document.getElementById("scp-studies-tree");
+  const infoEl = document.getElementById("scp-studies-info");
+  infoEl.textContent = "Loading…";
+  treeEl.innerHTML   = "";
+
+  let data;
+  try {
+    const res = await fetch("/api/scp/studies");
+    data = await res.json();
+    if (!data.ok) { infoEl.textContent = "Error: " + data.error; return; }
+  } catch (e) {
+    infoEl.textContent = "Error: " + e.message; return;
+  }
+
+  const studies = data.studies || [];
+  const legacy  = data.legacy  || [];
+  const total   = studies.reduce((s, st) => s + st.series.reduce((a, se) => a + se.count, 0), 0)
+                + legacy.length;
+  infoEl.textContent = `${studies.length} study / ${studies.reduce((s,st)=>s+st.series.length,0)} series / ${total} image(s)`;
+
+  if (!studies.length && !legacy.length) {
+    treeEl.innerHTML = '<div style="color:#888; font-size:12px; padding:8px 0">No studies received yet.</div>';
+    return;
+  }
+
+  // ── Studies ──────────────────────────────────────────────────────
+  studies.forEach(study => {
+    const m = study.meta || {};
+    const studyEl = document.createElement("div");
+    studyEl.style.cssText = "border:1px solid #e0e0e0; border-radius:4px; margin-bottom:8px; overflow:hidden";
+
+    // Study header
+    const hdr = document.createElement("div");
+    hdr.style.cssText = "background:#f8f8f8; padding:8px 12px; cursor:pointer; display:flex; align-items:center; gap:8px; user-select:none";
+    const arrow = document.createElement("span");
+    arrow.textContent = "▾";
+    arrow.style.cssText = "font-size:11px; color:#888; transition:transform .15s";
+    const info = document.createElement("span");
+    info.style.cssText = "font-size:12px; flex:1";
+    const name = m.PatientName ? `<strong>${escapeHtml(m.PatientName)}</strong>` : "<em style='color:#888'>Unknown Patient</em>";
+    const pid  = m.PatientID ? ` [${escapeHtml(m.PatientID)}]` : "";
+    const desc = m.StudyDescription ? ` — ${escapeHtml(m.StudyDescription)}` : "";
+    const date = m.StudyDate ? ` <span style='color:#888'>${_fmtDicomDate(m.StudyDate)}</span>` : "";
+    info.innerHTML = name + pid + desc + date;
+
+    // Delete-study button
+    const delBtn = document.createElement("button");
+    delBtn.className = "btn";
+    delBtn.style.cssText = "font-size:11px; padding:2px 8px; color:#dc2626; border-color:#fca5a5; flex-shrink:0";
+    delBtn.textContent = "Delete Study";
+    delBtn.onclick = e => { e.stopPropagation(); scpDeleteStudy(study.uid, study.series.map(s=>s.uid), studyEl); };
+
+    hdr.appendChild(arrow);
+    hdr.appendChild(info);
+    hdr.appendChild(delBtn);
+
+    // Series body
+    const body = document.createElement("div");
+    body.style.cssText = "padding:0 0 4px 0";
+
+    study.series.forEach(ser => {
+      const sm = ser.meta || {};
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex; align-items:center; gap:8px; padding:6px 12px 6px 28px; border-top:1px solid #f0f0f0; font-size:12px";
+
+      const mod = document.createElement("span");
+      mod.textContent = sm.Modality || "??";
+      mod.style.cssText = "background:#dbeafe; color:#1e40af; border-radius:3px; padding:0 5px; font-size:11px; font-weight:600; flex-shrink:0";
+
+      const sdesc = document.createElement("span");
+      sdesc.style.cssText = "flex:1; color:#374151; overflow:hidden; text-overflow:ellipsis; white-space:nowrap";
+      sdesc.textContent = (sm.SeriesDescription || "Series " + (sm.SeriesNumber || "?")) + ` (${ser.count} img)`;
+
+      const viewBtn = document.createElement("button");
+      viewBtn.className = "btn primary";
+      viewBtn.style.cssText = "font-size:11px; padding:2px 8px; flex-shrink:0";
+      viewBtn.textContent = "View ▶";
+      const viewLabel = (sm.Modality || "Series") + " — " + (sm.SeriesDescription || ser.uid.slice(0, 16));
+      viewBtn.onclick = () => viewSCPSeries(study.uid, ser.uid, viewLabel);
+
+      const delSer = document.createElement("button");
+      delSer.className = "btn";
+      delSer.style.cssText = "font-size:11px; padding:2px 8px; color:#dc2626; border-color:#fca5a5; flex-shrink:0";
+      delSer.textContent = "Del";
+      delSer.onclick = () => scpDeleteSeries(study.uid, ser.uid, row, study.uid, studyEl, study.series.length);
+
+      row.appendChild(mod);
+      row.appendChild(sdesc);
+      row.appendChild(viewBtn);
+      row.appendChild(delSer);
+      body.appendChild(row);
+    });
+
+    // Toggle collapse
+    hdr.addEventListener("click", () => {
+      const collapsed = body.style.display === "none";
+      body.style.display = collapsed ? "" : "none";
+      arrow.style.transform = collapsed ? "" : "rotate(-90deg)";
+    });
+
+    studyEl.appendChild(hdr);
+    studyEl.appendChild(body);
+    treeEl.appendChild(studyEl);
+  });
+
+  // ── Legacy flat files ────────────────────────────────────────────
+  if (legacy.length) {
+    const legEl = document.createElement("div");
+    legEl.style.cssText = "border:1px solid #e0e0e0; border-radius:4px; overflow:hidden; margin-bottom:8px";
+    const legHdr = document.createElement("div");
+    legHdr.style.cssText = "background:#f8f8f8; padding:8px 12px; font-size:12px; color:#555";
+    legHdr.textContent   = `Legacy flat files (${legacy.length})`;
+    legEl.appendChild(legHdr);
+    legacy.forEach(f => {
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex; align-items:center; gap:8px; padding:5px 12px; border-top:1px solid #f0f0f0; font-size:12px";
+      const nm = document.createElement("span");
+      nm.style.flex = "1";
+      nm.textContent = f.name;
+      const pvBtn = document.createElement("button");
+      pvBtn.className = "btn";
+      pvBtn.style.cssText = "font-size:11px; padding:2px 8px";
+      pvBtn.textContent = "Preview";
+      pvBtn.onclick = () => scpFilePreview(f.name);
+      const delBtn = document.createElement("button");
+      delBtn.className = "btn";
+      delBtn.style.cssText = "font-size:11px; padding:2px 8px; color:#dc2626; border-color:#fca5a5";
+      delBtn.textContent = "Delete";
+      delBtn.onclick = () => scpFileDelete(f.name, row);
+      row.setAttribute("data-legacy-row", "1");
+      row.appendChild(nm); row.appendChild(pvBtn); row.appendChild(delBtn);
+      legEl.appendChild(row);
+    });
+    treeEl.appendChild(legEl);
+  }
+}
+
+function _fmtDicomDate(d) {
+  if (!d || d.length < 8) return d;
+  return `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
+}
+
+async function scpDeleteStudy(studyUid, seriesUids, rowEl) {
+  if (!confirm(`Delete entire study (${seriesUids.length} series)?\n\nThis cannot be undone.`)) return;
+  let ok = true;
+  for (const serUid of seriesUids) {
+    try {
+      const r = await fetch("/api/scp/series/delete",
+        { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ study: studyUid, series: serUid }) });
+      const d = await r.json().catch(() => ({}));
+      if (!d.ok) ok = false;
+    } catch { ok = false; }
+  }
+  if (!ok) alert("Some series could not be deleted.");
+  rowEl.remove();
+}
+
+async function scpDeleteSeries(studyUid, serUid, rowEl) {
+  if (!confirm(`Delete series?\n${serUid}\n\nThis cannot be undone.`)) return;
+  try {
+    const res  = await fetch("/api/scp/series/delete",
+      { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ study: studyUid, series: serUid }) });
+    const data = await res.json();
+    if (!data.ok) { alert("Error: " + data.error); return; }
+    rowEl.remove();
+    // Reload tree so study disappears if now empty
+    loadSCPStudies();
+  } catch (e) {
+    alert("Error: " + e);
+  }
 }
 
 async function scpFileDelete(name, rowEl) {
