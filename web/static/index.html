@@ -2807,14 +2807,9 @@ function _previewShowFrame(url, idx, total) {
 }
 
 // Navigate to frame/instance idx  (fromSlider=true skips re-setting slider)
-async function previewGotoFrame(idx, fromSlider = false) {
+function previewGotoFrame(idx, fromSlider = false) {
   if (_previewLoading) return;
   idx = Math.max(0, Math.min(idx, _previewTotalFrames - 1));
-  if (idx === _previewFrameIdx && _previewLoading === false) {
-    // No-op unless first call
-    const label = document.getElementById("preview-frame-label");
-    if (label.textContent !== "") return;
-  }
   _previewLoading = true;
 
   let url;
