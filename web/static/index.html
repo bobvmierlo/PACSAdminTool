@@ -322,10 +322,48 @@
     .about-links { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; }
     .about-links a { color: #2b6cb0; font-size: 13px; text-decoration: none; }
     .about-links a:hover { text-decoration: underline; }
+
+    /* ── Offline overlay ──────────────────────────────────────────── */
+    #offline-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      background: rgba(0, 0, 0, 0.45);
+      align-items: center;
+      justify-content: center;
+    }
+    #offline-overlay.visible { display: flex; }
+    #offline-box {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+      padding: 36px 44px;
+      text-align: center;
+      max-width: 340px;
+    }
+    #offline-box .offline-icon { font-size: 40px; margin-bottom: 12px; }
+    #offline-box h2 { font-size: 18px; font-weight: 700; margin-bottom: 8px; color: #1a1a1a; }
+    #offline-box p  { font-size: 13px; color: #666; line-height: 1.5; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+    #offline-box .reconnecting { margin-top: 18px; font-size: 12px; color: #999;
+                                 animation: pulse 1.8s ease-in-out infinite; }
   </style>
 </head>
 
 <body>
+
+<!-- ── Offline overlay ──────────────────────────────────────────────────── -->
+<div id="offline-overlay" role="alertdialog" aria-modal="true" aria-labelledby="offline-title">
+  <div id="offline-box">
+    <div class="offline-icon">🔌</div>
+    <h2 id="offline-title">Server Offline</h2>
+    <p>The connection to the PACS Admin Tool server has been lost.</p>
+    <div class="reconnecting">Reconnecting…</div>
+  </div>
+</div>
 
 <!-- ══════════════════════════════════════════════════════════════════
      TOP HEADER
@@ -1306,11 +1344,13 @@ const socket = io();
 socket.on("connect", () => {
   document.getElementById("ws-status").textContent = "⬤ " + i18n("common.connected");
   document.getElementById("ws-status").style.color = "#15803d";
+  document.getElementById("offline-overlay").classList.remove("visible");
 });
 
 socket.on("disconnect", () => {
   document.getElementById("ws-status").textContent = "⬤ " + i18n("common.disconnected");
   document.getElementById("ws-status").style.color = "#dc2626";
+  document.getElementById("offline-overlay").classList.add("visible");
 });
 
 // "log" events come from server._log() calls in server.py.
