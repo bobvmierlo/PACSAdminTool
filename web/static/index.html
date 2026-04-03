@@ -958,46 +958,102 @@
   </div>
 
   <!-- ── Custom Anonymisation Profile Manager Modal ─────────────────── -->
-  <div class="modal-backdrop" id="anon-profile-modal" style="display:none; align-items:flex-start; justify-content:center; padding-top:48px"
+  <div class="modal-backdrop" id="anon-profile-modal"
+       style="display:none; align-items:center; justify-content:center"
        onclick="if(event.target===this)closeAnonProfileManager()">
-    <div style="background:#fff; border-radius:10px; box-shadow:0 8px 32px rgba(0,0,0,.2);
-                width:min(96vw,760px); max-height:85vh; display:flex; flex-direction:column; overflow:hidden">
-      <div style="padding:16px 20px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center">
-        <span style="font-size:16px; font-weight:700">Anonymisation Profiles</span>
+    <div style="background:#fff; border-radius:10px; box-shadow:0 8px 40px rgba(0,0,0,.25);
+                width:min(96vw,1100px); height:min(92vh,760px); display:flex; flex-direction:column; overflow:hidden">
+
+      <!-- Header -->
+      <div style="padding:14px 20px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center; flex-shrink:0">
+        <span style="font-size:16px; font-weight:700">Anonymisation Profile Manager</span>
         <button onclick="closeAnonProfileManager()"
                 style="background:none; border:none; font-size:22px; cursor:pointer; color:#6b7280; line-height:1">×</button>
       </div>
+
       <div style="display:flex; flex:1; overflow:hidden; min-height:0">
-        <!-- Profile list -->
-        <div style="width:210px; border-right:1px solid #e5e7eb; overflow-y:auto; padding:10px 8px; flex-shrink:0">
-          <button class="btn primary" style="width:100%; margin-bottom:10px; font-size:12px"
-                  onclick="anonProfileNew()">+ New Profile</button>
-          <div id="anon-profile-list" style="display:flex; flex-direction:column; gap:4px"></div>
+
+        <!-- Sidebar: profile list -->
+        <div style="width:240px; border-right:1px solid #e5e7eb; display:flex; flex-direction:column; flex-shrink:0">
+          <div style="padding:10px 10px 6px">
+            <button class="btn primary" style="width:100%; margin-bottom:6px; font-size:12px"
+                    onclick="anonProfileNew()">+ New Profile</button>
+            <!-- Built-in profiles (read-only labels, click to copy) -->
+            <div style="font-size:10px; font-weight:700; color:#9ca3af; text-transform:uppercase;
+                        letter-spacing:.06em; padding:6px 4px 2px">Built-in (read-only)</div>
+            <button onclick="anonProfileCopyBuiltin('basic')"
+                    style="display:block; width:100%; text-align:left; padding:5px 8px; font-size:12px;
+                           background:none; border:1px solid #e5e7eb; border-radius:4px; cursor:pointer;
+                           color:#374151; margin-bottom:4px"
+                    title="Click to copy to a new custom profile">
+              📋 Basic <span style="float:right;font-size:10px;color:#9ca3af">copy</span>
+            </button>
+            <button onclick="anonProfileCopyBuiltin('full')"
+                    style="display:block; width:100%; text-align:left; padding:5px 8px; font-size:12px;
+                           background:none; border:1px solid #e5e7eb; border-radius:4px; cursor:pointer;
+                           color:#374151; margin-bottom:8px"
+                    title="Click to copy to a new custom profile">
+              📋 Full <span style="float:right;font-size:10px;color:#9ca3af">copy</span>
+            </button>
+            <div style="font-size:10px; font-weight:700; color:#9ca3af; text-transform:uppercase;
+                        letter-spacing:.06em; padding:2px 4px 4px">Custom Profiles</div>
+          </div>
+          <div id="anon-profile-list" style="overflow-y:auto; flex:1; padding:0 10px 10px;
+               display:flex; flex-direction:column; gap:4px"></div>
         </div>
-        <!-- Profile editor -->
-        <div id="anon-profile-editor" style="flex:1; padding:16px 20px; overflow-y:auto; display:none">
-          <div class="field" style="margin-bottom:12px">
-            <label style="font-weight:600; font-size:13px">Profile Name</label>
-            <input id="apm-name" style="margin-top:4px; font-size:13px" placeholder="My Custom Profile">
+
+        <!-- Editor pane -->
+        <div id="anon-profile-editor" style="flex:1; display:none; flex-direction:column; overflow:hidden">
+
+          <!-- Editor header: name + copy-from -->
+          <div style="padding:14px 20px 10px; border-bottom:1px solid #f3f4f6; flex-shrink:0">
+            <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap">
+              <div class="field" style="flex:1; min-width:200px; margin:0">
+                <label style="font-weight:600; font-size:13px">Profile Name</label>
+                <input id="apm-name" style="margin-top:4px; font-size:13px" placeholder="My Custom Profile">
+              </div>
+              <div class="field" style="min-width:220px; margin:0">
+                <label style="font-size:11px; color:#6b7280">Copy tags from…</label>
+                <select id="apm-copy-from" style="margin-top:4px; font-size:12px"
+                        onchange="apmApplyCopyFrom()">
+                  <option value="">(no copy — start from current selection)</option>
+                  <option value="basic">Basic – patient identifiers &amp; institution</option>
+                  <option value="full">Full – all PHI including descriptions</option>
+                  <option value="__sep__" disabled>── Custom Profiles ──</option>
+                </select>
+              </div>
+            </div>
+            <div style="font-size:11px; color:#6b7280; margin-top:8px">
+              Check the tags that should be <strong>cleared (removed/blanked)</strong> when anonymising.
+              Future: per-tag replacement values for research pseudonymisation.
+            </div>
           </div>
-          <div style="font-size:13px; font-weight:600; margin-bottom:8px; color:#374151">Tags to clear (remove)</div>
-          <div style="font-size:12px; color:#6b7280; margin-bottom:10px">
-            Check the tags that should be blanked/removed from the DICOM files.
+
+          <!-- Tag search + list -->
+          <div style="padding:10px 20px 6px; flex-shrink:0">
+            <input id="apm-tag-filter" type="text" placeholder="Search tags by name or code…"
+                   style="width:100%; box-sizing:border-box; font-size:12px;
+                          padding:6px 10px; border:1px solid #d1d5db; border-radius:6px"
+                   oninput="renderApmTagList()">
           </div>
-          <input id="apm-tag-filter" type="text" placeholder="Search tags…"
-                 style="width:100%; box-sizing:border-box; margin-bottom:10px; font-size:12px;
-                        padding:5px 8px; border:1px solid #d1d5db; border-radius:4px"
-                 oninput="renderApmTagList()">
-          <div id="apm-tag-list" style="display:flex; flex-direction:column; gap:2px; max-height:340px; overflow-y:auto;
-                border:1px solid #e5e7eb; border-radius:6px; padding:8px; background:#fafafa"></div>
-          <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap">
+          <div id="apm-tag-list"
+               style="flex:1; overflow-y:auto; margin:0 20px 10px; padding:8px;
+                      border:1px solid #e5e7eb; border-radius:8px; background:#fafafa"></div>
+
+          <!-- Footer actions -->
+          <div style="padding:10px 20px 14px; border-top:1px solid #e5e7eb; display:flex; gap:8px; flex-wrap:wrap; flex-shrink:0">
             <button class="btn primary" onclick="anonProfileSave()">Save Profile</button>
             <button class="btn danger" id="apm-delete-btn" onclick="anonProfileDelete()" style="display:none">Delete Profile</button>
-            <button class="btn" onclick="closeAnonProfileManager()">Cancel</button>
+            <button class="btn" onclick="closeAnonProfileManager()">Close</button>
+            <span id="apm-status" style="font-size:12px; color:#6b7280; align-self:center"></span>
           </div>
         </div>
-        <div id="anon-profile-placeholder" style="flex:1; padding:40px 20px; color:#9ca3af; text-align:center; font-size:13px">
-          Select a profile on the left, or create a new one.
+
+        <div id="anon-profile-placeholder"
+             style="flex:1; display:flex; align-items:center; justify-content:center;
+                    color:#9ca3af; font-size:13px; flex-direction:column; gap:10px">
+          <div style="font-size:32px">📋</div>
+          <div>Select a profile on the left, or create a new one.</div>
         </div>
       </div>
     </div>
@@ -1364,17 +1420,45 @@
 ══════════════════════════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="preview-modal" style="display:none; align-items:center; justify-content:center"
      onclick="if(event.target===this)closePreviewModal()">
-  <div style="background:#1a1a1a; border-radius:8px; padding:16px; max-width:90vw; max-height:90vh;
-              display:flex; flex-direction:column; gap:10px; min-width:300px">
-    <div style="display:flex; justify-content:space-between; align-items:center">
-      <span id="preview-modal-title" style="color:#e5e7eb; font-size:14px; font-weight:600"></span>
+  <div style="background:#1a1a1a; border-radius:8px; padding:14px; max-width:92vw; max-height:94vh;
+              display:flex; flex-direction:column; gap:8px; min-width:320px">
+
+    <!-- Header -->
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px">
+      <div>
+        <div id="preview-modal-title" style="color:#e5e7eb; font-size:13px; font-weight:600; word-break:break-all"></div>
+        <div id="preview-modal-meta" style="color:#9ca3af; font-size:11px; margin-top:2px"></div>
+      </div>
       <button onclick="closePreviewModal()"
-              style="background:none; border:none; color:#9ca3af; font-size:20px; cursor:pointer; line-height:1">×</button>
+              style="background:none; border:none; color:#9ca3af; font-size:22px; cursor:pointer; line-height:1; flex-shrink:0">×</button>
     </div>
-    <div style="overflow:auto; display:flex; align-items:center; justify-content:center">
-      <img id="preview-modal-img" style="max-width:80vw; max-height:75vh; display:block; border-radius:4px">
+
+    <!-- Image area -->
+    <div style="overflow:auto; display:flex; align-items:center; justify-content:center;
+                flex:1; min-height:0; background:#000; border-radius:4px">
+      <img id="preview-modal-img" style="max-width:88vw; max-height:74vh; display:none; border-radius:2px; image-rendering:pixelated">
     </div>
-    <div id="preview-modal-msg" style="color:#9ca3af; font-size:12px; text-align:center; display:none"></div>
+    <div id="preview-modal-msg" style="color:#9ca3af; font-size:12px; text-align:center; padding:20px 0"></div>
+
+    <!-- Window / Level sliders -->
+    <div style="display:flex; gap:16px; align-items:center; padding:4px 0; flex-wrap:wrap">
+      <label style="display:flex; align-items:center; gap:8px; color:#9ca3af; font-size:11px; flex:1; min-width:160px">
+        Brightness
+        <input type="range" id="preview-brightness" min="10" max="300" value="100"
+               style="flex:1" oninput="applyPreviewFilter()">
+        <span id="preview-brt-val" style="width:32px; text-align:right; color:#e5e7eb; font-size:11px">100</span>
+      </label>
+      <label style="display:flex; align-items:center; gap:8px; color:#9ca3af; font-size:11px; flex:1; min-width:160px">
+        Contrast
+        <input type="range" id="preview-contrast" min="10" max="400" value="100"
+               style="flex:1" oninput="applyPreviewFilter()">
+        <span id="preview-ctr-val" style="width:32px; text-align:right; color:#e5e7eb; font-size:11px">100</span>
+      </label>
+      <button class="btn" style="font-size:11px; padding:2px 10px; color:#9ca3af; border-color:#4b5563; background:transparent"
+              onclick="document.getElementById('preview-brightness').value=100;
+                       document.getElementById('preview-contrast').value=100;
+                       applyPreviewFilter()">Reset</button>
+    </div>
   </div>
 </div>
 
@@ -2628,30 +2712,64 @@ async function scpFileInspect(name) {
 }
 
 async function scpFilePreview(name) {
-  const modal    = document.getElementById("preview-modal");
-  const titleEl  = document.getElementById("preview-modal-title");
-  const imgEl    = document.getElementById("preview-modal-img");
-  const msgEl    = document.getElementById("preview-modal-msg");
-  titleEl.textContent = name;
-  imgEl.style.display = "none";
-  msgEl.style.display = "block";
-  msgEl.textContent   = "Loading…";
-  modal.style.display = "flex";
-  try {
-    const res = await fetch(`/api/scp/files/preview?name=${encodeURIComponent(name)}`);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      msgEl.textContent = "Cannot preview: " + (data.error || res.statusText);
-      return;
+  const modal   = document.getElementById("preview-modal");
+  const titleEl = document.getElementById("preview-modal-title");
+  const imgEl   = document.getElementById("preview-modal-img");
+  const msgEl   = document.getElementById("preview-modal-msg");
+  const metaEl  = document.getElementById("preview-modal-meta");
+  const brtEl   = document.getElementById("preview-brightness");
+  const ctrEl   = document.getElementById("preview-contrast");
+
+  titleEl.textContent       = name;
+  imgEl.style.display       = "none";
+  msgEl.style.display       = "block";
+  msgEl.textContent         = "Loading…";
+  metaEl.textContent        = "";
+  modal.style.display       = "flex";
+  if (brtEl) brtEl.value   = 100;
+  if (ctrEl) ctrEl.value   = 100;
+  applyPreviewFilter();
+
+  // Use the URL directly — same-origin request carries session cookie,
+  // no blob: URL needed, works with 'self' img-src CSP.
+  const url = `/api/scp/files/preview?name=${encodeURIComponent(name)}&_=${Date.now()}`;
+
+  imgEl.onload  = () => { imgEl.style.display = "block"; msgEl.style.display = "none"; };
+  imgEl.onerror = async () => {
+    // The server returned a non-image response (JSON error); fetch it to read the message.
+    try {
+      const r = await fetch(url.replace(/&_=\d+/, ""));
+      const d = await r.json().catch(() => ({}));
+      msgEl.textContent = "Cannot preview: " + (d.error || "Unknown error");
+    } catch {
+      msgEl.textContent = "Cannot preview this file (no pixel data or unsupported format).";
     }
-    const blob = await res.blob();
-    imgEl.src = URL.createObjectURL(blob);
-    imgEl.onload = () => URL.revokeObjectURL(imgEl.src);
-    imgEl.style.display = "block";
-    msgEl.style.display = "none";
-  } catch (e) {
-    msgEl.textContent = "Error: " + e;
-  }
+  };
+  imgEl.src = url;
+
+  // Fetch metadata in parallel for the info strip
+  try {
+    const r = await fetch(`/api/scp/files/inspect?name=${encodeURIComponent(name)}`);
+    const d = await r.json().catch(() => ({}));
+    if (d.ok && d.meta) {
+      const m = d.meta;
+      metaEl.textContent = [m.PatientName, m.PatientID, m.Modality, m.StudyDate]
+        .filter(Boolean).join("  ·  ");
+    }
+  } catch { /* non-critical */ }
+}
+
+function applyPreviewFilter() {
+  const img    = document.getElementById("preview-modal-img");
+  const brtEl  = document.getElementById("preview-brightness");
+  const ctrEl  = document.getElementById("preview-contrast");
+  const brt    = brtEl?.value ?? 100;
+  const ctr    = ctrEl?.value ?? 100;
+  img.style.filter = `brightness(${brt}%) contrast(${ctr}%)`;
+  const bv = document.getElementById("preview-brt-val");
+  const cv = document.getElementById("preview-ctr-val");
+  if (bv) bv.textContent = brt;
+  if (cv) cv.textContent = ctr;
 }
 
 function closePreviewModal() {
@@ -3963,13 +4081,43 @@ function _rebuildAnonProfileDropdown() {
       sel.appendChild(opt);
     });
   }
+  // Keep copy-from dropdown in sync if modal is open
+  if (document.getElementById("anon-profile-modal").style.display !== "none") {
+    _updateApmCopyFromOptions();
+  }
+}
+
+// JS tag sets matching Python _ANON_BASIC and _ANON_FULL for copy-from
+const _APM_BASIC_TAGS = [
+  "(0008,0050)","(0008,0080)","(0008,0081)","(0008,0090)","(0008,1010)",
+  "(0008,1048)","(0008,1070)","(0010,0030)","(0010,0040)","(0010,1000)",
+  "(0010,1010)","(0010,1020)","(0010,1030)","(0010,1040)","(0010,2160)",
+  "(0010,21B0)","(0020,0010)","(0032,1032)","(0032,1060)",
+];
+const _APM_FULL_TAGS = [..._APM_BASIC_TAGS,
+  "(0008,1030)","(0008,103E)","(0018,1030)","(0032,1070)",
+  "(0040,0006)","(0040,0007)","(0040,0009)",
+];
+
+// Tracks checked tags in the editor (source of truth while editing)
+let _apmCurrentChecked = new Set();
+
+function _apmShowEditor() {
+  document.getElementById("anon-profile-editor").style.display = "flex";
+  document.getElementById("anon-profile-placeholder").style.display = "none";
+}
+
+function _apmHideEditor() {
+  document.getElementById("anon-profile-editor").style.display = "none";
+  document.getElementById("anon-profile-placeholder").style.display = "flex";
 }
 
 function openAnonProfileManager() {
   _apmEditingKey = null;
+  _apmCurrentChecked = new Set();
   renderApmProfileList();
-  document.getElementById("anon-profile-editor").style.display = "none";
-  document.getElementById("anon-profile-placeholder").style.display = "";
+  _updateApmCopyFromOptions();
+  _apmHideEditor();
   document.getElementById("anon-profile-modal").style.display = "flex";
 }
 
@@ -3977,12 +4125,24 @@ function closeAnonProfileManager() {
   document.getElementById("anon-profile-modal").style.display = "none";
 }
 
+function _updateApmCopyFromOptions() {
+  const sel = document.getElementById("apm-copy-from");
+  // Remove any custom profile options (keep first 4: blank, basic, full, sep)
+  while (sel.options.length > 4) sel.remove(4);
+  Object.keys(_anonCustomProfiles).forEach(n => {
+    const opt = document.createElement("option");
+    opt.value = "custom:" + n;
+    opt.textContent = n;
+    sel.appendChild(opt);
+  });
+}
+
 function renderApmProfileList() {
   const list = document.getElementById("anon-profile-list");
   list.innerHTML = "";
   const names = Object.keys(_anonCustomProfiles);
   if (!names.length) {
-    list.innerHTML = '<div style="color:#9ca3af;font-size:12px;text-align:center;padding:8px">No custom profiles yet.</div>';
+    list.innerHTML = '<div style="color:#9ca3af;font-size:12px;padding:4px 2px">No custom profiles yet.<br>Create one with "+ New Profile".</div>';
     return;
   }
   names.forEach(n => {
@@ -3994,6 +4154,8 @@ function renderApmProfileList() {
       btn.style.borderColor = "#bfdbfe";
       btn.style.color = "#1d4ed8";
     }
+    btn.onmouseover = () => { if (n !== _apmEditingKey) btn.style.background = "#f9fafb"; };
+    btn.onmouseout  = () => { if (n !== _apmEditingKey) btn.style.background = ""; };
     btn.onclick = () => apmEditProfile(n);
     list.appendChild(btn);
   });
@@ -4002,53 +4164,90 @@ function renderApmProfileList() {
 function apmEditProfile(name) {
   _apmEditingKey = name;
   const p = _anonCustomProfiles[name] || { name, tags: [] };
+  _apmCurrentChecked = new Set(p.tags || []);
   document.getElementById("apm-name").value = p.name || name;
   document.getElementById("apm-delete-btn").style.display = "";
-  document.getElementById("anon-profile-editor").style.display = "";
-  document.getElementById("anon-profile-placeholder").style.display = "none";
+  document.getElementById("apm-copy-from").value = "";
   document.getElementById("apm-tag-filter").value = "";
+  document.getElementById("apm-status").textContent = "";
+  _apmShowEditor();
   renderApmTagList();
   renderApmProfileList();
 }
 
 function anonProfileNew() {
   _apmEditingKey = null;
+  _apmCurrentChecked = new Set();
   document.getElementById("apm-name").value = "";
   document.getElementById("apm-delete-btn").style.display = "none";
-  document.getElementById("anon-profile-editor").style.display = "";
-  document.getElementById("anon-profile-placeholder").style.display = "none";
+  document.getElementById("apm-copy-from").value = "";
   document.getElementById("apm-tag-filter").value = "";
+  document.getElementById("apm-status").textContent = "";
+  _apmShowEditor();
   renderApmTagList();
 }
 
-function renderApmTagList() {
-  const q = (document.getElementById("apm-tag-filter").value || "").toLowerCase();
-  const container = document.getElementById("apm-tag-list");
-  const currentTags = _apmEditingKey
-    ? ((_anonCustomProfiles[_apmEditingKey] || {}).tags || [])
-    : [];
-  const checked = new Set(currentTags);
+function anonProfileCopyBuiltin(which) {
+  // Open a new profile editor pre-populated from a built-in profile
+  anonProfileNew();
+  _apmCurrentChecked = new Set(which === "full" ? _APM_FULL_TAGS : _APM_BASIC_TAGS);
+  document.getElementById("apm-name").value = `${which === "full" ? "Full" : "Basic"} copy`;
+  renderApmTagList();
+}
 
+function apmApplyCopyFrom() {
+  const val = document.getElementById("apm-copy-from").value;
+  if (!val) return;
+  let tags = [];
+  if (val === "basic")         tags = _APM_BASIC_TAGS;
+  else if (val === "full")     tags = _APM_FULL_TAGS;
+  else if (val.startsWith("custom:")) {
+    const n = val.slice(7);
+    tags = (_anonCustomProfiles[n] || {}).tags || [];
+  }
+  _apmCurrentChecked = new Set(tags);
+  renderApmTagList();
+  // Reset the dropdown so user can apply again if needed
+  setTimeout(() => { document.getElementById("apm-copy-from").value = ""; }, 300);
+}
+
+function renderApmTagList() {
+  const q         = (document.getElementById("apm-tag-filter").value || "").toLowerCase();
+  const container = document.getElementById("apm-tag-list");
   container.innerHTML = "";
+
   _APM_KNOWN_TAGS.forEach(group => {
     const filteredTags = group.tags.filter(t =>
-      !q || t.label.toLowerCase().includes(q) || t.tag.includes(q)
+      !q || t.label.toLowerCase().includes(q) || t.tag.toLowerCase().includes(q)
     );
     if (!filteredTags.length) return;
 
     const hdr = document.createElement("div");
-    hdr.style.cssText = "font-size:11px; font-weight:700; color:#6b7280; padding:6px 4px 2px; text-transform:uppercase; letter-spacing:.04em";
+    hdr.style.cssText = "font-size:11px; font-weight:700; color:#6b7280; padding:8px 4px 3px; text-transform:uppercase; letter-spacing:.05em";
     hdr.textContent = group.group;
     container.appendChild(hdr);
 
     filteredTags.forEach(t => {
       const row = document.createElement("label");
-      row.style.cssText = "display:flex; align-items:center; gap:8px; padding:3px 4px; cursor:pointer; border-radius:3px; font-size:12px";
-      row.innerHTML =
-        `<input type="checkbox" value="${t.tag}" ${checked.has(t.tag) ? "checked" : ""}>` +
-        `<span style="flex:1">${t.label}</span>` +
-        `<span style="font-family:Consolas; font-size:10px; color:#9ca3af">${t.tag}</span>`;
-      row.onmouseover = () => row.style.background = "#f3f4f6";
+      row.style.cssText = "display:flex; align-items:center; gap:10px; padding:5px 6px; cursor:pointer; border-radius:4px; font-size:13px; user-select:none";
+      const cb = document.createElement("input");
+      cb.type    = "checkbox";
+      cb.value   = t.tag;
+      cb.checked = _apmCurrentChecked.has(t.tag);
+      cb.addEventListener("change", () => {
+        if (cb.checked) _apmCurrentChecked.add(t.tag);
+        else            _apmCurrentChecked.delete(t.tag);
+      });
+      const labelSpan = document.createElement("span");
+      labelSpan.style.flex = "1";
+      labelSpan.textContent = t.label;
+      const tagSpan = document.createElement("span");
+      tagSpan.style.cssText = "font-family:Consolas; font-size:10px; color:#9ca3af";
+      tagSpan.textContent = t.tag;
+      row.appendChild(cb);
+      row.appendChild(labelSpan);
+      row.appendChild(tagSpan);
+      row.onmouseover = () => row.style.background = "#f0f9ff";
       row.onmouseout  = () => row.style.background = "";
       container.appendChild(row);
     });
@@ -4058,9 +4257,8 @@ function renderApmTagList() {
 async function anonProfileSave() {
   const name = document.getElementById("apm-name").value.trim();
   if (!name) { alert("Enter a profile name."); return; }
-  const tags = Array.from(
-    document.querySelectorAll("#apm-tag-list input[type=checkbox]:checked")
-  ).map(cb => cb.value);
+  const tags = [..._apmCurrentChecked];
+  const statusEl = document.getElementById("apm-status");
   try {
     const res  = await fetch("/api/dicom/anon_profiles", {
       method: "POST",
@@ -4070,14 +4268,14 @@ async function anonProfileSave() {
     const data = await res.json();
     if (!data.ok) { alert("Error saving: " + data.error); return; }
     if (_apmEditingKey && _apmEditingKey !== name) {
-      // Name changed — delete old key
       await fetch(`/api/dicom/anon_profiles/${encodeURIComponent(_apmEditingKey)}`,
                   { method: "DELETE" });
     }
     await _loadAnonProfilesFromServer();
     _apmEditingKey = name;
     renderApmProfileList();
-    apmEditProfile(name);
+    statusEl.textContent = `Saved "${name}".`;
+    setTimeout(() => { statusEl.textContent = ""; }, 2500);
   } catch (e) { alert("Error: " + e); }
 }
 
@@ -4088,10 +4286,10 @@ async function anonProfileDelete() {
     await fetch(`/api/dicom/anon_profiles/${encodeURIComponent(_apmEditingKey)}`,
                 { method: "DELETE" });
     _apmEditingKey = null;
+    _apmCurrentChecked = new Set();
     await _loadAnonProfilesFromServer();
     renderApmProfileList();
-    document.getElementById("anon-profile-editor").style.display = "none";
-    document.getElementById("anon-profile-placeholder").style.display = "";
+    _apmHideEditor();
   } catch (e) { alert("Error: " + e); }
 }
 
