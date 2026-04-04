@@ -2784,8 +2784,37 @@ async function updInstall() {
       body:    JSON.stringify({ action: "restart" }),
     });
   } catch (_) { /* expected – server exits */ }
-  // The server will restart; show the offline overlay which already exists
+
+  // Show the offline overlay with update-specific messaging.
+  document.getElementById("offline-title").textContent = "Installing update…";
+  document.querySelector("#offline-box p").textContent =
+    "The server is restarting with the new version. The page will reload automatically.";
   document.getElementById("offline-overlay").classList.add("visible");
+
+  // Poll /api/health until the server comes back, then reload.
+  _pollUntilRestart();
+}
+
+function _pollUntilRestart() {
+  const INTERVAL_MS = 2000;
+  const MAX_WAIT_MS = 120000;   // give up after 2 minutes
+  const started     = Date.now();
+
+  const timer = setInterval(async () => {
+    if (Date.now() - started > MAX_WAIT_MS) {
+      clearInterval(timer);
+      document.querySelector("#offline-box p").textContent =
+        "Restart is taking longer than expected. Please refresh the page manually.";
+      return;
+    }
+    try {
+      const res = await fetch("/api/health", { cache: "no-store" });
+      if (res.ok) {
+        clearInterval(timer);
+        location.reload();
+      }
+    } catch (_) { /* server still down – keep polling */ }
+  }, INTERVAL_MS);
 }
 
 function _updShowError(msg) {
