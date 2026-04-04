@@ -33,6 +33,28 @@ Can also be run locally with Python and pip, or deployed as a Docker container.
 
 ---
 
+## Automatic Update Notifications
+
+Both the desktop GUI and the web UI check GitHub Releases on startup and show a **styled notification banner** when a newer version is available.
+
+**Web UI** — a blue slide-in banner appears below the header bar:
+- Shows the new version number and a link to the release page
+- On `.exe` builds: a **"Download Update"** button downloads the new binary in the background; once ready it becomes **"Install & Restart"** — the swap and restart happen automatically
+
+**Desktop GUI** — a matching blue banner appears between the header and tabs:
+- Same Download / Install & Restart / View Release buttons
+- Fires 3 seconds after startup in a background thread; the UI is never blocked
+
+**Auto-update details:**
+- Works for frozen PyInstaller executables (`PacsAdminTool.exe`, `PacsAdminToolWeb.exe`)
+- Windows: a detached batch script performs the swap after the process exits, then relaunches
+- Linux/macOS: the binary is replaced in-place and `os.execv()` restarts the process
+- Docker and source-code installs: only the "View Release ↗" link is shown (no auto-update)
+- Uses only Python standard-library modules (`urllib`, `json`, `threading`) — **no extra packages required**
+- Results are cached for 1 hour; GitHub is never contacted more than once per hour
+
+---
+
 ## System Tray Icon
 
 Both the desktop GUI and the web server can show a **system tray icon** (notification area, bottom-right on Windows) when `pystray` and `Pillow` are installed. The app works without them, but system tray functionality will be disabled.
