@@ -146,7 +146,7 @@
   <button class="tool-btn active" id="btn-wl"      onclick="setTool('WindowLevel')">Window / Level</button>
   <button class="tool-btn"        id="btn-scroll"   onclick="setTool('Scroll')">Scroll</button>
   <button class="tool-btn"        id="btn-zoom"     onclick="setTool('ZoomAndPan')">Zoom / Pan</button>
-  <button class="tool-btn"        id="btn-measure"  onclick="setTool('Measure')">Measure</button>
+  <button class="tool-btn"        id="btn-measure"  onclick="activateMeasure()">Measure</button>
   <div class="tool-sep"></div>
   <button class="tool-btn"        onclick="app.resetDisplay()">Reset View</button>
   <button class="tool-btn"        onclick="toggleFlip()">Flip H</button>
@@ -213,7 +213,7 @@ app.init({
     WindowLevel: {},
     Scroll:      {},
     ZoomAndPan:  {},
-    Measure:     {},
+    Draw:        { options: ['Ruler'] },  // Ruler = distance measurement
   },
 });
 
@@ -222,13 +222,20 @@ const _toolBtns = {
   WindowLevel: document.getElementById('btn-wl'),
   Scroll:      document.getElementById('btn-scroll'),
   ZoomAndPan:  document.getElementById('btn-zoom'),
-  Measure:     document.getElementById('btn-measure'),
+  Draw:        document.getElementById('btn-measure'), // Measure uses Draw+Ruler internally
 };
 
 function setTool(name) {
   app.setTool(name);
   Object.entries(_toolBtns).forEach(([k, btn]) =>
     btn.classList.toggle('active', k === name));
+}
+
+// Measurement = Draw tool with the Ruler shape (RulerFactory in dwv 0.33).
+// Must call setToolFeatures after setTool to select the shape.
+function activateMeasure() {
+  setTool('Draw');
+  app.setToolFeatures({ shapeName: 'Ruler' });
 }
 
 // ── W/L preset application ────────────────────────────────────
