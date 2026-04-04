@@ -66,6 +66,22 @@ def _is_frozen() -> bool:
     return getattr(sys, "frozen", False)
 
 
+def _detect_deployment() -> str:
+    """
+    Return the deployment type so the UI can show appropriate update instructions.
+
+    "exe"    – frozen PyInstaller executable (auto-update capable)
+    "docker" – running inside a Docker container (pull new image to update)
+    "source" – plain Python source / pip install (manual update)
+    """
+    if _is_frozen():
+        return "exe"
+    # Docker creates /.dockerenv; our image also sets PACS_DATA_DIR=/data.
+    if os.path.exists("/.dockerenv") or os.environ.get("PACS_DATA_DIR") == "/data":
+        return "docker"
+    return "source"
+
+
 def _parse_semver(v: str) -> tuple:
     """'v2.7.0.1' → (2, 7, 0, 1).  Handles 1–4 part versions.  Returns (0,0,0,0) on parse error."""
     v = v.lstrip("v").strip()
@@ -136,7 +152,8 @@ def check_for_update(force: bool = False) -> dict:
 
 
 def _build_update_info() -> dict:
-    current = _current_version()
+    current    = _current_version()
+    deployment = _detect_deployment()
     base = {
         "current_version": current,
         "latest_version":  current,
@@ -145,6 +162,7 @@ def _build_update_info() -> dict:
         "download_url":    None,
         "release_notes":   "",
         "can_auto_update": False,
+        "deployment":      deployment,
         "error":           None,
     }
     try:
@@ -181,6 +199,7 @@ def _build_update_info() -> dict:
         "download_url":    download_url,
         "release_notes":   notes[:500],
         "can_auto_update": can_auto_update,
+        "deployment":      deployment,
         "error":           None,
     }
 
