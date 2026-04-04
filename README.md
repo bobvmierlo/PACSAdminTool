@@ -374,3 +374,23 @@ The compiled `.exe` has **no runtime requirements**.
 | Web UI | 5000 |
 
 Configure in **Settings** tab or `~/.pacs_admin_tool/config.json`.
+
+---
+
+## Open-source credits
+
+The web UI bundles the following JavaScript libraries (all served locally, no CDN):
+
+| Library | Version | Author / Project | License | Link |
+|---------|---------|-----------------|---------|------|
+| **dwv** (DICOM Web Viewer) | 0.33 | Yves Martelli | GPL-3.0 | [github.com/ivmartel/dwv](https://github.com/ivmartel/dwv) |
+| **Konva** | 8.4.2 | Anton Lavrenov | MIT | [github.com/konvajs/konva](https://github.com/konvajs/konva) |
+| **JSZip** | 3.10.1 | Stuart Knightley | MIT / GPL-3.0 | [github.com/Stuk/jszip](https://github.com/Stuk/jszip) |
+| **magic-wand-tool** | 1.1.7 | Ryasnoy Paul | MIT | [github.com/Tamersoul/magic-wand-js](https://github.com/Tamersoul/magic-wand-js) |
+| **Socket.IO** (client) | 4.7.2 | Guillermo Rauch | MIT | [github.com/socketio/socket.io](https://github.com/socketio/socket.io) |
+
+The DICOM decoder Web Worker scripts bundled under `web/static/decoders/` originate from the **dwv** project and its upstream sources:
+
+- `decoders/pdfjs/` — JPEG 2000 / JPEG Baseline decoders adapted from [Mozilla PDF.js](https://github.com/mozilla/pdf.js) (Apache-2.0)
+- `decoders/rii-mango/` — JPEG Lossless decoder from [rii-mango/jpeg-lossless-decoder-js](https://github.com/rii-mango/JPEG-Lossless-decoder-JS) (MIT)
+- `decoders/dwv/` — RLE decoder from the dwv project (GPL-3.0)

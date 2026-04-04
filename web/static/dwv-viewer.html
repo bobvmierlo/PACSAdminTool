@@ -83,6 +83,19 @@
     .tool-btn:hover   { background: #444; color: #fff; }
     .tool-btn.active  { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }
     .tool-sep { width: 1px; height: 20px; background: #444; margin: 0 4px; }
+    /* W/L preset dropdown styled to match tool buttons */
+    #wl-preset {
+      background: #333;
+      border: 1px solid #444;
+      color: #ccc;
+      border-radius: 4px;
+      padding: 4px 6px;
+      cursor: pointer;
+      font-size: 12px;
+      height: 28px;
+    }
+    #wl-preset:hover { background: #444; color: #fff; }
+    #wl-preset option { background: #222; color: #ccc; }
 
     /* ── Main viewer area ────────────────────────────────────────── */
     #layout {
@@ -130,12 +143,31 @@
 
 <!-- Tool bar -->
 <div id="toolbar">
-  <button class="tool-btn active" id="btn-wl"     onclick="setTool('WindowLevel')">Window / Level</button>
-  <button class="tool-btn"        id="btn-scroll"  onclick="setTool('Scroll')">Scroll</button>
-  <button class="tool-btn"        id="btn-zoom"    onclick="setTool('ZoomAndPan')">Zoom / Pan</button>
+  <button class="tool-btn active" id="btn-wl"      onclick="setTool('WindowLevel')">Window / Level</button>
+  <button class="tool-btn"        id="btn-scroll"   onclick="setTool('Scroll')">Scroll</button>
+  <button class="tool-btn"        id="btn-zoom"     onclick="setTool('ZoomAndPan')">Zoom / Pan</button>
+  <button class="tool-btn"        id="btn-measure"  onclick="setTool('Measure')">Measure</button>
   <div class="tool-sep"></div>
   <button class="tool-btn"        onclick="app.resetDisplay()">Reset View</button>
   <button class="tool-btn"        onclick="toggleFlip()">Flip H</button>
+  <div class="tool-sep"></div>
+  <select id="wl-preset" title="Apply W/L preset" onchange="applyWLPreset(this)">
+    <option value="">W/L Preset…</option>
+    <optgroup label="CT">
+      <option value="40,80">CT Brain</option>
+      <option value="80,200">CT Subdural</option>
+      <option value="400,1800">CT Bone</option>
+      <option value="-600,1500">CT Lung</option>
+      <option value="40,400">CT Soft Tissue</option>
+      <option value="60,400">CT Abdomen</option>
+      <option value="60,150">CT Liver</option>
+      <option value="250,500">CT Angio</option>
+    </optgroup>
+    <optgroup label="MR">
+      <option value="600,1200">MR T1 Brain</option>
+      <option value="300,600">MR T2 / FLAIR</option>
+    </optgroup>
+  </select>
 </div>
 
 <!-- Viewer -->
@@ -181,6 +213,7 @@ app.init({
     WindowLevel: {},
     Scroll:      {},
     ZoomAndPan:  {},
+    Measure:     {},
   },
 });
 
@@ -189,12 +222,29 @@ const _toolBtns = {
   WindowLevel: document.getElementById('btn-wl'),
   Scroll:      document.getElementById('btn-scroll'),
   ZoomAndPan:  document.getElementById('btn-zoom'),
+  Measure:     document.getElementById('btn-measure'),
 };
 
 function setTool(name) {
   app.setTool(name);
   Object.entries(_toolBtns).forEach(([k, btn]) =>
     btn.classList.toggle('active', k === name));
+}
+
+// ── W/L preset application ────────────────────────────────────
+// dwv.WindowLevel(center, width) — set via the view controller.
+function applyWLPreset(sel) {
+  const val = sel.value;
+  sel.value = '';           // reset so the same preset can be re-applied
+  if (!val) return;
+  const [wc, ww] = val.split(',').map(Number);
+  try {
+    const lg = app.getLayerGroupByDivId('layerGroup0');
+    const vc = lg.getActiveViewLayer().getViewController();
+    vc.setWindowLevel(new dwv.WindowLevel(wc, ww));
+  } catch (e) {
+    console.warn('[dwv] W/L preset failed:', e);
+  }
 }
 
 let _flipped = false;
