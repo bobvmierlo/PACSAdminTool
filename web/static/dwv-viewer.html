@@ -166,7 +166,7 @@ document.getElementById('topbar-title').textContent = _title;
 // Assigning to it would only replace the export property, leaving the
 // internal variable unchanged.  We must mutate via Object.assign() so the
 // internal Xn reference gets the actual script paths.
-Object.assign(dwv.decoderScripts(), {
+Object.assign(dwv.decoderScripts, {
   'jpeg2000':       '/static/decoders/pdfjs/decode-jpeg2000.js',
   'jpeg-lossless':  '/static/decoders/rii-mango/decode-jpegloss.js',
   'jpeg-baseline':  '/static/decoders/pdfjs/decode-jpegbaseline.js',
