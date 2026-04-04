@@ -5,6 +5,7 @@ import os
 from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request
+import pydicom
 
 import web.context as ctx
 from web.audit import log as _audit
@@ -137,7 +138,6 @@ def _render_frame(fpath: str, frame: int = 0):
     Returns (buf, total_frames, wc, ww, modality) or raises."""
     import io as _io
     import numpy as np
-    import pydicom
     from PIL import Image
 
     ds  = pydicom.dcmread(fpath)
@@ -205,11 +205,10 @@ def _sort_series_files(series_path: str, files: list) -> list:
     """Sort .dcm filenames by InstanceNumber tag; fall back to mtime.
     Reads only the InstanceNumber tag per file (stop_before_pixels + specific_tags)
     so it stays fast even for large series."""
-    import pydicom as _pd
 
     def _key(fname):
         try:
-            ds = _pd.dcmread(os.path.join(series_path, fname),
+            ds = pydicom.dcmread(os.path.join(series_path, fname),
                              stop_before_pixels=True,
                              specific_tags=["InstanceNumber"])
             val = getattr(ds, "InstanceNumber", None)
@@ -239,7 +238,6 @@ def scp_studies():
 
 
 def _scp_studies_impl():
-    import pydicom
 
     storage_dir = _scp_storage_dir()
     if not storage_dir or not os.path.isdir(storage_dir):
@@ -378,7 +376,6 @@ def scp_series_frame():
 
     if info:
         try:
-            import pydicom
             ds = pydicom.dcmread(target, stop_before_pixels=True)
             modality = str(getattr(ds, "Modality", "") or "")
             wc = float(getattr(ds, "WindowCenter", 0) or 0)
@@ -401,7 +398,6 @@ def scp_series_frame():
 
     try:
         import numpy as np
-        import pydicom
         from PIL import Image
         buf, _total_frames, _wc, _ww, _mod = _render_frame(target, frame=0)
         return _send(buf, mimetype="image/png")
@@ -425,7 +421,6 @@ def scp_files_inspect():
     if not fpath or not os.path.isfile(fpath):
         return jsonify({"ok": False, "error": "File not found."}), 404
     try:
-        import pydicom
         ds   = pydicom.dcmread(fpath)
         meta = {
             "SOPClassUID":    str(getattr(ds, "SOPClassUID",    "")),
@@ -466,7 +461,6 @@ def scp_files_preview():
 
     if info:
         try:
-            import pydicom
             ds     = pydicom.dcmread(fpath, stop_before_pixels=True)
             nf     = int(getattr(ds, "NumberOfFrames", 1) or 1)
             wc     = float(getattr(ds, "WindowCenter", 0) or 0)
@@ -484,7 +478,6 @@ def scp_files_preview():
 
     try:
         import numpy as np
-        import pydicom
         from PIL import Image
         buf, _total, _wc, _ww, _mod = _render_frame(fpath, frame=frame)
         return _send(buf, mimetype="image/png")
@@ -617,7 +610,6 @@ def scp_series_delete():
 @require_login
 def scp_stats():
     """Scan SCP storage and return a summary (total files, by-modality, by-date)."""
-    import pydicom
 
     with ctx._listener_lock:
         storage_dir = ctx._scp_listener.storage_dir if ctx._scp_listener else None
