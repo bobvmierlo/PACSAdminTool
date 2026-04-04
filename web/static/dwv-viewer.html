@@ -161,12 +161,17 @@ document.getElementById('topbar-title').textContent = _title;
 // ── dwv app ───────────────────────────────────────────────────
 // Register decoder workers BEFORE app.init() so dwv knows how to
 // decompress JPEG Lossless, JPEG 2000, JPEG Baseline and RLE files.
-dwv.decoderScripts = {
+//
+// dwv.decoderScripts is a getter function (returns the internal Xn object).
+// Assigning to it would only replace the export property, leaving the
+// internal variable unchanged.  We must mutate via Object.assign() so the
+// internal Xn reference gets the actual script paths.
+Object.assign(dwv.decoderScripts(), {
   'jpeg2000':       '/static/decoders/pdfjs/decode-jpeg2000.js',
   'jpeg-lossless':  '/static/decoders/rii-mango/decode-jpegloss.js',
   'jpeg-baseline':  '/static/decoders/pdfjs/decode-jpegbaseline.js',
   'rle':            '/static/decoders/dwv/decode-rle.js',
-};
+});
 
 const app = new dwv.App();
 
