@@ -159,6 +159,15 @@ const _title  = _p.get('title')  || 'DICOM Viewer';
 document.getElementById('topbar-title').textContent = _title;
 
 // ── dwv app ───────────────────────────────────────────────────
+// Register decoder workers BEFORE app.init() so dwv knows how to
+// decompress JPEG Lossless, JPEG 2000, JPEG Baseline and RLE files.
+dwv.decoderScripts = {
+  'jpeg2000':       '/static/decoders/pdfjs/decode-jpeg2000.js',
+  'jpeg-lossless':  '/static/decoders/rii-mango/decode-jpegloss.js',
+  'jpeg-baseline':  '/static/decoders/pdfjs/decode-jpegbaseline.js',
+  'rle':            '/static/decoders/dwv/decode-rle.js',
+};
+
 const app = new dwv.App();
 
 app.init({
@@ -235,8 +244,12 @@ app.addEventListener('load', () => {
 });
 
 app.addEventListener('error', evt => {
-  document.getElementById('loading-msg').textContent =
-    'Error: ' + (evt.error?.message || String(evt.error));
+  // dwv wraps errors in various event shapes — extract the best message available
+  const err = evt.error ?? evt.data ?? evt;
+  const msg = err?.message ?? err?.error?.message ?? (typeof err === 'string' ? err : null)
+              ?? JSON.stringify(err);
+  console.error('[dwv error]', evt);
+  document.getElementById('loading-msg').textContent = 'Error: ' + msg;
   document.getElementById('loading-bar').style.background = '#dc2626';
 });
 
