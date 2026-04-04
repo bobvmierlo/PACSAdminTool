@@ -290,17 +290,44 @@ def apply_update_and_restart() -> None:
 
 def _swap_windows(staged: str, current_exe: str) -> None:
     """
-    On Windows the running .exe is locked, so we write a tiny batch script that:
-      1. Waits 2 s for us to exit
-      2. Moves (overwrites) the new exe over the old path
-      3. Launches the new exe
-      4. Deletes itself
-    Then we start the script detached and exit.
+    Replace the running .exe on Windows and restart it cleanly.
+
+    Two PyInstaller oneFile quirks that must both be handled:
+
+    1. File still locked → "old version runs after update"
+       PyInstaller spawns a bootloader "parent" process that keeps the .exe
+       file open (locked) until the child Python process exits and the parent
+       finishes its own cleanup.  A fixed timeout is unreliable.  Instead we
+       retry the MOVE in a loop until Windows lets it succeed.
+
+    2. Wrong _MEI dir → "Failed to load Python DLL from _MEI371482"
+       The parent bootloader sets env vars (_PYI_ONEFILE_PARENT, _PYI_PARENT_PID,
+       …) that tell any child "use THIS temp dir as your runtime".  Those vars
+       propagate from our Python process → cmd.exe → the new exe.  The new exe's
+       bootloader then tries to load the Python DLL from the old (now-deleted)
+       _MEI dir and crashes.  Fix: strip all _PYI* vars before spawning cmd.exe.
     """
     script = (
         "@echo off\r\n"
+        # Short initial pause so os._exit(0) completes and the PyInstaller
+        # parent starts its own shutdown / _MEI cleanup.
         "timeout /t 2 /nobreak >nul\r\n"
-        f'move /Y "{staged}" "{current_exe}"\r\n'
+        # Retry the MOVE until the file lock is released (up to ~15 s).
+        "set _R=0\r\n"
+        ":RETRY\r\n"
+        f'move /Y "{staged}" "{current_exe}" >nul 2>&1\r\n'
+        "if errorlevel 1 (\r\n"
+        "    set /A _R+=1\r\n"
+        "    if %_R% LSS 15 (\r\n"
+        "        timeout /t 1 /nobreak >nul\r\n"
+        "        goto RETRY\r\n"
+        "    )\r\n"
+        # Give up — leave old exe in place; staged file remains for next try.
+        "    exit /B 1\r\n"
+        ")\r\n"
+        # Start the new exe.  The _PYI* env vars were already stripped by
+        # Python before spawning this cmd.exe, so the new process bootstraps
+        # as a fresh oneFile extract rather than as a stale child.
         f'start "" "{current_exe}"\r\n'
         'del "%~f0"\r\n'
     )
@@ -308,12 +335,17 @@ def _swap_windows(staged: str, current_exe: str) -> None:
     with open(batch, "w", encoding="utf-8") as f:
         f.write(script)
 
+    # Strip all _PYI* env vars before spawning cmd.exe so the new exe never
+    # inherits the old bootloader's runtime pointers.
+    clean_env = {k: v for k, v in os.environ.items() if not k.startswith("_PYI")}
+
     subprocess.Popen(
         ["cmd", "/c", batch],
         creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW,
         close_fds=True,
+        env=clean_env,
     )
-    time.sleep(0.5)   # let cmd start before we exit
+    time.sleep(0.5)   # let cmd.exe start before we exit
     os._exit(0)
 
 
