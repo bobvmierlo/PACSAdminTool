@@ -226,6 +226,7 @@ def _sort_series_files(series_path: str, files: list) -> list:
 
 
 
+@bp.route("/api/scp/studies", methods=["GET"])
 @require_login
 def scp_studies():
     """Return the Study→Series hierarchy built from the storage directory tree.
