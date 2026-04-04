@@ -162,6 +162,15 @@ def _auth_guard():
 @app.after_request
 def _log_outgoing_response(response):
     logger.debug("← %s %s  HTTP %s", request.method, request.path, response.status_code)
+    # dwv-viewer.html is intentionally embedded as a same-origin iframe;
+    # allow it to be framed by 'self' while keeping everything else locked down.
+    if request.path == "/static/dwv-viewer.html":
+        fa  = "frame-ancestors 'self'"
+        xfo = "SAMEORIGIN"
+    else:
+        fa  = "frame-ancestors 'none'"
+        xfo = "DENY"
+
     response.headers.setdefault(
         "Content-Security-Policy",
         "default-src 'self'; "
@@ -169,10 +178,11 @@ def _log_outgoing_response(response):
         "style-src 'self' 'unsafe-inline'; "
         "connect-src 'self' ws: wss:; "
         "img-src 'self' data: blob:; "
+        "frame-src 'self'; "
         "object-src 'none'; "
-        "frame-ancestors 'none'",
+        f"{fa}",
     )
-    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("X-Frame-Options", xfo)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "same-origin")
     return response
