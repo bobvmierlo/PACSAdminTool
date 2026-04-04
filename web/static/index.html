@@ -1337,6 +1337,17 @@
             <option value="5000">5000</option>
           </select>
         </div>
+        <div class="field" style="min-width:110px">
+          <label>Level</label>
+          <select id="log-level-select" onchange="loadLogContent()">
+            <option value="">All levels</option>
+            <option value="DEBUG">DEBUG</option>
+            <option value="INFO">INFO</option>
+            <option value="WARNING">WARNING</option>
+            <option value="ERROR">ERROR</option>
+            <option value="CRITICAL">CRITICAL</option>
+          </select>
+        </div>
         <div class="field" style="flex:2; min-width:160px">
           <label>Filter</label>
           <input id="log-filter-input" placeholder="Substring filter…" oninput="scheduleLogRefresh()">
@@ -3930,6 +3941,7 @@ async function loadLogContent() {
   const file   = document.getElementById("log-file-select").value;
   const lines  = document.getElementById("log-lines-select").value;
   const filter = document.getElementById("log-filter-input").value.trim();
+  const level  = document.getElementById("log-level-select").value;
   if (!file) return;
 
   let url = `/api/logs/content?file=${encodeURIComponent(file)}&lines=${lines}`;
@@ -3947,9 +3959,17 @@ async function loadLogContent() {
       meta.textContent = "";
       return;
     }
-    box.textContent = data.lines.join("\n");
+    // Client-side level filter: log format has "  LEVEL  " as a fixed column.
+    // Match "  LEVEL" (two leading spaces + level name) case-insensitively.
+    let displayed = data.lines;
+    if (level) {
+      const token = "  " + level;
+      displayed = data.lines.filter(ln => ln.toUpperCase().includes(token));
+    }
+    box.textContent = displayed.join("\n");
     box.scrollTop   = box.scrollHeight;
-    meta.textContent = `${data.returned} of ${data.total} lines`;
+    const levelNote = level ? ` (${level} filter: ${displayed.length} shown)` : "";
+    meta.textContent = `${data.returned} of ${data.total} lines${levelNote}`;
   } catch (e) {
     box.textContent = "Error loading log: " + e;
     meta.textContent = "";
