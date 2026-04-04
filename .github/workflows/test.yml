@@ -3,7 +3,11 @@ name: Run tests
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "__version__.py"
   pull_request:
+    paths-ignore:
+      - "__version__.py"
 
 jobs:
   test:
