@@ -201,7 +201,31 @@ def scp_files():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
-@bp.route("/api/scp/studies", methods=["GET"])
+def _sort_series_files(series_path: str, files: list) -> list:
+    """Sort .dcm filenames by InstanceNumber tag; fall back to mtime.
+    Reads only the InstanceNumber tag per file (stop_before_pixels + specific_tags)
+    so it stays fast even for large series."""
+    import pydicom as _pd
+
+    def _key(fname):
+        try:
+            ds = _pd.dcmread(os.path.join(series_path, fname),
+                             stop_before_pixels=True,
+                             specific_tags=["InstanceNumber"])
+            val = getattr(ds, "InstanceNumber", None)
+            if val is not None:
+                return (0, int(val))
+        except Exception:
+            pass
+        try:
+            return (1, os.path.getmtime(os.path.join(series_path, fname)))
+        except OSError:
+            return (1, 0)
+
+    return sorted(files, key=_key)
+
+
+
 @require_login
 def scp_studies():
     """Return the Study→Series hierarchy built from the storage directory tree.
@@ -256,10 +280,8 @@ def scp_studies():
                 continue
             series_uid = series_entry
             try:
-                dcm_files = sorted(
-                    [f for f in os.listdir(series_path) if f.lower().endswith(".dcm")],
-                    key=lambda f: os.path.getmtime(os.path.join(series_path, f)),
-                )
+                raw = [f for f in os.listdir(series_path) if f.lower().endswith(".dcm")]
+                dcm_files = _sort_series_files(series_path, raw)
             except OSError:
                 continue
             if not dcm_files:
@@ -333,12 +355,8 @@ def scp_series_frame():
         return jsonify({"ok": False, "error": "Series not found."}), 404
 
     try:
-        files = sorted(
-            [f for f in os.listdir(series_path) if f.lower().endswith(".dcm")],
-            key=lambda f: os.path.getmtime(os.path.join(series_path, f)),
-        )
-        # Re-sort by InstanceNumber if readable from the first file cheaply
-        # (only do this if already loaded metadata for info mode)
+        raw   = [f for f in os.listdir(series_path) if f.lower().endswith(".dcm")]
+        files = _sort_series_files(series_path, raw)
     except OSError as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
