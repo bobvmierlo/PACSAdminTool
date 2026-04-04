@@ -1498,7 +1498,17 @@
   <div id="tab-about" class="tab-panel">
     <div id="about-layout">
       <h2 id="about-app-title" data-i18n="about.title">PACS Admin Tool</h2>
-      <p id="about-version" class="about-dim">Version ...</p>
+      <p id="about-version" class="about-dim" style="display:flex; align-items:center; gap:12px">
+        <span id="about-version-text">Version ...</span>
+        <button id="btn-check-update" onclick="updCheckNow()"
+                style="padding:3px 10px; font-size:11px; font-weight:600; border:1px solid #d0d0d0;
+                       border-radius:3px; background:#f5f5f5; color:#555; cursor:pointer;
+                       transition:background 0.15s"
+                onmouseover="this.style.background='#e8e8e8'" onmouseout="this.style.background='#f5f5f5'">
+          Check for updates
+        </button>
+        <span id="upd-check-status" style="font-size:11px; color:#888"></span>
+      </p>
       <!-- Update card — shown when a newer release is available -->
       <div id="about-update-card">
         <div class="auc-title" id="auc-title">🚀 Update available</div>
@@ -2605,7 +2615,7 @@ document.addEventListener("DOMContentLoaded", () => {
   fetch("/api/version")
     .then(r => r.json())
     .then(d => {
-      document.getElementById("about-version").textContent = "Version " + (d.version || "?");
+      document.getElementById("about-version-text").textContent = "Version " + (d.version || "?");
       if (d.app_dir) {
         const el = document.getElementById("about-app-dir");
         el.textContent = d.app_dir;
@@ -2625,17 +2635,50 @@ document.addEventListener("DOMContentLoaded", () => {
 let _updInfo          = null;   // latest /api/check-update response
 let _updPollTimer     = null;   // timer for polling download progress
 
-async function checkForUpdate() {
+async function checkForUpdate(force = false) {
+  const url = force ? "/api/check-update?force=1" : "/api/check-update";
   try {
-    const res = await fetch("/api/check-update");
-    if (!res.ok) return;
+    const res = await fetch(url);
+    if (!res.ok) return null;
     const info = await res.json();
     _updInfo = info;
     if (info.has_update) {
       _showUpdateBanner(info);
       _showUpdateAboutCard(info);
     }
+    return info;
   } catch (_) { /* silently ignore – no internet, no problem */ }
+  return null;
+}
+
+async function updCheckNow() {
+  const btn    = document.getElementById("btn-check-update");
+  const status = document.getElementById("upd-check-status");
+  btn.disabled = true;
+  btn.textContent = "Checking…";
+  status.textContent = "";
+
+  const info = await checkForUpdate(true);
+
+  btn.disabled = false;
+  btn.textContent = "Check for updates";
+
+  if (!info) {
+    status.textContent = "Could not reach GitHub.";
+    status.style.color = "#dc2626";
+  } else if (info.has_update) {
+    status.textContent = `v${info.latest_version} available!`;
+    status.style.color = "#15803d";
+  } else if (!info.error) {
+    status.textContent = "You're up to date.";
+    status.style.color = "#15803d";
+  } else {
+    status.textContent = "Check failed.";
+    status.style.color = "#dc2626";
+  }
+
+  // Clear the status label after 5 s
+  setTimeout(() => { status.textContent = ""; }, 5000);
 }
 
 function _showUpdateBanner(info) {
