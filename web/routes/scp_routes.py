@@ -219,7 +219,7 @@ def _sort_series_files(series_path: str, files: list) -> list:
             pass
         try:
             return (1, os.path.getmtime(os.path.join(series_path, fname)))
-        except OSError:
+        except Exception:
             return (1, 0)
 
     return sorted(files, key=_key)
@@ -231,6 +231,14 @@ def _sort_series_files(series_path: str, files: list) -> list:
 def scp_studies():
     """Return the Study→Series hierarchy built from the storage directory tree.
     Reads one DICOM header per series (stop_before_pixels) for metadata."""
+    try:
+        return _scp_studies_impl()
+    except Exception as e:
+        logger.exception("scp/studies unexpected error")
+        return jsonify({"ok": False, "error": f"Internal error: {e}"}), 500
+
+
+def _scp_studies_impl():
     import pydicom
 
     storage_dir = _scp_storage_dir()
@@ -272,7 +280,7 @@ def scp_studies():
 
         try:
             series_dirs = os.listdir(entry_path)
-        except OSError:
+        except Exception:
             continue
 
         for series_entry in sorted(series_dirs):
@@ -283,7 +291,7 @@ def scp_studies():
             try:
                 raw = [f for f in os.listdir(series_path) if f.lower().endswith(".dcm")]
                 dcm_files = _sort_series_files(series_path, raw)
-            except OSError:
+            except Exception:
                 continue
             if not dcm_files:
                 continue
