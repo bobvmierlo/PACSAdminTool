@@ -953,7 +953,7 @@
        style="display:none; align-items:center; justify-content:center"
        onclick="if(event.target===this)closeAnonProfileManager()">
     <div style="background:#fff; border-radius:10px; box-shadow:0 8px 40px rgba(0,0,0,.25);
-                width:min(96vw,1100px); height:min(92vh,760px); display:flex; flex-direction:column; overflow:hidden">
+                width:min(98vw,1400px); height:min(96vh,900px); display:flex; flex-direction:column; overflow:hidden">
 
       <!-- Header -->
       <div style="padding:14px 20px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center; flex-shrink:0">
@@ -1411,7 +1411,8 @@
 ══════════════════════════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="preview-modal" style="display:none; align-items:center; justify-content:center"
      onclick="if(event.target===this)closePreviewModal()">
-  <div style="background:#1a1a1a; border-radius:8px; padding:14px; max-width:92vw; max-height:94vh;
+  <div style="background:#1a1a1a; border-radius:8px; padding:14px;
+              width:min(98vw,1400px); height:min(96vh,900px);
               display:flex; flex-direction:column; gap:8px; min-width:320px">
 
     <!-- Header -->
@@ -1427,7 +1428,7 @@
     <!-- Image area -->
     <div style="overflow:auto; display:flex; align-items:center; justify-content:center;
                 flex:1; min-height:0; background:#000; border-radius:4px">
-      <img id="preview-modal-img" style="max-width:88vw; max-height:74vh; display:none; border-radius:2px; image-rendering:pixelated">
+      <img id="preview-modal-img" style="max-width:100%; max-height:100%; display:none; border-radius:2px; image-rendering:pixelated">
     </div>
     <div id="preview-modal-msg" style="color:#9ca3af; font-size:12px; text-align:center; padding:20px 0"></div>
 
