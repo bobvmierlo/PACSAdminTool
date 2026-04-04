@@ -3042,6 +3042,9 @@ async function loadSCPStudies() {
   let data;
   try {
     const res = await fetch("/api/scp/studies");
+    if (!res.ok && res.headers.get("content-type")?.includes("text/html")) {
+      infoEl.textContent = `Error: HTTP ${res.status} from /api/scp/studies`; return;
+    }
     data = await res.json();
     if (!data.ok) { infoEl.textContent = "Error: " + data.error; return; }
   } catch (e) {

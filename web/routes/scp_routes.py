@@ -231,6 +231,14 @@ def _sort_series_files(series_path: str, files: list) -> list:
 def scp_studies():
     """Return the Study→Series hierarchy built from the storage directory tree.
     Reads one DICOM header per series (stop_before_pixels) for metadata."""
+    try:
+        return _scp_studies_impl()
+    except Exception as e:
+        logger.exception("scp/studies unexpected error")
+        return jsonify({"ok": False, "error": f"Internal error: {e}"}), 500
+
+
+def _scp_studies_impl():
     import pydicom
 
     storage_dir = _scp_storage_dir()
