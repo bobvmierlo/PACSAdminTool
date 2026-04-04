@@ -201,7 +201,31 @@ def scp_files():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
-@bp.route("/api/scp/studies", methods=["GET"])
+def _sort_series_files(series_path: str, files: list) -> list:
+    """Sort .dcm filenames by InstanceNumber tag; fall back to mtime.
+    Reads only the InstanceNumber tag per file (stop_before_pixels + specific_tags)
+    so it stays fast even for large series."""
+    import pydicom as _pd
+
+    def _key(fname):
+        try:
+            ds = _pd.dcmread(os.path.join(series_path, fname),
+                             stop_before_pixels=True,
+                             specific_tags=["InstanceNumber"])
+            val = getattr(ds, "InstanceNumber", None)
+            if val is not None:
+                return (0, int(val))
+        except Exception:
+            pass
+        try:
+            return (1, os.path.getmtime(os.path.join(series_path, fname)))
+        except OSError:
+            return (1, 0)
+
+    return sorted(files, key=_key)
+
+
+
 @require_login
 def scp_studies():
     """Return the Study→Series hierarchy built from the storage directory tree.
@@ -256,10 +280,8 @@ def scp_studies():
                 continue
             series_uid = series_entry
             try:
-                dcm_files = sorted(
-                    [f for f in os.listdir(series_path) if f.lower().endswith(".dcm")],
-                    key=lambda f: os.path.getmtime(os.path.join(series_path, f)),
-                )
+                raw = [f for f in os.listdir(series_path) if f.lower().endswith(".dcm")]
+                dcm_files = _sort_series_files(series_path, raw)
             except OSError:
                 continue
             if not dcm_files:
@@ -333,12 +355,8 @@ def scp_series_frame():
         return jsonify({"ok": False, "error": "Series not found."}), 404
 
     try:
-        files = sorted(
-            [f for f in os.listdir(series_path) if f.lower().endswith(".dcm")],
-            key=lambda f: os.path.getmtime(os.path.join(series_path, f)),
-        )
-        # Re-sort by InstanceNumber if readable from the first file cheaply
-        # (only do this if already loaded metadata for info mode)
+        raw   = [f for f in os.listdir(series_path) if f.lower().endswith(".dcm")]
+        files = _sort_series_files(series_path, raw)
     except OSError as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
@@ -468,6 +486,59 @@ def scp_files_preview():
     except Exception as e:
         logger.exception("scp/files/preview error")
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@bp.route("/api/scp/files/raw", methods=["GET"])
+@require_login
+def scp_files_raw():
+    """Serve a raw DICOM file with Content-Type: application/dicom.
+    Used by the dwv viewer to load files directly in the browser."""
+    from flask import send_file as _send
+
+    rel = (request.args.get("path") or request.args.get("name") or "").strip()
+    storage_dir = _scp_storage_dir()
+    if not storage_dir:
+        return jsonify({"ok": False, "error": "SCP storage directory not found."}), 404
+    fpath = _resolve_scp_path(storage_dir, rel)
+    if not fpath or not os.path.isfile(fpath):
+        return jsonify({"ok": False, "error": "File not found."}), 404
+    return _send(fpath, mimetype="application/dicom",
+                 as_attachment=False,
+                 download_name=os.path.basename(fpath))
+
+
+@bp.route("/api/scp/series/list", methods=["GET"])
+@require_login
+def scp_series_list():
+    """Return an ordered list of raw-DICOM URLs for all instances in a series.
+    Query params: study, series
+    Used by the dwv viewer to know which files to load."""
+    study  = request.args.get("study",  "").strip()
+    series = request.args.get("series", "").strip()
+
+    storage_dir = _scp_storage_dir()
+    if not storage_dir:
+        return jsonify({"ok": False, "error": "SCP storage directory not found."}), 404
+
+    if not study or not series or "/" in study or "/" in series \
+            or ".." in study or ".." in series:
+        return _bad_request("Invalid study or series UID.")
+
+    series_path = os.path.join(storage_dir, study, series)
+    if not os.path.isdir(series_path):
+        return jsonify({"ok": False, "error": "Series not found."}), 404
+
+    try:
+        raw   = [f for f in os.listdir(series_path) if f.lower().endswith(".dcm")]
+        files = _sort_series_files(series_path, raw)
+    except OSError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    urls = [
+        f"/api/scp/files/raw?path={study}/{series}/{f}"
+        for f in files
+    ]
+    return jsonify({"ok": True, "urls": urls, "count": len(urls)})
 
 
 @bp.route("/api/scp/files/delete", methods=["POST"])
