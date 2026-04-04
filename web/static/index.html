@@ -323,6 +323,86 @@
     .about-links a { color: #2b6cb0; font-size: 13px; text-decoration: none; }
     .about-links a:hover { text-decoration: underline; }
 
+    /* ── Mobile: responsive overrides ───────────────────────────── */
+    /* Mobile nav bar (hamburger + current-tab label) */
+    #mobile-nav-bar { display: none; }
+
+    @media (max-width: 767px) {
+      /* Header: compact, subtitle hidden */
+      #header {
+        height: auto;
+        min-height: 40px;
+        padding: 6px 12px;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      #header h1 { font-size: 14px; }
+      #header-subtitle { display: none; }
+
+      /* Tab bar: full-screen slide-down drawer (hidden by default) */
+      #tab-bar {
+        position: fixed;
+        inset: 0;
+        z-index: 300;
+        flex-direction: column;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        background: #fff;
+        border: none;
+        display: none;
+      }
+      #tab-bar.mobile-open { display: flex; }
+
+      /* Tab buttons in drawer: large tap targets, left-border for active */
+      .tab-btn {
+        padding: 14px 20px;
+        font-size: 15px;
+        border-bottom: 1px solid #f0f0f0;
+        border-right: none;
+        text-align: left;
+      }
+      .tab-btn.active {
+        border-bottom-color: #f0f0f0;
+        border-left: 3px solid #2b6cb0;
+        background: #eff6ff;
+      }
+
+      /* Mobile nav bar */
+      #mobile-nav-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #fff;
+        border-bottom: 1px solid #e0e0e0;
+        padding: 0 12px;
+        height: 42px;
+        flex-shrink: 0;
+      }
+
+      /* Close row inside the drawer */
+      #mobile-nav-close-row { display: flex; }
+
+      /* Content: tighter padding on small screens */
+      .tab-panel { padding: 10px 8px; }
+      .field-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+
+      /* Help: stack sidebar above content */
+      #help-layout { flex-direction: column; }
+      #help-topics { width: 100%; }
+
+      /* About: less whitespace */
+      #about-layout { padding: 20px 16px; margin: 16px auto; }
+
+      /* Tables: allow horizontal scroll without clipping */
+      .result-table-wrap { -webkit-overflow-scrolling: touch; }
+
+      /* Bigger tap targets for buttons */
+      .btn { min-height: 38px; }
+
+      /* Cards: reduce padding */
+      .card { padding: 12px; }
+    }
+
     /* ── Offline overlay ──────────────────────────────────────────── */
     #offline-overlay {
       display: none;
@@ -370,7 +450,7 @@
 ══════════════════════════════════════════════════════════════════ -->
 <div id="header">
   <h1 data-i18n="app.title">PACS Admin Tool</h1>
-  <span data-i18n="app.subtitle">DICOM &amp; HL7 Administration Utility</span>
+  <span id="header-subtitle" data-i18n="app.subtitle">DICOM &amp; HL7 Administration Utility</span>
   <span id="ws-status" style="margin-left:auto; font-size:12px; color:#aaa" data-i18n="common.connecting">⬤ connecting…</span>
   <span id="header-user" style="font-size:12px; color:#555; display:none"></span>
   <button id="btn-logout" onclick="doLogout()" style="display:none; padding:4px 10px; font-size:12px; border:1px solid #d0d0d0; border-radius:3px; background:#fff; cursor:pointer; color:#555" data-i18n="auth.logout">Sign out</button>
@@ -380,6 +460,15 @@
      TAB BAR
 ══════════════════════════════════════════════════════════════════ -->
 <div id="tab-bar">
+  <!-- Close row — only visible in the mobile drawer -->
+  <div id="mobile-nav-close-row"
+       style="display:none; padding:10px 16px; border-bottom:1px solid #e5e7eb;
+              justify-content:space-between; align-items:center; background:#f8f8f8; flex-shrink:0">
+    <span style="font-size:11px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:.06em">Navigation</span>
+    <button onclick="toggleMobileNav()"
+            style="background:none; border:none; font-size:26px; line-height:1; cursor:pointer; color:#555; padding:0 4px"
+            aria-label="Close navigation">×</button>
+  </div>
   <button class="tab-btn active" onclick="showTab('dashboard')" data-i18n="tabs.dashboard">Dashboard</button>
   <button class="tab-btn" onclick="showTab('cfind')" data-i18n="tabs.cfind">C-FIND / Q-R</button>
   <button class="tab-btn" onclick="showTab('cstore')" data-i18n="tabs.cstore">C-STORE</button>
@@ -397,6 +486,14 @@
   <button class="tab-btn" onclick="showTab('logs')">Logs</button>
   <button class="tab-btn" onclick="showTab('help')" data-i18n="tabs.help">Help</button>
   <button class="tab-btn" onclick="showTab('about')" data-i18n="tabs.about">About</button>
+</div>
+
+<!-- Mobile navigation bar — sits in flow on small screens, hidden on desktop -->
+<div id="mobile-nav-bar" aria-label="Current section">
+  <span id="mobile-tab-label" style="font-size:14px; font-weight:600; color:#2b6cb0">Dashboard</span>
+  <button onclick="toggleMobileNav()"
+          style="background:none; border:none; font-size:24px; line-height:1; cursor:pointer; color:#555; padding:4px 6px"
+          aria-label="Open navigation">&#9776;</button>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════
@@ -1648,14 +1745,25 @@ function showTab(name) {
   document.getElementById("tab-" + name).classList.add("active");
 
   // Find the button that triggered this tab and mark it active
-  // (We match by onclick attribute content)
   document.querySelectorAll(".tab-btn").forEach(b => {
     if (b.getAttribute("onclick") === `showTab('${name}')`) b.classList.add("active");
   });
 
+  // Update mobile nav label and close the drawer
+  const activeBtn = document.querySelector(`.tab-btn[onclick="showTab('${name}')"]`);
+  if (activeBtn) {
+    const lbl = document.getElementById("mobile-tab-label");
+    if (lbl) lbl.textContent = activeBtn.textContent.trim();
+  }
+  document.getElementById("tab-bar").classList.remove("mobile-open");
+
   if (name === "logs")      initLogViewer();
   if (name === "dashboard") loadDashboard();
   if (name === "scp")       loadSCPStudies();
+}
+
+function toggleMobileNav() {
+  document.getElementById("tab-bar").classList.toggle("mobile-open");
 }
 
 function showHL7Tab(sub) {
