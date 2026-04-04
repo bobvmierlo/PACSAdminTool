@@ -219,7 +219,7 @@ def _sort_series_files(series_path: str, files: list) -> list:
             pass
         try:
             return (1, os.path.getmtime(os.path.join(series_path, fname)))
-        except OSError:
+        except Exception:
             return (1, 0)
 
     return sorted(files, key=_key)
@@ -280,7 +280,7 @@ def _scp_studies_impl():
 
         try:
             series_dirs = os.listdir(entry_path)
-        except OSError:
+        except Exception:
             continue
 
         for series_entry in sorted(series_dirs):
@@ -291,7 +291,7 @@ def _scp_studies_impl():
             try:
                 raw = [f for f in os.listdir(series_path) if f.lower().endswith(".dcm")]
                 dcm_files = _sort_series_files(series_path, raw)
-            except OSError:
+            except Exception:
                 continue
             if not dcm_files:
                 continue
