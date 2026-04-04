@@ -435,6 +435,15 @@
 
 <body>
 
+<!-- ── dwv viewer overlay ────────────────────────────────────────────────── -->
+<div id="dwv-overlay"
+     style="display:none; position:fixed; inset:0; z-index:500; background:#000; flex-direction:column">
+  <iframe id="dwv-iframe"
+          src="about:blank"
+          style="flex:1; border:none; width:100%; height:100%"
+          allow="same-origin"></iframe>
+</div>
+
 <!-- ── Offline overlay ──────────────────────────────────────────────────── -->
 <div id="offline-overlay" role="alertdialog" aria-modal="true" aria-labelledby="offline-title">
   <div id="offline-box">
@@ -2955,27 +2964,20 @@ async function scpFilePreview(name) {
   previewGotoFrame(0, false);
 }
 
-// Open the viewer for a Study/Series stack
-async function viewSCPSeries(study, series, label) {
-  _previewReset();
-  _previewMode   = "series";
-  _previewStudy  = study;
-  _previewSeries = series;
-  _previewOpenModal(label || series);
+// Open the dwv viewer for a Study/Series stack in a full-screen iframe overlay
+function viewSCPSeries(study, series, label) {
+  const overlay = document.getElementById("dwv-overlay");
+  const iframe  = document.getElementById("dwv-iframe");
+  const url = `/static/dwv-viewer.html?study=${encodeURIComponent(study)}&series=${encodeURIComponent(series)}&title=${encodeURIComponent(label || series)}`;
+  iframe.src = url;
+  overlay.style.display = "flex";
+}
 
-  // Fetch metadata for this series
-  try {
-    const r = await fetch(`/api/scp/series/frame?study=${encodeURIComponent(study)}&series=${encodeURIComponent(series)}&idx=0&info=1`);
-    const d = await r.json().catch(() => ({}));
-    if (d.ok) {
-      _previewTotalFrames = d.total_instances || 1;
-      const metaEl = document.getElementById("preview-modal-meta");
-      metaEl.textContent = [d.patient, d.modality, d.series_desc, d.study_date]
-        .filter(Boolean).join("  ·  ");
-    }
-  } catch { /* non-critical */ }
-
-  previewGotoFrame(0, false);
+function closeDwvViewer() {
+  const overlay = document.getElementById("dwv-overlay");
+  const iframe  = document.getElementById("dwv-iframe");
+  overlay.style.display = "none";
+  iframe.src = "about:blank"; // stop loading / free memory
 }
 
 // Mouse-wheel scrolls through frames inside the viewer

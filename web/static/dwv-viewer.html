@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<!--
+  dwv-viewer.html  –  Standalone DICOM viewer powered by dwv (v0.33)
+  Opened in a full-screen iframe overlay by the main PACS Admin Tool UI.
+
+  URL params:
+    study  – StudyInstanceUID (subdirectory name in SCP storage)
+    series – SeriesInstanceUID (subdirectory name)
+    title  – Human-readable label shown in the header bar
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DICOM Viewer</title>
+
+  <!-- dwv dependencies (all bundled locally, no CDN) -->
+  <script src="/static/konva.min.js"></script>
+  <script src="/static/jszip.min.js"></script>
+  <script src="/static/magic-wand.min.js"></script>
+  <script src="/static/dwv.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: #1a1a1a;
+      color: #e5e7eb;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 13px;
+      overflow: hidden;
+    }
+
+    /* ── Top bar ─────────────────────────────────────────────────── */
+    #topbar {
+      height: 44px;
+      background: #111;
+      border-bottom: 1px solid #333;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 12px;
+      flex-shrink: 0;
+    }
+    #topbar-close {
+      background: none;
+      border: 1px solid #444;
+      color: #aaa;
+      border-radius: 4px;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    #topbar-close:hover { background: #333; color: #fff; }
+    #topbar-title { font-size: 13px; font-weight: 600; color: #e5e7eb; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #topbar-meta  { font-size: 11px; color: #6b7280; white-space: nowrap; }
+    #topbar-status { font-size: 11px; color: #9ca3af; white-space: nowrap; }
+
+    /* ── Toolbar ─────────────────────────────────────────────────── */
+    #toolbar {
+      height: 40px;
+      background: #222;
+      border-bottom: 1px solid #333;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0 10px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+      overflow: hidden;
+    }
+    .tool-btn {
+      background: #333;
+      border: 1px solid #444;
+      color: #ccc;
+      border-radius: 4px;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .tool-btn:hover   { background: #444; color: #fff; }
+    .tool-btn.active  { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }
+    .tool-sep { width: 1px; height: 20px; background: #444; margin: 0 4px; }
+
+    /* ── Main viewer area ────────────────────────────────────────── */
+    #layout {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 84px); /* 44px topbar + 40px toolbar */
+    }
+    #layerGroup0 {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ── Loading overlay ─────────────────────────────────────────── */
+    #loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      z-index: 10;
+    }
+    #loading-overlay.hidden { display: none; }
+    #loading-msg { font-size: 14px; color: #e5e7eb; }
+    #loading-bar-wrap { width: 240px; height: 6px; background: #333; border-radius: 3px; overflow: hidden; }
+    #loading-bar { height: 100%; width: 0%; background: #2b6cb0; border-radius: 3px; transition: width 0.2s; }
+    #loading-count { font-size: 11px; color: #6b7280; }
+
+    /* ── dwv canvas sits inside #layerGroup0 ────────────────────── */
+    #layerGroup0 canvas { display: block; }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="topbar">
+  <button id="topbar-close" onclick="window.parent.closeDwvViewer()">✕ Close</button>
+  <span id="topbar-title">DICOM Viewer</span>
+  <span id="topbar-meta"></span>
+  <span id="topbar-status">Loading…</span>
+</div>
+
+<!-- Tool bar -->
+<div id="toolbar">
+  <button class="tool-btn active" id="btn-wl"     onclick="setTool('WindowLevel')">Window / Level</button>
+  <button class="tool-btn"        id="btn-scroll"  onclick="setTool('Scroll')">Scroll</button>
+  <button class="tool-btn"        id="btn-zoom"    onclick="setTool('ZoomAndPan')">Zoom / Pan</button>
+  <div class="tool-sep"></div>
+  <button class="tool-btn"        onclick="app.resetDisplay()">Reset View</button>
+  <button class="tool-btn"        onclick="toggleFlip()">Flip H</button>
+</div>
+
+<!-- Viewer -->
+<div id="layout">
+  <div id="layerGroup0">
+    <div id="loading-overlay">
+      <div id="loading-msg">Fetching DICOM files…</div>
+      <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+      <div id="loading-count"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Read URL params ────────────────────────────────────────────
+const _p      = new URLSearchParams(location.search);
+const _study  = _p.get('study')  || '';
+const _series = _p.get('series') || '';
+const _title  = _p.get('title')  || 'DICOM Viewer';
+
+document.getElementById('topbar-title').textContent = _title;
+
+// ── dwv app ───────────────────────────────────────────────────
+const app = new dwv.App();
+
+app.init({
+  dataViewConfigs: { '*': [{ divId: 'layerGroup0' }] },
+  tools: {
+    WindowLevel: {},
+    Scroll:      {},
+    ZoomAndPan:  {},
+  },
+});
+
+// ── Tool switching ────────────────────────────────────────────
+const _toolBtns = {
+  WindowLevel: document.getElementById('btn-wl'),
+  Scroll:      document.getElementById('btn-scroll'),
+  ZoomAndPan:  document.getElementById('btn-zoom'),
+};
+
+function setTool(name) {
+  app.setTool(name);
+  Object.entries(_toolBtns).forEach(([k, btn]) =>
+    btn.classList.toggle('active', k === name));
+}
+
+let _flipped = false;
+function toggleFlip() {
+  // dwv doesn't expose a flip API directly; toggle CSS transform on the canvas
+  _flipped = !_flipped;
+  const lg = document.getElementById('layerGroup0');
+  lg.style.transform = _flipped ? 'scaleX(-1)' : '';
+}
+
+// ── Progress tracking ─────────────────────────────────────────
+let _loaded = 0, _total = 0;
+
+app.addEventListener('loadstart', () => {
+  _loaded = 0;
+  document.getElementById('loading-overlay').classList.remove('hidden');
+  document.getElementById('loading-msg').textContent = 'Loading DICOM files…';
+});
+
+app.addEventListener('loadprogress', evt => {
+  if (evt.total) {
+    const pct = Math.round(evt.loaded / evt.total * 100);
+    document.getElementById('loading-bar').style.width = pct + '%';
+  }
+});
+
+app.addEventListener('loaditem', () => {
+  _loaded++;
+  document.getElementById('loading-count').textContent =
+    `${_loaded} / ${_total} instance(s)`;
+});
+
+app.addEventListener('load', () => {
+  document.getElementById('loading-overlay').classList.add('hidden');
+  document.getElementById('topbar-status').textContent =
+    `${_total} instance(s)`;
+  // Extract patient / series metadata from the first loaded data
+  try {
+    const ids  = app.getDataIds();
+    if (ids.length) {
+      const meta = app.getMetaData(ids[0]);
+      const pn   = meta?.['00100010']?.value?.[0]?.Alphabetic ?? '';
+      const sd   = meta?.['0008103E']?.value?.[0] ?? '';
+      const mod  = meta?.['00080060']?.value?.[0] ?? '';
+      const parts = [pn, mod, sd].filter(Boolean);
+      if (parts.length)
+        document.getElementById('topbar-meta').textContent = parts.join('  ·  ');
+    }
+  } catch { /* non-critical */ }
+  // Default to WindowLevel tool
+  try { app.setTool('WindowLevel'); } catch { /* may throw if no image */ }
+});
+
+app.addEventListener('error', evt => {
+  document.getElementById('loading-msg').textContent =
+    'Error: ' + (evt.error?.message || String(evt.error));
+  document.getElementById('loading-bar').style.background = '#dc2626';
+});
+
+// ── Load the series ───────────────────────────────────────────
+async function loadSeries() {
+  if (!_study || !_series) {
+    document.getElementById('loading-msg').textContent =
+      'Missing study or series parameter.';
+    return;
+  }
+  try {
+    const res  = await fetch(
+      `/api/scp/series/list?study=${encodeURIComponent(_study)}&series=${encodeURIComponent(_series)}`
+    );
+    const data = await res.json();
+    if (!data.ok) {
+      document.getElementById('loading-msg').textContent =
+        'Error: ' + data.error;
+      return;
+    }
+    _total = data.count;
+    document.getElementById('loading-count').textContent =
+      `0 / ${_total} instance(s)`;
+    app.loadURLs(data.urls);
+  } catch (e) {
+    document.getElementById('loading-msg').textContent =
+      'Network error: ' + e.message;
+  }
+}
+
+loadSeries();
+</script>
+</body>
+</html>

@@ -488,6 +488,59 @@ def scp_files_preview():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@bp.route("/api/scp/files/raw", methods=["GET"])
+@require_login
+def scp_files_raw():
+    """Serve a raw DICOM file with Content-Type: application/dicom.
+    Used by the dwv viewer to load files directly in the browser."""
+    from flask import send_file as _send
+
+    rel = (request.args.get("path") or request.args.get("name") or "").strip()
+    storage_dir = _scp_storage_dir()
+    if not storage_dir:
+        return jsonify({"ok": False, "error": "SCP storage directory not found."}), 404
+    fpath = _resolve_scp_path(storage_dir, rel)
+    if not fpath or not os.path.isfile(fpath):
+        return jsonify({"ok": False, "error": "File not found."}), 404
+    return _send(fpath, mimetype="application/dicom",
+                 as_attachment=False,
+                 download_name=os.path.basename(fpath))
+
+
+@bp.route("/api/scp/series/list", methods=["GET"])
+@require_login
+def scp_series_list():
+    """Return an ordered list of raw-DICOM URLs for all instances in a series.
+    Query params: study, series
+    Used by the dwv viewer to know which files to load."""
+    study  = request.args.get("study",  "").strip()
+    series = request.args.get("series", "").strip()
+
+    storage_dir = _scp_storage_dir()
+    if not storage_dir:
+        return jsonify({"ok": False, "error": "SCP storage directory not found."}), 404
+
+    if not study or not series or "/" in study or "/" in series \
+            or ".." in study or ".." in series:
+        return _bad_request("Invalid study or series UID.")
+
+    series_path = os.path.join(storage_dir, study, series)
+    if not os.path.isdir(series_path):
+        return jsonify({"ok": False, "error": "Series not found."}), 404
+
+    try:
+        raw   = [f for f in os.listdir(series_path) if f.lower().endswith(".dcm")]
+        files = _sort_series_files(series_path, raw)
+    except OSError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    urls = [
+        f"/api/scp/files/raw?path={study}/{series}/{f}"
+        for f in files
+    ]
+    return jsonify({"ok": True, "urls": urls, "count": len(urls)})
+
+
 @bp.route("/api/scp/files/delete", methods=["POST"])
 @require_login
 def scp_files_delete():
