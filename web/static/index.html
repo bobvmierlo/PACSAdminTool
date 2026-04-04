@@ -1790,6 +1790,8 @@ function showTab(name) {
   }
   document.getElementById("tab-bar").classList.remove("mobile-open");
 
+  localStorage.setItem("activeTab", name);
+
   if (name === "logs")      initLogViewer();
   if (name === "dashboard") loadDashboard();
   if (name === "scp")       loadSCPStudies();
@@ -2472,8 +2474,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("hl7-template")
     .addEventListener("change", updateTemplateDesc);
 
-  // Load dashboard data on first open (it is the default active tab)
-  loadDashboard();
+  // Restore the last active tab, falling back to dashboard
+  showTab(localStorage.getItem("activeTab") || "dashboard");
 
   // Fetch app version from the server and display it in the About tab
   // Fetch app version and data paths from the server
