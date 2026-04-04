@@ -323,6 +323,99 @@
     .about-links a { color: #2b6cb0; font-size: 13px; text-decoration: none; }
     .about-links a:hover { text-decoration: underline; }
 
+    /* ── Update notification banner ──────────────────────────────── */
+    #update-banner {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 18px;
+      background: linear-gradient(90deg, #1a56db 0%, #2b6cb0 100%);
+      color: #fff;
+      font-size: 13px;
+      flex-shrink: 0;
+      z-index: 200;
+      animation: slideDownBanner 0.35s ease;
+    }
+    #update-banner.visible { display: flex; }
+    @keyframes slideDownBanner {
+      from { transform: translateY(-100%); opacity: 0; }
+      to   { transform: translateY(0);     opacity: 1; }
+    }
+    #update-banner .upd-icon { font-size: 16px; flex-shrink: 0; }
+    #update-banner .upd-text { flex: 1; line-height: 1.4; }
+    #update-banner .upd-text strong { font-weight: 700; }
+    #update-banner .upd-text small  { opacity: 0.82; font-size: 11px; display: block; margin-top: 1px; }
+    #update-banner .upd-btn {
+      padding: 5px 13px;
+      border-radius: 4px;
+      border: none;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: filter 0.15s;
+    }
+    #update-banner .upd-btn:hover { filter: brightness(1.12); }
+    #update-banner .upd-btn-primary {
+      background: #fff;
+      color: #1a56db;
+    }
+    #update-banner .upd-btn-secondary {
+      background: rgba(255,255,255,0.18);
+      color: #fff;
+    }
+    #update-banner .upd-progress {
+      width: 120px;
+      height: 6px;
+      background: rgba(255,255,255,0.3);
+      border-radius: 3px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    #update-banner .upd-progress-bar {
+      height: 100%;
+      background: #fff;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+    #update-banner .upd-close {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.7);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 2px;
+      flex-shrink: 0;
+    }
+    #update-banner .upd-close:hover { color: #fff; }
+
+    /* About-tab update card */
+    #about-update-card {
+      display: none;
+      margin-top: 16px;
+      padding: 14px 16px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+    }
+    #about-update-card.visible { display: block; }
+    #about-update-card .auc-title { font-weight: 700; font-size: 14px; color: #1e40af; }
+    #about-update-card .auc-notes {
+      margin-top: 6px; font-size: 12px; color: #374151;
+      white-space: pre-wrap; max-height: 120px; overflow-y: auto;
+    }
+    #about-update-card .auc-btns { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+    #about-update-card .auc-btn {
+      padding: 6px 14px; border-radius: 4px; font-size: 12px; font-weight: 600;
+      border: none; cursor: pointer; transition: filter 0.15s;
+    }
+    #about-update-card .auc-btn:hover { filter: brightness(0.92); }
+    #about-update-card .auc-btn-primary   { background: #2b6cb0; color: #fff; }
+    #about-update-card .auc-btn-secondary { background: #e5e7eb; color: #374151; }
+
     /* ── Mobile: responsive overrides ───────────────────────────── */
     /* Mobile nav bar (hamburger + current-tab label) */
     #mobile-nav-bar { display: none; }
@@ -452,6 +545,24 @@
     <p>The connection to the PACS Admin Tool server has been lost.</p>
     <div class="reconnecting">Reconnecting…</div>
   </div>
+</div>
+
+<!-- ── Update notification banner ────────────────────────────────────────── -->
+<div id="update-banner" role="status" aria-live="polite">
+  <span class="upd-icon">🚀</span>
+  <span class="upd-text">
+    <strong id="upd-headline">Update available</strong>
+    <small id="upd-subline"></small>
+  </span>
+  <!-- progress bar (hidden until download starts) -->
+  <div id="upd-progress-wrap" class="upd-progress" style="display:none">
+    <div id="upd-progress-bar" class="upd-progress-bar"></div>
+  </div>
+  <!-- action buttons (swapped depending on state) -->
+  <button id="upd-btn-install"  class="upd-btn upd-btn-primary"   onclick="updInstall()"  style="display:none">Install &amp; Restart</button>
+  <button id="upd-btn-download" class="upd-btn upd-btn-primary"   onclick="updDownload()" style="display:none">Download Update</button>
+  <button id="upd-btn-release"  class="upd-btn upd-btn-secondary" onclick="updOpenRelease()">View Release</button>
+  <button class="upd-close" onclick="updDismiss()" aria-label="Dismiss">×</button>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════
@@ -1388,6 +1499,16 @@
     <div id="about-layout">
       <h2 id="about-app-title" data-i18n="about.title">PACS Admin Tool</h2>
       <p id="about-version" class="about-dim">Version ...</p>
+      <!-- Update card — shown when a newer release is available -->
+      <div id="about-update-card">
+        <div class="auc-title" id="auc-title">🚀 Update available</div>
+        <div class="auc-notes" id="auc-notes"></div>
+        <div class="auc-btns">
+          <button id="auc-btn-install"  class="auc-btn auc-btn-primary"   onclick="updInstall()"     style="display:none">Install &amp; Restart</button>
+          <button id="auc-btn-download" class="auc-btn auc-btn-primary"   onclick="updDownload()"    style="display:none">Download Update</button>
+          <button id="auc-btn-release"  class="auc-btn auc-btn-secondary" onclick="updOpenRelease()">View Release Notes ↗</button>
+        </div>
+      </div>
       <hr class="about-sep">
       <p class="about-desc" data-i18n-html="about.description_html">
         A portable DICOM &amp; HL7 administration utility for PACS engineers,<br>
@@ -1724,6 +1845,9 @@ socket.on("disconnect", () => {
   document.getElementById("ws-status").style.color = "#dc2626";
   document.getElementById("offline-overlay").classList.add("visible");
 });
+
+// Server pushes this when a background update download has finished.
+socket.on("update_ready", data => { _onUpdateReady(data); });
 
 // "log" events come from server._log() calls in server.py.
 // We route them to the correct log box based on the "room" field.
@@ -2477,7 +2601,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // Restore the last active tab, falling back to dashboard
   showTab(localStorage.getItem("activeTab") || "dashboard");
 
-  // Fetch app version from the server and display it in the About tab
   // Fetch app version and data paths from the server
   fetch("/api/version")
     .then(r => r.json())
@@ -2490,7 +2613,149 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     })
     .catch(() => {});
+
+  // Check for updates after a short delay (so the UI is fully ready first)
+  setTimeout(checkForUpdate, 3000);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Update notification
+// ─────────────────────────────────────────────────────────────────────────────
+
+let _updInfo          = null;   // latest /api/check-update response
+let _updPollTimer     = null;   // timer for polling download progress
+
+async function checkForUpdate() {
+  try {
+    const res = await fetch("/api/check-update");
+    if (!res.ok) return;
+    const info = await res.json();
+    _updInfo = info;
+    if (info.has_update) {
+      _showUpdateBanner(info);
+      _showUpdateAboutCard(info);
+    }
+  } catch (_) { /* silently ignore – no internet, no problem */ }
+}
+
+function _showUpdateBanner(info) {
+  const banner = document.getElementById("update-banner");
+  if (!banner) return;
+  document.getElementById("upd-headline").textContent =
+    `Update available — v${info.latest_version}`;
+  document.getElementById("upd-subline").textContent =
+    `You are running v${info.current_version}`;
+
+  // Show the right action button
+  if (info.can_auto_update) {
+    document.getElementById("upd-btn-download").style.display = "";
+  }
+  // Always show "View Release" link
+  document.getElementById("upd-btn-release").style.display = "";
+
+  banner.classList.add("visible");
+}
+
+function _showUpdateAboutCard(info) {
+  const card = document.getElementById("about-update-card");
+  if (!card) return;
+  document.getElementById("auc-title").textContent =
+    `🚀 Update available — v${info.latest_version}`;
+  if (info.release_notes) {
+    document.getElementById("auc-notes").textContent = info.release_notes;
+  }
+  if (info.can_auto_update) {
+    document.getElementById("auc-btn-download").style.display = "";
+  }
+  document.getElementById("auc-btn-release").style.display = "";
+  card.classList.add("visible");
+}
+
+function updDismiss() {
+  const banner = document.getElementById("update-banner");
+  if (banner) banner.classList.remove("visible");
+}
+
+function updOpenRelease() {
+  if (_updInfo && _updInfo.release_url) {
+    window.open(_updInfo.release_url, "_blank", "noopener,noreferrer");
+  }
+}
+
+async function updDownload() {
+  if (!_updInfo) return;
+
+  // Switch to progress view
+  document.getElementById("upd-btn-download").style.display = "none";
+  document.getElementById("auc-btn-download").style.display = "none";
+  document.getElementById("upd-progress-wrap").style.display = "";
+  document.getElementById("upd-btn-release").style.display = "none";
+  document.getElementById("auc-btn-release").style.display = "none";
+  document.getElementById("upd-headline").textContent = "Downloading update…";
+  document.getElementById("auc-title").textContent     = "⏳ Downloading update…";
+
+  try {
+    const res  = await fetch("/api/apply-update", { method: "POST" });
+    const data = await res.json();
+    if (!data.ok) {
+      _updShowError(data.error || "Download failed.");
+      return;
+    }
+    // Poll the download state
+    _updPollTimer = setInterval(_updPollProgress, 800);
+  } catch (e) {
+    _updShowError("Network error: " + e.message);
+  }
+}
+
+async function _updPollProgress() {
+  // Progress is pushed via socket.on("update_ready") when complete.
+  // This function is kept as a placeholder in case polling is needed in the future.
+}
+
+function _onUpdateReady(data) {
+  if (_updPollTimer) { clearInterval(_updPollTimer); _updPollTimer = null; }
+
+  // Progress: 100%
+  document.getElementById("upd-progress-bar").style.width = "100%";
+  document.getElementById("upd-progress-wrap").style.display = "none";
+
+  document.getElementById("upd-headline").textContent =
+    `v${(data && data.latest_version) || "new"} ready to install`;
+  document.getElementById("auc-title").textContent =
+    `✅ v${(data && data.latest_version) || "new"} ready to install`;
+
+  document.getElementById("upd-btn-install").style.display = "";
+  document.getElementById("auc-btn-install").style.display = "";
+}
+
+async function updInstall() {
+  document.getElementById("upd-headline").textContent = "Restarting…";
+  document.getElementById("auc-title").textContent    = "⏳ Restarting…";
+  document.getElementById("upd-btn-install").disabled = true;
+  document.getElementById("auc-btn-install").disabled = true;
+  try {
+    await fetch("/api/apply-update", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ action: "restart" }),
+    });
+  } catch (_) { /* expected – server exits */ }
+  // The server will restart; show the offline overlay which already exists
+  document.getElementById("offline-overlay").classList.add("visible");
+}
+
+function _updShowError(msg) {
+  if (_updPollTimer) { clearInterval(_updPollTimer); _updPollTimer = null; }
+  document.getElementById("upd-progress-wrap").style.display = "none";
+  document.getElementById("upd-headline").textContent = "Update failed";
+  document.getElementById("auc-title").textContent    = "❌ Update failed";
+  document.getElementById("upd-subline").textContent  = msg;
+  document.getElementById("auc-notes").textContent    = msg;
+  // Re-show the release link as fallback
+  document.getElementById("upd-btn-release").style.display = "";
+  document.getElementById("auc-btn-release").style.display = "";
+}
 
 async function loadHL7Template() {
   // Fetch the full body of the selected template from the server,
