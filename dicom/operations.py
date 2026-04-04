@@ -579,6 +579,27 @@ class SCPListener:
         ae = AE(ae_title=self.ae_title)
         ae.add_supported_context(Verification)
 
+        # Broad transfer-syntax list so we accept any encoding a sender offers:
+        # uncompressed (implicit/explicit), all JPEG variants, JPEG-LS, JPEG 2000,
+        # and RLE.  This prevents "Transfer Syntaxes Not Supported" rejections
+        # for compressed modalities (MRI, CT with JPEG-LS, etc.).
+        _TS = [
+            "1.2.840.10008.1.2",        # Implicit VR Little Endian
+            "1.2.840.10008.1.2.1",      # Explicit VR Little Endian
+            "1.2.840.10008.1.2.2",      # Explicit VR Big Endian (retired)
+            "1.2.840.10008.1.2.4.50",   # JPEG Baseline (Process 1)
+            "1.2.840.10008.1.2.4.51",   # JPEG Extended (Process 2 & 4)
+            "1.2.840.10008.1.2.4.57",   # JPEG Lossless (Process 14)
+            "1.2.840.10008.1.2.4.70",   # JPEG Lossless SV1 (Process 14, SV1)
+            "1.2.840.10008.1.2.4.80",   # JPEG-LS Lossless
+            "1.2.840.10008.1.2.4.81",   # JPEG-LS Near-Lossless
+            "1.2.840.10008.1.2.4.90",   # JPEG 2000 Lossless
+            "1.2.840.10008.1.2.4.91",   # JPEG 2000 Lossy
+            "1.2.840.10008.1.2.4.92",   # JPEG 2000 Part 2 MC Lossless
+            "1.2.840.10008.1.2.4.93",   # JPEG 2000 Part 2 MC
+            "1.2.840.10008.1.2.5",      # RLE Lossless
+        ]
+
         # DICOM allows max 128 presentation contexts per association.
         # We prioritise the SOP classes most commonly sent by PACS systems,
         # putting SR, PR, KO (Key Objects) and common image types first so
@@ -613,7 +634,7 @@ class SCPListener:
         ]
         for uid in PRIORITY_SOPS:
             try:
-                ae.add_supported_context(uid)
+                ae.add_supported_context(uid, _TS)
             except Exception:
                 pass
 
@@ -622,13 +643,13 @@ class SCPListener:
             from pynetdicom.presentation import AllStoragePresentationContexts
             for cx in AllStoragePresentationContexts:
                 try:
-                    ae.add_supported_context(cx.abstract_syntax)
+                    ae.add_supported_context(cx.abstract_syntax, _TS)
                 except Exception:
                     pass
         except ImportError:
             for sop in STORAGE_SOPS:
                 try:
-                    ae.add_supported_context(sop)
+                    ae.add_supported_context(sop, _TS)
                 except Exception:
                     pass
 
