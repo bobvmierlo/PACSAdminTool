@@ -28,6 +28,141 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+#  Update notification banner (shown at the top of the window)
+# ---------------------------------------------------------------------------
+
+class _UpdateBanner(tk.Frame):
+    """
+    A slim, dismissible banner that slides in below the header bar when a
+    newer version is available on GitHub.
+
+    Colours intentionally match the web UI's blue gradient (#1a56db / #2b6cb0).
+    """
+    _BG   = "#1a56db"
+    _FG   = "#ffffff"
+    _BTN_BG  = "#ffffff"
+    _BTN_FG  = "#1a56db"
+    _BTN2_BG = "rgba(255,255,255,0.18)"   # approximated as a light blue
+
+    def __init__(self, parent, info: dict):
+        super().__init__(parent, bg=self._BG, pady=6, padx=12)
+        self._info = info
+        self._build()
+
+    def _build(self):
+        info = self._info
+
+        # Left side: icon + text
+        left = tk.Frame(self, bg=self._BG)
+        left.pack(side="left", fill="x", expand=True)
+
+        tk.Label(left, text="🚀", bg=self._BG, fg=self._FG,
+                 font=("Segoe UI", 12)).pack(side="left", padx=(0, 8))
+
+        txt_frame = tk.Frame(left, bg=self._BG)
+        txt_frame.pack(side="left")
+        tk.Label(
+            txt_frame,
+            text=f"Update available — v{info['latest_version']}",
+            bg=self._BG, fg=self._FG,
+            font=("Segoe UI", 9, "bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            txt_frame,
+            text=f"You are running v{info['current_version']}",
+            bg=self._BG, fg="#c7d9f8",
+            font=("Segoe UI", 8),
+        ).pack(anchor="w")
+
+        # Right side: buttons
+        btn_frame = tk.Frame(self, bg=self._BG)
+        btn_frame.pack(side="right")
+
+        if info.get("can_auto_update"):
+            tk.Button(
+                btn_frame, text="Install & Restart",
+                bg=self._BTN_BG, fg=self._BTN_FG,
+                font=("Segoe UI", 8, "bold"),
+                relief="flat", bd=0, padx=10, pady=3, cursor="hand2",
+                command=self._do_install,
+            ).pack(side="left", padx=(0, 6))
+
+        tk.Button(
+            btn_frame, text="View Release ↗",
+            bg="#2b6cb0", fg="#ffffff",
+            font=("Segoe UI", 8),
+            relief="flat", bd=0, padx=10, pady=3, cursor="hand2",
+            command=lambda: webbrowser.open(info.get("release_url", "")),
+        ).pack(side="left", padx=(0, 6))
+
+        tk.Button(
+            btn_frame, text="×",
+            bg=self._BG, fg="#c7d9f8",
+            font=("Segoe UI", 11, "bold"),
+            relief="flat", bd=0, padx=6, pady=0, cursor="hand2",
+            command=self.destroy,
+        ).pack(side="left")
+
+    def _do_install(self):
+        """Trigger the auto-update sequence for frozen executables."""
+        from web.updater import apply_update_async, apply_update_and_restart, get_update_state
+
+        info = self._info
+        if get_update_state()["status"] == "ready":
+            # Already downloaded – just restart
+            if messagebox.askyesno(
+                "Install Update",
+                f"Version {info['latest_version']} is ready to install.\n\n"
+                "The application will close and restart automatically.\n"
+                "Proceed?"
+            ):
+                apply_update_and_restart()
+            return
+
+        # Start the download
+        def _on_ready():
+            self.after(0, self._on_download_ready)
+
+        self._lbl_status = tk.Label(
+            self, text="Downloading…", bg=self._BG, fg="#c7d9f8",
+            font=("Segoe UI", 8),
+        )
+        self._lbl_status.pack(side="left", padx=4)
+        apply_update_async(info["download_url"], on_ready=_on_ready)
+
+    def _on_download_ready(self):
+        from web.updater import apply_update_and_restart
+        if hasattr(self, "_lbl_status"):
+            self._lbl_status.destroy()
+        info = self._info
+        if messagebox.askyesno(
+            "Install Update",
+            f"Version {info['latest_version']} has been downloaded.\n\n"
+            "The application will close and restart automatically.\n"
+            "Proceed?"
+        ):
+            apply_update_and_restart()
+
+
+def _check_for_update_async(callback):
+    """
+    Run the GitHub update check in a daemon thread.
+    Calls ``callback(info)`` on the main thread if an update is found.
+    ``callback`` receives the dict from ``web.updater.check_for_update``.
+    """
+    def _worker():
+        try:
+            from web.updater import check_for_update
+            info = check_for_update()
+            if info.get("has_update") and callable(callback):
+                callback(info)
+        except Exception as exc:
+            logger.debug("GUI update check failed: %s", exc)
+
+    threading.Thread(target=_worker, daemon=True, name="gui-update-check").start()
+
+
 def _setup_client_logging():
     """
     Add a daily-rotating log file handler for the desktop client.
@@ -1609,9 +1744,12 @@ class PACSAdminApp:
         self.root.configure(bg="#f5f5f5")
         self._set_window_icon()
         _style_setup(self.root)
+        self._banner_slot = None   # will hold the _UpdateBanner widget
         self._build_ui()
         self._tray = None
         self._start_tray()
+        # Check for updates ~3 s after startup (non-blocking)
+        self.root.after(3000, self._schedule_update_check)
 
     @property
     def local_ae(self):
@@ -1626,6 +1764,9 @@ class PACSAdminApp:
         tk.Label(hdr,text=t("app.title"),font=FONT_H1,bg="#ffffff",fg="#1a1a1a").pack(side="left",padx=16,pady=8)
         tk.Frame(hdr,bg="#e0e0e0",width=1).pack(side="left",fill="y",padx=0,pady=8)
         tk.Label(hdr,text=t("app.subtitle"),font=FONT,bg="#ffffff",fg="#888888").pack(side="left",padx=12)
+        # Slot for the update banner — packed after header, before notebook
+        self._banner_slot = tk.Frame(self.root, bg="#1a56db")
+        self._banner_slot.pack(fill="x", side="top")  # empty until update found
         nb = ttk.Notebook(self.root); nb.pack(fill="both",expand=True,padx=0,pady=0)
         for label, cls in [
             ("  "+t("tabs.cfind")+"  ", CFindTab), ("  "+t("tabs.cstore")+"  ", CStoreTab),
@@ -1690,6 +1831,22 @@ class PACSAdminApp:
     def _on_close(self):
         """Hide to tray instead of quitting when the user clicks X."""
         self.root.withdraw()
+
+    # ── Update check ────────────────────────────────────────────────────────
+
+    def _schedule_update_check(self):
+        """Kick off the non-blocking GitHub version check."""
+        _check_for_update_async(lambda info: self.root.after(0, lambda: self._show_update_banner(info)))
+
+    def _show_update_banner(self, info: dict):
+        """Display the update notification banner below the header."""
+        if not self._banner_slot:
+            return
+        # Remove any previous banner
+        for child in self._banner_slot.winfo_children():
+            child.destroy()
+        banner = _UpdateBanner(self._banner_slot, info)
+        banner.pack(fill="x")
 
     def run(self):
         try:
