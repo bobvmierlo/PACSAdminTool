@@ -1847,13 +1847,22 @@ const socket = io();
 socket.on("connect", () => {
   document.getElementById("ws-status").textContent = "⬤ " + i18n("common.connected");
   document.getElementById("ws-status").style.color = "#15803d";
+  // If a restart was triggered by an update, reload the page now that the
+  // new server is accepting connections — don't just hide the overlay.
+  if (_updInstalling) {
+    location.reload();
+    return;
+  }
   document.getElementById("offline-overlay").classList.remove("visible");
 });
 
 socket.on("disconnect", () => {
   document.getElementById("ws-status").textContent = "⬤ " + i18n("common.disconnected");
   document.getElementById("ws-status").style.color = "#dc2626";
-  document.getElementById("offline-overlay").classList.add("visible");
+  // Don't overwrite the update overlay (already visible with custom text).
+  if (!_updInstalling) {
+    document.getElementById("offline-overlay").classList.add("visible");
+  }
 });
 
 // Server pushes this when a background update download has finished.
@@ -2634,6 +2643,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 let _updInfo          = null;   // latest /api/check-update response
 let _updPollTimer     = null;   // timer for polling download progress
+let _updInstalling    = false;  // true while waiting for a restart after install
 
 async function checkForUpdate(force = false) {
   const url = force ? "/api/check-update?force=1" : "/api/check-update";
@@ -2804,47 +2814,62 @@ function _onUpdateReady(data) {
 }
 
 async function updInstall() {
+  _updInstalling = true;
   document.getElementById("upd-headline").textContent = "Restarting…";
   document.getElementById("auc-title").textContent    = "⏳ Restarting…";
   document.getElementById("upd-btn-install").disabled = true;
   document.getElementById("auc-btn-install").disabled = true;
+
+  // Show the update overlay BEFORE the fetch so we beat the Socket.IO
+  // disconnect event (which would otherwise flash "Server Offline" first).
+  document.getElementById("offline-title").textContent = "Installing update…";
+  document.querySelector("#offline-box p").textContent =
+    "The server is restarting with the new version. The page will reload automatically.";
+  document.getElementById("offline-overlay").classList.add("visible");
+
+  // Start the health-poll fallback immediately (socket reconnect is primary).
+  _pollUntilRestart();
+
   try {
     await fetch("/api/apply-update", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ action: "restart" }),
     });
-  } catch (_) { /* expected – server exits */ }
-
-  // Show the offline overlay with update-specific messaging.
-  document.getElementById("offline-title").textContent = "Installing update…";
-  document.querySelector("#offline-box p").textContent =
-    "The server is restarting with the new version. The page will reload automatically.";
-  document.getElementById("offline-overlay").classList.add("visible");
-
-  // Poll /api/health until the server comes back, then reload.
-  _pollUntilRestart();
+  } catch (_) { /* expected – server exits mid-request */ }
 }
 
 function _pollUntilRestart() {
+  // Two-phase: wait until the server goes DOWN, then reload when it comes back.
+  // This prevents a premature reload if the server hasn't shut down yet when
+  // the first poll fires (which would reload onto the still-running old version).
+  //
+  // The socket.on("connect") handler is the primary reload trigger; this poll
+  // is a fallback for cases where the WebSocket doesn't reconnect on its own.
   const INTERVAL_MS = 2000;
-  const MAX_WAIT_MS = 120000;   // give up after 2 minutes
-  const started     = Date.now();
+  const MAX_WAIT_MS = 120000;
+  const started       = Date.now();
+  let   serverWasDown = false;
 
   const timer = setInterval(async () => {
     if (Date.now() - started > MAX_WAIT_MS) {
       clearInterval(timer);
+      _updInstalling = false;
       document.querySelector("#offline-box p").textContent =
         "Restart is taking longer than expected. Please refresh the page manually.";
       return;
     }
     try {
       const res = await fetch("/api/health", { cache: "no-store" });
-      if (res.ok) {
+      if (res.ok && serverWasDown) {
+        // Server is back up after being down – reload (if socket hasn't already).
         clearInterval(timer);
         location.reload();
       }
-    } catch (_) { /* server still down – keep polling */ }
+      // res.ok but !serverWasDown → server hasn't shut down yet, keep waiting.
+    } catch (_) {
+      serverWasDown = true;   // server is down – next successful poll triggers reload
+    }
   }, INTERVAL_MS);
 }
 
