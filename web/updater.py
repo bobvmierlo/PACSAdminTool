@@ -67,15 +67,15 @@ def _is_frozen() -> bool:
 
 
 def _parse_semver(v: str) -> tuple:
-    """'v2.7.1' → (2, 7, 1).  Returns (0,0,0) on parse error."""
+    """'v2.7.0.1' → (2, 7, 0, 1).  Handles 1–4 part versions.  Returns (0,0,0,0) on parse error."""
     v = v.lstrip("v").strip()
     try:
         parts = [int(x) for x in v.split(".")]
-        while len(parts) < 3:
+        while len(parts) < 4:
             parts.append(0)
-        return tuple(parts[:3])
+        return tuple(parts[:4])
     except (ValueError, AttributeError):
-        return (0, 0, 0)
+        return (0, 0, 0, 0)
 
 
 def _detect_asset_name() -> str | None:
