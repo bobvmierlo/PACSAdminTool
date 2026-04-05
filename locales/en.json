@@ -326,7 +326,8 @@
     "title": "DICOM File Inspector",
     "parse": "Parse & Inspect",
     "metadata": "File Metadata",
-    "all_tags": "View All DICOM Tags"
+    "all_tags": "View All DICOM Tags",
+    "edit_tags": "Edit Tags…"
   },
   "anonymizer": {
     "title": "DICOM Anonymizer",

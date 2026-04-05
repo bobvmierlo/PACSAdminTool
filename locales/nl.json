@@ -326,7 +326,8 @@
     "title": "DICOM Bestandsinspector",
     "parse": "Parse & Inspecteren",
     "metadata": "Bestandsmetadata",
-    "all_tags": "Alle DICOM-tags bekijken"
+    "all_tags": "Alle DICOM-tags bekijken",
+    "edit_tags": "Tags bewerken…"
   },
   "anonymizer": {
     "title": "DICOM Anonimiseerder",
