@@ -26,7 +26,8 @@
     "dicomdir": "DICOMDIR",
     "settings": "Instellingen",
     "help": "Help",
-    "about": "Over"
+    "about": "Over",
+    "logs": "Logboeken"
   },
   "common": {
     "preset": "Voorinstelling:",
@@ -320,7 +321,10 @@
     "ae_health": "AE Connectiviteit",
     "test_all": "Alle AEs testen",
     "recent_activity": "Recente activiteit",
-    "no_presets": "Geen externe AE-presets geconfigureerd. Voeg ze toe in Instellingen."
+    "no_presets": "Geen externe AE-presets geconfigureerd. Voeg ze toe in Instellingen.",
+    "ae_reachable": "✓ bereikbaar",
+    "ae_failed": "✗ {message}",
+    "ae_error": "✗ netwerkfout"
   },
   "inspector": {
     "title": "DICOM Bestandsinspector",
@@ -427,5 +431,67 @@
     "setup_notice": "Er zijn nog geen gebruikers. Maak het eerste beheerdersaccount aan om deze instantie te beveiligen.",
     "invalid_credentials": "Ongeldige gebruikersnaam of wachtwoord.",
     "session_expired": "Uw sessie is verlopen. Log opnieuw in."
+  },
+  "offline": {
+    "title": "Server offline",
+    "body": "De verbinding met de PACS Admin Tool server is verbroken.",
+    "reconnecting": "Opnieuw verbinden…",
+    "install_title": "Update installeren…",
+    "install_body": "De server herstart met de nieuwe versie. De pagina laadt automatisch opnieuw.",
+    "timeout_body": "Het herstarten duurt langer dan verwacht. Vernieuw de pagina handmatig."
+  },
+  "update": {
+    "check_btn": "Controleer op updates",
+    "checking": "Controleren…",
+    "status_available": "v{version} beschikbaar!",
+    "status_uptodate": "U bent up-to-date.",
+    "status_no_github": "Kan GitHub niet bereiken.",
+    "status_failed": "Controle mislukt.",
+    "headline": "Update beschikbaar — v{version}",
+    "subline_running": "U gebruikt versie v{version}",
+    "subline_docker": "Haal de nieuwe containerafbeelding op om te updaten",
+    "btn_install": "Installeren & herstarten",
+    "btn_download": "Update downloaden",
+    "btn_release": "Release bekijken",
+    "btn_release_notes": "Release-opmerkingen bekijken ↗",
+    "btn_dismiss": "Sluiten",
+    "btn_docker_how": "Hoe updaten ↓",
+    "card_title": "🚀 Update beschikbaar",
+    "card_title_version": "🚀 Update beschikbaar — v{version}",
+    "downloading": "Update downloaden…",
+    "downloading_card": "⏳ Update downloaden…",
+    "ready": "v{version} klaar om te installeren",
+    "ready_card": "✅ v{version} klaar om te installeren",
+    "restarting": "Herstarten…",
+    "restarting_card": "⏳ Herstarten…",
+    "failed": "Update mislukt",
+    "failed_card": "❌ Update mislukt"
+  },
+  "logs": {
+    "tab": "Logboeken",
+    "viewer_title": "Logboekweergave",
+    "log_file": "Logbestand",
+    "last_n_lines": "Laatste N regels",
+    "level": "Niveau",
+    "all_levels": "Alle niveaus",
+    "filter_placeholder": "Subtekenreeksfilter…",
+    "content": "Inhoud"
+  },
+  "tag_editor": {
+    "title": "Tag-editor",
+    "filter_placeholder": "Tags filteren…",
+    "reset": "Wijzigingen resetten",
+    "changes_pending": "{n} wijziging(en) in behandeling",
+    "download": "Gewijzigd bestand downloaden",
+    "send_label": "Verzenden naar externe AE",
+    "select_preset": "Selecteer een voorinstelling…",
+    "send_pacs": "Verzenden naar PACS",
+    "edit_btn": "Bewerken",
+    "preparing": "Voorbereiden…",
+    "downloaded": "Gedownload.",
+    "sending": "Verzenden…",
+    "no_file": "Geen bestand geladen in de Inspector.",
+    "parse_first": "Parseer eerst een DICOM-bestand.",
+    "fill_ae_fields": "Vul AE Title, Host en een geldige poort in voordat u verzendt."
   }
 }

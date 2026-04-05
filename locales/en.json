@@ -26,7 +26,8 @@
     "dicomdir": "DICOMDIR",
     "settings": "Settings",
     "help": "Help",
-    "about": "About"
+    "about": "About",
+    "logs": "Logs"
   },
   "common": {
     "preset": "Preset:",
@@ -320,7 +321,10 @@
     "ae_health": "AE Connectivity",
     "test_all": "Test All AEs",
     "recent_activity": "Recent Activity",
-    "no_presets": "No remote AE presets configured. Add them in Settings."
+    "no_presets": "No remote AE presets configured. Add them in Settings.",
+    "ae_reachable": "✓ reachable",
+    "ae_failed": "✗ {message}",
+    "ae_error": "✗ network error"
   },
   "inspector": {
     "title": "DICOM File Inspector",
@@ -427,5 +431,67 @@
     "setup_notice": "No users exist yet. Create the first administrator account to secure this instance.",
     "invalid_credentials": "Invalid username or password.",
     "session_expired": "Your session has expired. Please sign in again."
+  },
+  "offline": {
+    "title": "Server Offline",
+    "body": "The connection to the PACS Admin Tool server has been lost.",
+    "reconnecting": "Reconnecting…",
+    "install_title": "Installing update…",
+    "install_body": "The server is restarting with the new version. The page will reload automatically.",
+    "timeout_body": "Restart is taking longer than expected. Please refresh the page manually."
+  },
+  "update": {
+    "check_btn": "Check for updates",
+    "checking": "Checking…",
+    "status_available": "v{version} available!",
+    "status_uptodate": "You're up to date.",
+    "status_no_github": "Could not reach GitHub.",
+    "status_failed": "Check failed.",
+    "headline": "Update available — v{version}",
+    "subline_running": "You are running v{version}",
+    "subline_docker": "Pull the new container image to update",
+    "btn_install": "Install & Restart",
+    "btn_download": "Download Update",
+    "btn_release": "View Release",
+    "btn_release_notes": "View Release Notes ↗",
+    "btn_dismiss": "Dismiss",
+    "btn_docker_how": "How to update ↓",
+    "card_title": "🚀 Update available",
+    "card_title_version": "🚀 Update available — v{version}",
+    "downloading": "Downloading update…",
+    "downloading_card": "⏳ Downloading update…",
+    "ready": "v{version} ready to install",
+    "ready_card": "✅ v{version} ready to install",
+    "restarting": "Restarting…",
+    "restarting_card": "⏳ Restarting…",
+    "failed": "Update failed",
+    "failed_card": "❌ Update failed"
+  },
+  "logs": {
+    "tab": "Logs",
+    "viewer_title": "Log Viewer",
+    "log_file": "Log File",
+    "last_n_lines": "Last N lines",
+    "level": "Level",
+    "all_levels": "All levels",
+    "filter_placeholder": "Substring filter…",
+    "content": "Content"
+  },
+  "tag_editor": {
+    "title": "Tag Editor",
+    "filter_placeholder": "Filter tags…",
+    "reset": "Reset changes",
+    "changes_pending": "{n} change(s) pending",
+    "download": "Download Modified File",
+    "send_label": "Send to Remote AE",
+    "select_preset": "Select a preset…",
+    "send_pacs": "Send to PACS",
+    "edit_btn": "Edit",
+    "preparing": "Preparing…",
+    "downloaded": "Downloaded.",
+    "sending": "Sending…",
+    "no_file": "No file loaded in the Inspector.",
+    "parse_first": "Parse a DICOM file first.",
+    "fill_ae_fields": "Fill in AE Title, Host, and a valid Port before sending."
   }
 }
