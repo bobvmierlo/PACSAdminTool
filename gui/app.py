@@ -1770,11 +1770,12 @@ class PACSAdminApp:
         nb = ttk.Notebook(self.root); nb.pack(fill="both",expand=True,padx=0,pady=0)
         for label, cls in [
             ("  "+t("tabs.cfind")+"  ", CFindTab), ("  "+t("tabs.cstore")+"  ", CStoreTab),
-            ("  "+t("tabs.dmwl")+"  ", DMWLTab), ("  "+t("tabs.commit")+"  ", StorageCommitTab),
-            ("  "+t("tabs.iocm")+"  ", IOCMTab), ("  "+t("tabs.hl7")+"  ", HL7Tab),
             ("  "+t("tabs.scp")+"  ", SCPListenerTab),
+            ("  "+t("tabs.dmwl")+"  ", DMWLTab), ("  "+t("tabs.commit")+"  ", StorageCommitTab),
+            ("  "+t("tabs.iocm")+"  ", IOCMTab),
             ("  "+t("tabs.sr_viewer")+"  ", SRViewerTab),
             ("  "+t("tabs.kos_creator")+"  ", KOSCreatorTab),
+            ("  "+t("tabs.hl7")+"  ", HL7Tab),
             ("  "+t("tabs.settings")+"  ", SettingsTab),
             ("  "+t("tabs.help")+"  ", HelpTab), ("  "+t("tabs.about")+"  ", AboutTab),
         ]:
