@@ -541,9 +541,9 @@
 <div id="offline-overlay" role="alertdialog" aria-modal="true" aria-labelledby="offline-title">
   <div id="offline-box">
     <div class="offline-icon">🔌</div>
-    <h2 id="offline-title">Server Offline</h2>
-    <p>The connection to the PACS Admin Tool server has been lost.</p>
-    <div class="reconnecting">Reconnecting…</div>
+    <h2 id="offline-title" data-i18n="offline.title">Server Offline</h2>
+    <p id="offline-body" data-i18n="offline.body">The connection to the PACS Admin Tool server has been lost.</p>
+    <div class="reconnecting" data-i18n="offline.reconnecting">Reconnecting…</div>
   </div>
 </div>
 
@@ -559,10 +559,10 @@
     <div id="upd-progress-bar" class="upd-progress-bar"></div>
   </div>
   <!-- action buttons (swapped depending on state) -->
-  <button id="upd-btn-install"  class="upd-btn upd-btn-primary"   onclick="updInstall()"  style="display:none">Install &amp; Restart</button>
-  <button id="upd-btn-download" class="upd-btn upd-btn-primary"   onclick="updDownload()" style="display:none">Download Update</button>
-  <button id="upd-btn-release"  class="upd-btn upd-btn-secondary" onclick="updOpenRelease()">View Release</button>
-  <button class="upd-close" onclick="updDismiss()" aria-label="Dismiss">×</button>
+  <button id="upd-btn-install"  class="upd-btn upd-btn-primary"   onclick="updInstall()"  style="display:none" data-i18n="update.btn_install">Install &amp; Restart</button>
+  <button id="upd-btn-download" class="upd-btn upd-btn-primary"   onclick="updDownload()" style="display:none" data-i18n="update.btn_download">Download Update</button>
+  <button id="upd-btn-release"  class="upd-btn upd-btn-secondary" onclick="updOpenRelease()" data-i18n="update.btn_release">View Release</button>
+  <button class="upd-close" onclick="updDismiss()" data-i18n-aria-label="update.btn_dismiss" aria-label="Dismiss">×</button>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════
@@ -603,7 +603,7 @@
   <button class="tab-btn" onclick="showTab('kos_creator')" data-i18n="tabs.kos_creator">KOS Creator</button>
   <button class="tab-btn" onclick="showTab('hl7')" data-i18n="tabs.hl7">HL7</button>
   <button class="tab-btn" onclick="showTab('settings')" data-i18n="tabs.settings">Settings</button>
-  <button class="tab-btn" onclick="showTab('logs')">Logs</button>
+  <button class="tab-btn" onclick="showTab('logs')" data-i18n="tabs.logs">Logs</button>
   <button class="tab-btn" onclick="showTab('help')" data-i18n="tabs.help">Help</button>
   <button class="tab-btn" onclick="showTab('about')" data-i18n="tabs.about">About</button>
 </div>
@@ -1051,44 +1051,44 @@
     <!-- Tag editor (shown when Edit Tags is clicked) -->
     <div class="card" id="tag-editor-card" style="display:none">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:8px">
-        <h3 style="margin:0">Tag Editor
+        <h3 style="margin:0" data-i18n="tag_editor.title">Tag Editor
           <span id="tag-editor-change-count" style="font-size:12px; color:#2b6cb0; margin-left:8px"></span>
         </h3>
         <div style="display:flex; gap:6px; flex-wrap:wrap">
-          <input id="tag-editor-filter" type="text" placeholder="Filter tags…"
+          <input id="tag-editor-filter" type="text" data-i18n-placeholder="tag_editor.filter_placeholder" placeholder="Filter tags…"
                  style="width:180px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px"
                  oninput="renderEditTagTable()">
-          <button class="btn" onclick="resetTagEdits()">Reset changes</button>
+          <button class="btn" onclick="resetTagEdits()" data-i18n="tag_editor.reset">Reset changes</button>
         </div>
       </div>
       <div class="result-table-wrap" style="max-height:380px; overflow-y:auto">
         <table id="tag-editor-table">
           <thead><tr>
-            <th>Tag</th><th>Keyword</th><th>VR</th><th>Value</th><th style="width:60px"></th>
+            <th data-i18n="dicom_detail.col_tag">Tag</th><th data-i18n="dicom_detail.col_keyword">Keyword</th><th data-i18n="dicom_detail.col_vr">VR</th><th data-i18n="dicom_detail.col_value">Value</th><th style="width:60px"></th>
           </tr></thead>
           <tbody id="tag-editor-tbody"></tbody>
         </table>
       </div>
       <div style="margin-top:14px; border-top:1px solid #e5e7eb; padding-top:12px">
-        <div style="font-size:13px; font-weight:600; margin-bottom:8px; color:#374151">Actions</div>
+        <div style="font-size:13px; font-weight:600; margin-bottom:8px; color:#374151" data-i18n="common.actions">Actions</div>
         <div class="btn-row" style="flex-wrap:wrap; gap:8px; align-items:flex-end">
-          <button class="btn primary" onclick="downloadEdited()">Download Modified File</button>
+          <button class="btn primary" onclick="downloadEdited()" data-i18n="tag_editor.download">Download Modified File</button>
           <span style="color:#bbb; font-size:13px">or</span>
           <div style="display:flex; align-items:flex-end; gap:6px; flex-wrap:wrap">
             <div class="field" style="min-width:200px">
-              <label style="font-size:11px; color:#888">Send to Remote AE</label>
+              <label style="font-size:11px; color:#888" data-i18n="tag_editor.send_label">Send to Remote AE</label>
               <select id="tag-editor-ae-select" style="font-size:12px"
                       onchange="tagEditorAEChanged()">
-                <option value="">Select a preset…</option>
+                <option value="" data-i18n="tag_editor.select_preset">Select a preset…</option>
               </select>
             </div>
-            <input id="tag-editor-ae-title" placeholder="AE Title"
+            <input id="tag-editor-ae-title" data-i18n-placeholder="common.ae_title" placeholder="AE Title"
                    style="width:110px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
-            <input id="tag-editor-ae-host" placeholder="Host"
+            <input id="tag-editor-ae-host" data-i18n-placeholder="common.host" placeholder="Host"
                    style="width:130px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
-            <input id="tag-editor-ae-port" placeholder="Port" type="number" min="1" max="65535"
+            <input id="tag-editor-ae-port" data-i18n-placeholder="common.port" placeholder="Port" type="number" min="1" max="65535"
                    style="width:70px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
-            <button class="btn success" onclick="sendEditedToPACS()">Send to PACS</button>
+            <button class="btn success" onclick="sendEditedToPACS()" data-i18n="tag_editor.send_pacs">Send to PACS</button>
           </div>
           <span id="tag-editor-status" style="font-size:12px; color:#888"></span>
         </div>
@@ -1432,14 +1432,14 @@
   <!-- ── Log Viewer ──────────────────────────────────────────────── -->
   <div id="tab-logs" class="tab-panel">
     <div class="card">
-      <h3>Log Viewer</h3>
+      <h3 data-i18n="logs.viewer_title">Log Viewer</h3>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end">
         <div class="field" style="flex:2; min-width:200px">
-          <label>Log File</label>
+          <label data-i18n="logs.log_file">Log File</label>
           <select id="log-file-select" style="width:100%" onchange="loadLogContent()"></select>
         </div>
         <div class="field" style="min-width:90px">
-          <label>Last N lines</label>
+          <label data-i18n="logs.last_n_lines">Last N lines</label>
           <select id="log-lines-select" onchange="loadLogContent()">
             <option value="100">100</option>
             <option value="200" selected>200</option>
@@ -1449,9 +1449,9 @@
           </select>
         </div>
         <div class="field" style="min-width:110px">
-          <label>Level</label>
+          <label data-i18n="logs.level">Level</label>
           <select id="log-level-select" onchange="loadLogContent()">
-            <option value="">All levels</option>
+            <option value="" data-i18n="logs.all_levels">All levels</option>
             <option value="DEBUG">DEBUG</option>
             <option value="INFO">INFO</option>
             <option value="WARNING">WARNING</option>
@@ -1460,17 +1460,17 @@
           </select>
         </div>
         <div class="field" style="flex:2; min-width:160px">
-          <label>Filter</label>
-          <input id="log-filter-input" placeholder="Substring filter…" oninput="scheduleLogRefresh()">
+          <label data-i18n="common.filter">Filter:</label>
+          <input id="log-filter-input" data-i18n-placeholder="logs.filter_placeholder" placeholder="Substring filter…" oninput="scheduleLogRefresh()">
         </div>
         <div class="field" style="align-self:flex-end">
-          <button class="btn primary" onclick="loadLogContent()">Refresh</button>
+          <button class="btn primary" onclick="loadLogContent()" data-i18n="common.refresh">Refresh</button>
         </div>
       </div>
     </div>
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px">
-        <h3 style="margin:0">Content</h3>
+        <h3 style="margin:0" data-i18n="logs.content">Content</h3>
         <span id="log-meta" style="font-size:11px; color:#888"></span>
       </div>
       <div id="log-viewer-content"
@@ -1505,18 +1505,18 @@
                        border-radius:3px; background:#f5f5f5; color:#555; cursor:pointer;
                        transition:background 0.15s"
                 onmouseover="this.style.background='#e8e8e8'" onmouseout="this.style.background='#f5f5f5'">
-          Check for updates
+          <span data-i18n="update.check_btn">Check for updates</span>
         </button>
         <span id="upd-check-status" style="font-size:11px; color:#888"></span>
       </p>
       <!-- Update card — shown when a newer release is available -->
       <div id="about-update-card">
-        <div class="auc-title" id="auc-title">🚀 Update available</div>
+        <div class="auc-title" id="auc-title" data-i18n="update.card_title">🚀 Update available</div>
         <div class="auc-notes" id="auc-notes"></div>
         <div class="auc-btns">
-          <button id="auc-btn-install"  class="auc-btn auc-btn-primary"   onclick="updInstall()"     style="display:none">Install &amp; Restart</button>
-          <button id="auc-btn-download" class="auc-btn auc-btn-primary"   onclick="updDownload()"    style="display:none">Download Update</button>
-          <button id="auc-btn-release"  class="auc-btn auc-btn-secondary" onclick="updOpenRelease()">View Release Notes ↗</button>
+          <button id="auc-btn-install"  class="auc-btn auc-btn-primary"   onclick="updInstall()"     style="display:none" data-i18n="update.btn_install">Install &amp; Restart</button>
+          <button id="auc-btn-download" class="auc-btn auc-btn-primary"   onclick="updDownload()"    style="display:none" data-i18n="update.btn_download">Download Update</button>
+          <button id="auc-btn-release"  class="auc-btn auc-btn-secondary" onclick="updOpenRelease()" data-i18n="update.btn_release_notes">View Release Notes ↗</button>
         </div>
       </div>
       <hr class="about-sep">
@@ -2031,14 +2031,14 @@ async function testPreset(i, btn) {
     });
     const data = await res.json();
     if (data.ok) {
-      statusEl.textContent = "✓ reachable";
+      statusEl.textContent = i18n("dashboard.ae_reachable");
       statusEl.style.color = "#16a34a";
     } else {
-      statusEl.textContent = "✗ " + (data.message || "failed");
+      statusEl.textContent = i18n("dashboard.ae_failed", { message: data.message || "failed" });
       statusEl.style.color = "#dc2626";
     }
   } catch {
-    statusEl.textContent = "✗ network error";
+    statusEl.textContent = i18n("dashboard.ae_error");
     statusEl.style.color = "#dc2626";
   } finally {
     btn.disabled = false;
@@ -2665,25 +2665,25 @@ async function updCheckNow() {
   const btn    = document.getElementById("btn-check-update");
   const status = document.getElementById("upd-check-status");
   btn.disabled = true;
-  btn.textContent = "Checking…";
+  btn.querySelector("span").textContent = i18n("update.checking");
   status.textContent = "";
 
   const info = await checkForUpdate(true);
 
   btn.disabled = false;
-  btn.textContent = "Check for updates";
+  btn.querySelector("span").textContent = i18n("update.check_btn");
 
   if (!info) {
-    status.textContent = "Could not reach GitHub.";
+    status.textContent = i18n("update.status_no_github");
     status.style.color = "#dc2626";
   } else if (info.has_update) {
-    status.textContent = `v${info.latest_version} available!`;
+    status.textContent = i18n("update.status_available", { version: info.latest_version });
     status.style.color = "#15803d";
   } else if (!info.error) {
-    status.textContent = "You're up to date.";
+    status.textContent = i18n("update.status_uptodate");
     status.style.color = "#15803d";
   } else {
-    status.textContent = "Check failed.";
+    status.textContent = i18n("update.status_failed");
     status.style.color = "#dc2626";
   }
 
@@ -2700,19 +2700,19 @@ function _showUpdateBanner(info) {
   const banner = document.getElementById("update-banner");
   if (!banner) return;
   document.getElementById("upd-headline").textContent =
-    `Update available — v${info.latest_version}`;
+    i18n("update.headline", { version: info.latest_version });
 
   if (info.deployment === "docker") {
     document.getElementById("upd-subline").textContent =
-      "Pull the new container image to update";
+      i18n("update.subline_docker");
     // Replace the "View Release" button with a docker-specific one
     const releaseBtn = document.getElementById("upd-btn-release");
-    releaseBtn.textContent = "How to update ↓";
+    releaseBtn.textContent = i18n("update.btn_docker_how");
     releaseBtn.onclick = () => { updDismiss(); showTab("about"); };
     releaseBtn.style.display = "";
   } else {
     document.getElementById("upd-subline").textContent =
-      `You are running v${info.current_version}`;
+      i18n("update.subline_running", { version: info.current_version });
     if (info.can_auto_update) {
       document.getElementById("upd-btn-download").style.display = "";
     }
@@ -2726,7 +2726,7 @@ function _showUpdateAboutCard(info) {
   const card = document.getElementById("about-update-card");
   if (!card) return;
   document.getElementById("auc-title").textContent =
-    `🚀 Update available — v${info.latest_version}`;
+    i18n("update.card_title_version", { version: info.latest_version });
   if (info.release_notes) {
     document.getElementById("auc-notes").textContent = info.release_notes;
   }
@@ -2744,7 +2744,7 @@ function _showUpdateAboutCard(info) {
         >${_updateDockerCmd()}</code>
       </div>
       <button class="auc-btn auc-btn-secondary" style="margin-top:8px"
-              onclick="updOpenRelease()">View Release Notes ↗</button>`;
+              onclick="updOpenRelease()">${i18n("update.btn_release_notes")}</button>`;
   } else {
     if (info.can_auto_update) {
       document.getElementById("auc-btn-download").style.display = "";
@@ -2775,8 +2775,8 @@ async function updDownload() {
   document.getElementById("upd-progress-wrap").style.display = "";
   document.getElementById("upd-btn-release").style.display = "none";
   document.getElementById("auc-btn-release").style.display = "none";
-  document.getElementById("upd-headline").textContent = "Downloading update…";
-  document.getElementById("auc-title").textContent     = "⏳ Downloading update…";
+  document.getElementById("upd-headline").textContent = i18n("update.downloading");
+  document.getElementById("auc-title").textContent     = i18n("update.downloading_card");
 
   try {
     const res  = await fetch("/api/apply-update", { method: "POST" });
@@ -2805,9 +2805,9 @@ function _onUpdateReady(data) {
   document.getElementById("upd-progress-wrap").style.display = "none";
 
   document.getElementById("upd-headline").textContent =
-    `v${(data && data.latest_version) || "new"} ready to install`;
+    i18n("update.ready", { version: (data && data.latest_version) || "new" });
   document.getElementById("auc-title").textContent =
-    `✅ v${(data && data.latest_version) || "new"} ready to install`;
+    i18n("update.ready_card", { version: (data && data.latest_version) || "new" });
 
   document.getElementById("upd-btn-install").style.display = "";
   document.getElementById("auc-btn-install").style.display = "";
@@ -2815,16 +2815,16 @@ function _onUpdateReady(data) {
 
 async function updInstall() {
   _updInstalling = true;
-  document.getElementById("upd-headline").textContent = "Restarting…";
-  document.getElementById("auc-title").textContent    = "⏳ Restarting…";
+  document.getElementById("upd-headline").textContent = i18n("update.restarting");
+  document.getElementById("auc-title").textContent    = i18n("update.restarting_card");
   document.getElementById("upd-btn-install").disabled = true;
   document.getElementById("auc-btn-install").disabled = true;
 
   // Show the update overlay BEFORE the fetch so we beat the Socket.IO
   // disconnect event (which would otherwise flash "Server Offline" first).
-  document.getElementById("offline-title").textContent = "Installing update…";
-  document.querySelector("#offline-box p").textContent =
-    "The server is restarting with the new version. The page will reload automatically.";
+  document.getElementById("offline-title").textContent = i18n("offline.install_title");
+  document.getElementById("offline-body").textContent =
+    i18n("offline.install_body");
   document.getElementById("offline-overlay").classList.add("visible");
 
   // Start the health-poll fallback immediately (socket reconnect is primary).
@@ -2855,8 +2855,8 @@ function _pollUntilRestart() {
     if (Date.now() - started > MAX_WAIT_MS) {
       clearInterval(timer);
       _updInstalling = false;
-      document.querySelector("#offline-box p").textContent =
-        "Restart is taking longer than expected. Please refresh the page manually.";
+      document.getElementById("offline-body").textContent =
+        i18n("offline.timeout_body");
       return;
     }
     try {
@@ -2876,8 +2876,8 @@ function _pollUntilRestart() {
 function _updShowError(msg) {
   if (_updPollTimer) { clearInterval(_updPollTimer); _updPollTimer = null; }
   document.getElementById("upd-progress-wrap").style.display = "none";
-  document.getElementById("upd-headline").textContent = "Update failed";
-  document.getElementById("auc-title").textContent    = "❌ Update failed";
+  document.getElementById("upd-headline").textContent = i18n("update.failed");
+  document.getElementById("auc-title").textContent    = i18n("update.failed_card");
   document.getElementById("upd-subline").textContent  = msg;
   document.getElementById("auc-notes").textContent    = msg;
   // Re-show the release link as fallback
@@ -4560,7 +4560,7 @@ let _inspectorFile  = null; // the raw File object for the inspector
 function _inspectorSetFile(file) { _inspectorFile = file; }
 
 function openTagEditor() {
-  if (!_inspectorTags.length) { alert("Parse a DICOM file first."); return; }
+  if (!_inspectorTags.length) { alert(i18n("tag_editor.parse_first")); return; }
   _tagEdits = {};
   _populateTagEditorAEDropdown();
   document.getElementById("tag-editor-card").style.display = "";
@@ -4578,7 +4578,7 @@ function resetTagEdits() {
 function _populateTagEditorAEDropdown() {
   const sel = document.getElementById("tag-editor-ae-select");
   const aes = (appConfig.remote_aes || []);
-  sel.innerHTML = '<option value="">Select a preset…</option>';
+  sel.innerHTML = `<option value="">${i18n("tag_editor.select_preset")}</option>`;
   aes.forEach((ae, i) => {
     const opt = document.createElement("option");
     opt.value = i;
@@ -4628,13 +4628,13 @@ function renderEditTagTable() {
       `<td style="font-size:12px">${escapeHtml(r.keyword)}</td>` +
       `<td style="font-size:11px;color:#6b7280">${r.vr}</td>` +
       `<td id="tev-${r.tag}" style="max-width:320px;word-break:break-all;font-size:12px">${escapeHtml(dispValue)}</td>` +
-      `<td><button class="btn" style="font-size:10px;padding:1px 7px" onclick="editTagInline('${r.tag}','${r.vr}')">Edit</button></td>`;
+      `<td><button class="btn" style="font-size:10px;padding:1px 7px" onclick="editTagInline('${r.tag}','${r.vr}')">${i18n("tag_editor.edit_btn")}</button></td>`;
     tbody.appendChild(tr);
   });
 
   const n = Object.keys(_tagEdits).length;
   document.getElementById("tag-editor-change-count").textContent =
-    n ? `${n} change${n > 1 ? "s" : ""} pending` : "";
+    n ? i18n("tag_editor.changes_pending", { n }) : "";
 }
 
 function editTagInline(tag, vr) {
@@ -4657,9 +4657,9 @@ function editTagInline(tag, vr) {
 }
 
 async function downloadEdited() {
-  if (!_inspectorFile) { alert("No file loaded in the Inspector."); return; }
+  if (!_inspectorFile) { alert(i18n("tag_editor.no_file")); return; }
   const status = document.getElementById("tag-editor-status");
-  status.textContent = "Preparing…";
+  status.textContent = i18n("tag_editor.preparing");
   const fd = new FormData();
   fd.append("file", _inspectorFile);
   fd.append("edits", JSON.stringify(
@@ -4678,24 +4678,24 @@ async function downloadEdited() {
     a.download = _inspectorFile.name || "edited.dcm";
     a.click();
     URL.revokeObjectURL(a.href);
-    status.textContent = "Downloaded.";
+    status.textContent = i18n("tag_editor.downloaded");
   } catch (e) {
     status.textContent = "Error: " + e;
   }
 }
 
 async function sendEditedToPACS() {
-  if (!_inspectorFile) { alert("No file loaded in the Inspector."); return; }
+  if (!_inspectorFile) { alert(i18n("tag_editor.no_file")); return; }
   const aeTitle = document.getElementById("tag-editor-ae-title").value.trim();
   const host    = document.getElementById("tag-editor-ae-host").value.trim();
   const portStr = document.getElementById("tag-editor-ae-port").value.trim();
   const port    = parsePort(portStr);
   if (!aeTitle || !host || port === null) {
-    alert("Fill in AE Title, Host, and a valid Port before sending.");
+    alert(i18n("tag_editor.fill_ae_fields"));
     return;
   }
   const status = document.getElementById("tag-editor-status");
-  status.textContent = "Sending…";
+  status.textContent = i18n("tag_editor.sending");
   const fd = new FormData();
   fd.append("file",     _inspectorFile);
   fd.append("edits",    JSON.stringify(
