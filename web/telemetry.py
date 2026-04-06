@@ -139,7 +139,8 @@ def capture(event: str, properties: dict | None = None) -> None:
         import posthog as _ph
         if _ph.disabled:
             return
-        _ph.capture(_anonymous_id, event, properties or {})
+        props = {"$geoip_disable": False, **(properties or {})}
+        _ph.capture(_anonymous_id, event, props)
     except Exception as exc:
         logger.debug("Telemetry capture error (%s): %s", event, exc)
 
