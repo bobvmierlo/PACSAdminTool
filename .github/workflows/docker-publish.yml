@@ -41,6 +41,12 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
 
+      - name: Inject PostHog API key
+        env:
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: |
+          sed -i "s|phc_REPLACE_WITH_YOUR_POSTHOG_PROJECT_API_KEY|${POSTHOG_API_KEY}|g" web/telemetry.py
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v7
         with:

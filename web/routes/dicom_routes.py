@@ -353,6 +353,7 @@ def dicom_dmwl():
                 "Procedure":     _safe_str(getattr(r, "RequestedProcedureDescription", "")),
                 "tags":          _dataset_to_tag_list(r),
             })
+        _capture("feature_used", {"feature": "dicom_dmwl", "result": "ok" if ok else "error"})
         return jsonify({"ok": ok, "message": msg, "results": rows})
     except Exception as e:
         logger.exception("DMWL error")
