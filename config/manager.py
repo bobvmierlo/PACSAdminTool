@@ -39,7 +39,18 @@ DEFAULT_CONFIG = {
         "port": 5000
     },
     "log_level": "INFO",
-    "language": "en"
+    "language": "en",
+    "telemetry": {
+        # enabled: true  = opt-out model (on by default, user may disable)
+        # Set to false to completely stop sending any telemetry events.
+        "enabled": True,
+        # anonymous_id: randomly-generated UUID, created on first run.
+        # Not tied to any user, machine, or patient data.
+        "anonymous_id": None,
+        # consent_shown: tracks whether the user has seen the telemetry notice.
+        # When false the UI shows a one-time consent banner.
+        "consent_shown": False,
+    }
 }
 
 

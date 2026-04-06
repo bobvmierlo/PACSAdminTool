@@ -323,6 +323,39 @@
     .about-links a { color: #2b6cb0; font-size: 13px; text-decoration: none; }
     .about-links a:hover { text-decoration: underline; }
 
+    /* ── Telemetry consent banner ────────────────────────────────── */
+    #telemetry-consent {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: #1e293b;
+      color: #e2e8f0;
+      z-index: 9000;
+      padding: 16px 20px;
+      box-shadow: 0 -4px 24px rgba(0,0,0,0.25);
+      animation: slideUpBanner 0.3s ease;
+      gap: 16px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    #telemetry-consent.visible { display: flex; }
+    @keyframes slideUpBanner {
+      from { transform: translateY(100%); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    #telemetry-consent .tc-text { flex: 1; min-width: 260px; font-size: 13px; line-height: 1.55; }
+    #telemetry-consent .tc-text strong { display: block; font-size: 14px; margin-bottom: 4px; color: #f8fafc; }
+    #telemetry-consent .tc-text a { color: #93c5fd; text-decoration: underline; cursor: pointer; }
+    #telemetry-consent .tc-actions { display: flex; gap: 8px; flex-shrink: 0; align-items: center; flex-wrap: wrap; }
+    #telemetry-consent .tc-btn {
+      padding: 7px 16px; border-radius: 4px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    #telemetry-consent .tc-btn-accept { background: #3b82f6; color: #fff; }
+    #telemetry-consent .tc-btn-accept:hover { background: #2563eb; }
+    #telemetry-consent .tc-btn-optout { background: rgba(255,255,255,0.1); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.2); }
+    #telemetry-consent .tc-btn-optout:hover { background: rgba(255,255,255,0.18); }
+
     /* ── Update notification banner ──────────────────────────────── */
     #update-banner {
       display: none;
@@ -544,6 +577,23 @@
     <h2 id="offline-title" data-i18n="offline.title">Server Offline</h2>
     <p id="offline-body" data-i18n="offline.body">The connection to the PACS Admin Tool server has been lost.</p>
     <div class="reconnecting" data-i18n="offline.reconnecting">Reconnecting…</div>
+  </div>
+</div>
+
+<!-- ── Telemetry consent banner ───────────────────────────────────────────── -->
+<div id="telemetry-consent" role="dialog" aria-labelledby="tc-title" aria-modal="false">
+  <div class="tc-text">
+    <strong id="tc-title" data-i18n="telemetry.consent_title">Usage data collection</strong>
+    <span id="tc-body" data-i18n="telemetry.consent_body">
+      PACS Admin Tool collects anonymous usage statistics (app version, deployment type,
+      OS, and which features are used). No patient data, AE titles, or IP addresses are
+      stored. You can opt out at any time in Settings → Telemetry.
+    </span>
+    &nbsp;<a onclick="showTab('settings')" data-i18n="telemetry.consent_settings_link">Open Settings</a>
+  </div>
+  <div class="tc-actions">
+    <button class="tc-btn tc-btn-accept" onclick="telemetryAccept()" data-i18n="telemetry.consent_accept">Got it</button>
+    <button class="tc-btn tc-btn-optout" onclick="telemetryOptOut()" data-i18n="telemetry.consent_optout">Opt out</button>
   </div>
 </div>
 
@@ -1389,6 +1439,20 @@
         Logs are written to logs/pacs_admin.log and rotated daily (7-day retention).
       </p>
     </div>
+    <div class="card">
+      <h3 data-i18n="telemetry.settings_title">Telemetry</h3>
+      <div class="field-grid">
+        <div class="field" style="flex-direction:row; align-items:center; gap:10px; flex-wrap:nowrap">
+          <input type="checkbox" id="set-telemetry-enabled" style="width:16px; height:16px; flex-shrink:0; cursor:pointer">
+          <label for="set-telemetry-enabled" style="margin:0; cursor:pointer" data-i18n="telemetry.settings_enable">Send anonymous usage statistics</label>
+        </div>
+      </div>
+      <p style="font-size:12px; color:#888; margin:8px 0 0" data-i18n="telemetry.settings_note">
+        Collects: app version, deployment type, OS, interface language, and which
+        features are used. No patient data, AE titles, hostnames, or IP addresses.
+        Data is sent to PostHog (EU servers). Changes take effect immediately.
+      </p>
+    </div>
     <div class="btn-row" style="margin-top:4px; padding:0 0 20px 0">
       <button class="btn primary" onclick="saveSettings()" data-i18n="settings.save">Save Settings</button>
       <span id="save-status" style="color:#888; font-size:13px"></span>
@@ -1985,6 +2049,14 @@ async function loadConfig() {
   if (appConfig.language) {
     document.getElementById("set-language").value = appConfig.language;
   }
+  const tel = appConfig.telemetry || {};
+  document.getElementById("set-telemetry-enabled").checked =
+    tel.enabled !== false;  // default true
+
+  // Show the consent banner once if the user hasn't seen it yet.
+  if (tel.consent_shown === false || tel.consent_shown === undefined) {
+    document.getElementById("telemetry-consent").classList.add("visible");
+  }
 
   // Set SCP / HL7 listener defaults from config
   document.getElementById("scp-ae").value          = lae.ae_title || "PACSADMIN";
@@ -2092,6 +2164,10 @@ async function saveSettings() {
   };
   appConfig.log_level = document.getElementById("set-log-level").value;
   appConfig.language = document.getElementById("set-language").value;
+  appConfig.telemetry = {
+    ...(appConfig.telemetry || {}),
+    enabled: document.getElementById("set-telemetry-enabled").checked,
+  };
   await fetch("/api/config", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -2108,6 +2184,34 @@ async function saveSettings() {
       .forEach(([c, p]) => buildAESelector(c, p));
     refreshAllPresetDropdowns();
   }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 3b. Telemetry consent banner
+// ─────────────────────────────────────────────────────────────────
+
+async function _saveTelemetryConsent(enabled) {
+  const tel = { ...(appConfig.telemetry || {}), enabled, consent_shown: true };
+  appConfig.telemetry = tel;
+  document.getElementById("set-telemetry-enabled").checked = enabled;
+  document.getElementById("telemetry-consent").classList.remove("visible");
+  try {
+    await fetch("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ telemetry: tel }),
+    });
+  } catch (e) {
+    console.warn("Could not save telemetry consent:", e);
+  }
+}
+
+function telemetryAccept() {
+  _saveTelemetryConsent(true);
+}
+
+function telemetryOptOut() {
+  _saveTelemetryConsent(false);
 }
 
 // ─────────────────────────────────────────────────────────────────

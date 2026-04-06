@@ -23,6 +23,7 @@ _CONFIG_SCHEMA = {
     "web":            dict,
     "log_level":      str,
     "language":       str,
+    "telemetry":      dict,
 }
 
 _LOG_LEVELS   = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
@@ -118,6 +119,11 @@ def save_config_route():
     if "language" in data:
         set_language(data["language"])
         logger.info("Language changed to %s", data["language"])
+    if "telemetry" in data:
+        from web.telemetry import init as _telemetry_init
+        _telemetry_init(ctx.config)
+        logger.info("Telemetry settings updated (enabled=%s)",
+                    ctx.config.get("telemetry", {}).get("enabled", True))
     _audit("config.save", ip=_req_ip(), user=_req_user(),
            detail={"keys": sorted(data.keys())})
     return jsonify({"ok": True})

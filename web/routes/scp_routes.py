@@ -10,6 +10,7 @@ import pydicom
 import web.context as ctx
 from web.audit import log as _audit
 from web.auth import require_login
+from web.telemetry import capture as _capture
 from web.helpers import (
     _bad_request,
     _cleanup_scp_storage,
@@ -60,6 +61,7 @@ def scp_start():
             ctx._last_scp_storage_dir = save_dir
             _audit("scp.start", ip=_req_ip(), user=_req_user(),
                    detail={"ae_title": ae_title, "port": port, "save_dir": save_dir})
+            _capture("feature_used", {"feature": "scp_start"})
             return jsonify({"ok": True, "message": f"SCP started as {ae_title} on port {port}"})
         except Exception as e:
             logger.exception("SCP start failed")

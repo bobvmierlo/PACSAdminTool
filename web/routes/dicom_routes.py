@@ -16,6 +16,7 @@ from config.manager import APP_DIR
 import web.context as ctx
 from web.audit import log as _audit
 from web.auth import require_login
+from web.telemetry import capture as _capture
 from web.helpers import (
     _bad_request,
     _dataset_to_tag_list,
@@ -89,6 +90,7 @@ def dicom_echo():
         _audit("dicom.c_echo", ip=_req_ip(), user=_req_user(),
                detail={"ae_title": d["ae_title"], "host": d["host"], "port": d["port"]},
                result="ok" if ok else "error", error=None if ok else msg)
+        _capture("feature_used", {"feature": "dicom_echo", "result": "ok" if ok else "error"})
         return jsonify({"ok": ok, "message": msg})
     except Exception as e:
         logger.exception("C-ECHO exception")
@@ -171,6 +173,9 @@ def dicom_find():
                detail={"ae_title": d["ae_title"], "host": d["host"], "port": d["port"],
                        "level": d.get("query_level"), "results": len(rows)},
                result="ok" if ok else "error", error=None if ok else msg)
+        _capture("feature_used", {"feature": "dicom_find",
+                                  "query_level": d.get("query_level", "STUDY"),
+                                  "result": "ok" if ok else "error"})
         return jsonify({"ok": ok, "message": msg, "results": rows})
     except Exception as e:
         logger.exception("C-FIND error")
@@ -206,6 +211,7 @@ def dicom_move():
             _log("cfind", msg, "ok" if ok else "err")
 
         threading.Thread(target=run, daemon=True).start()
+        _capture("feature_used", {"feature": "dicom_move"})
         return jsonify({"ok": True, "message": "C-MOVE started"})
     except Exception as e:
         logger.exception("C-MOVE setup error")
@@ -289,6 +295,7 @@ def dicom_store():
             tmp_dir_obj.cleanup()
 
     threading.Thread(target=run, daemon=True).start()
+    _capture("feature_used", {"feature": "dicom_store", "file_count": len(paths)})
     return jsonify({"ok": True, "message": f"Sending {len(paths)} file(s)…"})
 
 

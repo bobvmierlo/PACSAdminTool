@@ -477,6 +477,16 @@
     "filter_placeholder": "Substring filter…",
     "content": "Content"
   },
+  "telemetry": {
+    "consent_title": "Anonymous usage statistics",
+    "consent_body": "PACS Admin Tool collects anonymous usage data (app version, deployment type, OS, language, and which features are used). No patient data, AE titles, hostnames, or IP addresses are collected. Data is sent to PostHog on EU servers. You can opt out at any time in Settings.",
+    "consent_settings_link": "Open Settings",
+    "consent_accept": "Got it",
+    "consent_optout": "Opt out",
+    "settings_title": "Telemetry",
+    "settings_enable": "Send anonymous usage statistics",
+    "settings_note": "Collects: app version, deployment type (Docker / exe / source), OS, interface language, and which features are used. No patient data, AE titles, hostnames, or IP addresses. Data is sent to PostHog on EU servers. Changes take effect immediately."
+  },
   "tag_editor": {
     "title": "Tag Editor",
     "filter_placeholder": "Filter tags…",

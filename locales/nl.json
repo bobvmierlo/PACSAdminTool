@@ -477,6 +477,16 @@
     "filter_placeholder": "Subtekenreeksfilter…",
     "content": "Inhoud"
   },
+  "telemetry": {
+    "consent_title": "Anonieme gebruiksstatistieken",
+    "consent_body": "PACS Admin Tool verzamelt anonieme gebruiksgegevens (app-versie, type installatie, besturingssysteem, taal en welke functies worden gebruikt). Er worden geen patiëntgegevens, AE-titels, hostnamen of IP-adressen verzameld. De gegevens worden verzonden naar PostHog op EU-servers. U kunt zich op elk moment afmelden via Instellingen.",
+    "consent_settings_link": "Instellingen openen",
+    "consent_accept": "Begrepen",
+    "consent_optout": "Afmelden",
+    "settings_title": "Telemetrie",
+    "settings_enable": "Anonieme gebruiksstatistieken verzenden",
+    "settings_note": "Verzamelt: app-versie, type installatie (Docker / exe / bron), besturingssysteem, interfacetaal en welke functies worden gebruikt. Geen patiëntgegevens, AE-titels, hostnamen of IP-adressen. Gegevens worden verzonden naar PostHog op EU-servers. Wijzigingen worden direct van kracht."
+  },
   "tag_editor": {
     "title": "Tag-editor",
     "filter_placeholder": "Tags filteren…",
