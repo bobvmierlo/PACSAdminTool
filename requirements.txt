@@ -18,6 +18,9 @@ flask~=3.1
 flask-socketio~=5.6
 simple-websocket~=1.1
 
+# Telemetry (anonymous usage statistics — PostHog EU)
+posthog~=3.0
+
 # System tray icon
 pystray~=0.19
 Pillow~=12.2

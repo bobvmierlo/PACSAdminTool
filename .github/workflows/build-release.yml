@@ -27,6 +27,18 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Inject PostHog API key
+        env:
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: |
+          python -c "
+          import os, pathlib
+          key = os.environ.get('POSTHOG_API_KEY', '')
+          if key:
+              p = pathlib.Path('web/telemetry.py')
+              p.write_text(p.read_text().replace('phc_REPLACE_WITH_YOUR_POSTHOG_PROJECT_API_KEY', key))
+          "
+
       - name: Sync version info files
         run: python update_version_info.py
 
