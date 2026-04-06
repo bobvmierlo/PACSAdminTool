@@ -9,6 +9,10 @@ jobs:
   sync-stats:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents:  read
+      packages:  read   # required to read GHCR package statistics via GraphQL
+
     steps:
       - name: Fetch GitHub release downloads and Docker Hub pulls, push to PostHog
         env:
@@ -99,39 +103,88 @@ jobs:
           )
           print(f"  GitHub  TOTAL  {total_github_downloads} downloads")
 
-          # ── GHCR: per-version pull counts via GitHub Packages API ─────────
+          # ── GHCR: pull counts via GitHub GraphQL API ──────────────────
+          # The REST packages API does not populate pull counts for container
+          # packages. The GraphQL API exposes Package.statistics.downloadsTotalCount
+          # and per-version counts correctly.
 
+          graphql_query = """
+          query($owner: String!, $name: String!) {
+            user(login: $owner) {
+              packages(names: [$name], packageType: CONTAINER, first: 1) {
+                nodes {
+                  name
+                  statistics { downloadsTotalCount }
+                  versions(first: 50, orderBy: {field: CREATED_AT, direction: DESC}) {
+                    nodes {
+                      version
+                      statistics { downloadsTotalCount }
+                      metadata {
+                        ... on DockerImageMetadata {
+                          tags { name }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          """
+
+          gql_payload = json.dumps({
+              "query":     graphql_query,
+              "variables": {"owner": REPO_OWNER, "name": PACKAGE_NAME},
+          }).encode()
+          gql_req = urllib.request.Request(
+              "https://api.github.com/graphql",
+              data=gql_payload,
+              headers={
+                  "Authorization":        f"Bearer {GH_TOKEN}",
+                  "Content-Type":         "application/json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              },
+              method="POST",
+          )
+          with urllib.request.urlopen(gql_req, timeout=15) as r:
+              gql_data = json.loads(r.read())
+
+          # Print raw response so we can see exactly what GitHub returns
+          print("  GHCR raw GraphQL response:")
+          print(json.dumps(gql_data, indent=2))
+
+          pkg_nodes = (
+              gql_data.get("data", {})
+                      .get("user", {})
+                      .get("packages", {})
+                      .get("nodes", [])
+          )
           ghcr_total = 0
-          page = 1
-          while True:
-              versions = gh_get(
-                  f"https://api.github.com/users/{REPO_OWNER}/packages"
-                  f"/container/{PACKAGE_NAME}/versions?per_page=50&page={page}"
-              )
-              if not versions:
-                  break
-              for v in versions:
-                  tags       = v.get("metadata", {}).get("container", {}).get("tags", [])
-                  pull_count = v.get("metadata", {}).get("container", {}).get("pull_count") \
-                               or v.get("statistics", {}).get("downloads_total_count", 0)
-                  ghcr_total += pull_count
-                  label = ", ".join(tags) if tags else v.get("name", "untagged")[:16]
-                  for tag in (tags or [v.get("name", "untagged")]):
+          if pkg_nodes:
+              pkg = pkg_nodes[0]
+              ghcr_total = pkg.get("statistics", {}).get("downloadsTotalCount", 0)
+              for v in pkg.get("versions", {}).get("nodes", []):
+                  v_count = v.get("statistics", {}).get("downloadsTotalCount", 0)
+                  raw_tags = (
+                      v.get("metadata", {}).get("tags", []) if v.get("metadata") else []
+                  )
+                  tags = [t["name"] for t in raw_tags if isinstance(t, dict)] \
+                         if raw_tags and isinstance(raw_tags[0], dict) \
+                         else [t for t in raw_tags if isinstance(t, str)]
+                  label = ", ".join(tags) if tags else v.get("version", "untagged")[:20]
+                  for tag in (tags or [v.get("version", "untagged")]):
                       capture(
                           f"stats:ghcr:{tag}",
                           "ghcr_tag_pulls",
                           {
                               "source":     "ghcr",
                               "tag":        tag,
-                              "pull_count": pull_count,
+                              "pull_count": v_count,
                               "date":       TODAY,
-                              "$set": {"pull_count": pull_count, "tag": tag},
+                              "$set": {"pull_count": v_count, "tag": tag},
                           },
                       )
-                  print(f"  GHCR  {label:30s}  {pull_count:>6} pulls")
-              if len(versions) < 50:
-                  break
-              page += 1
+                  print(f"  GHCR  {label:30s}  {v_count:>6} pulls")
 
           capture(
               "stats:ghcr:total",
@@ -166,29 +219,8 @@ jobs:
           )
           print(f"  Docker Hub  TOTAL  {dh_pulls} pulls")
 
-          # ── Docker Hub: per-tag pull counts ───────────────────────────────
-
-          req = urllib.request.Request(
-              f"https://hub.docker.com/v2/repositories/{DOCKERHUB_USER}/pacsadmintool/tags/?page_size=50",
-          )
-          with urllib.request.urlopen(req, timeout=15) as r:
-              dh_tags = json.loads(r.read())
-
-          for tag in dh_tags.get("results", []):
-              tag_name  = tag.get("name", "unknown")
-              tag_pulls = tag.get("pull_count", 0)
-              capture(
-                  f"stats:dockerhub:{tag_name}",
-                  "dockerhub_tag_pulls",
-                  {
-                      "source":     "dockerhub",
-                      "tag":        tag_name,
-                      "pull_count": tag_pulls,
-                      "date":       TODAY,
-                      "$set": {"pull_count": tag_pulls, "tag": tag_name},
-                  },
-              )
-              print(f"  Docker Hub  {tag_name:20s}  {tag_pulls:>6} pulls")
+          # Docker Hub does not expose per-tag pull counts via its public API.
+          # Total pull count (above) is the only reliable metric available.
 
           print("Done.")
           PYEOF
