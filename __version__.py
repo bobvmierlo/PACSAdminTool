@@ -1,3 +1,3 @@
 """Single source of truth for the PACS Admin Tool version number."""
 
-__version__ = "2.9.2"
+__version__ = "2.9.3"
