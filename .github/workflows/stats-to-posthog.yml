@@ -149,6 +149,10 @@ jobs:
           with urllib.request.urlopen(gql_req, timeout=15) as r:
               gql_data = json.loads(r.read())
 
+          # Print raw response so we can see exactly what GitHub returns
+          print("  GHCR raw GraphQL response:")
+          print(json.dumps(gql_data, indent=2))
+
           pkg_nodes = (
               gql_data.get("data", {})
                       .get("user", {})
@@ -215,29 +219,8 @@ jobs:
           )
           print(f"  Docker Hub  TOTAL  {dh_pulls} pulls")
 
-          # ── Docker Hub: per-tag pull counts ───────────────────────────────
-
-          req = urllib.request.Request(
-              f"https://hub.docker.com/v2/repositories/{DOCKERHUB_USER}/pacsadmintool/tags/?page_size=50",
-          )
-          with urllib.request.urlopen(req, timeout=15) as r:
-              dh_tags = json.loads(r.read())
-
-          for tag in dh_tags.get("results", []):
-              tag_name  = tag.get("name", "unknown")
-              tag_pulls = tag.get("pull_count", 0)
-              capture(
-                  f"stats:dockerhub:{tag_name}",
-                  "dockerhub_tag_pulls",
-                  {
-                      "source":     "dockerhub",
-                      "tag":        tag_name,
-                      "pull_count": tag_pulls,
-                      "date":       TODAY,
-                      "$set": {"pull_count": tag_pulls, "tag": tag_name},
-                  },
-              )
-              print(f"  Docker Hub  {tag_name:20s}  {tag_pulls:>6} pulls")
+          # Docker Hub does not expose per-tag pull counts via its public API.
+          # Total pull count (above) is the only reliable metric available.
 
           print("Done.")
           PYEOF
