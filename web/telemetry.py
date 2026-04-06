@@ -121,9 +121,13 @@ def init(config: dict) -> None:
                 disabled=not _enabled or key_is_placeholder,
             )
             logger.debug(
-                "Telemetry initialised (enabled=%s, id=%s…)",
-                _enabled, anon_id[:8],
+                "Telemetry initialised (enabled=%s, key_ok=%s, id=%s…)",
+                _enabled, not key_is_placeholder, anon_id[:8],
             )
+            if key_is_placeholder:
+                logger.debug("Telemetry disabled: API key is still the placeholder.")
+            elif not _enabled:
+                logger.debug("Telemetry disabled: user opted out.")
         except ImportError:
             logger.debug("posthog package not installed; telemetry disabled.")
             _client = None
@@ -138,9 +142,18 @@ def capture(event: str, properties: dict | None = None) -> None:
     the posthog package is not installed, or init() has not been called yet.
     """
     if not _enabled or _client is None or not _anonymous_id:
+        logger.debug(
+            "Telemetry event skipped (%s): enabled=%s, client=%s",
+            event, _enabled, _client is not None,
+        )
         return
     try:
         _client.capture(_anonymous_id, event, properties or {})
+        logger.debug(
+            "Telemetry event sent: %s | props: %s",
+            event,
+            {k: v for k, v in (properties or {}).items() if not k.startswith("$")},
+        )
     except Exception as exc:
         logger.debug("Telemetry capture error (%s): %s", event, exc)
 
@@ -158,6 +171,10 @@ def send_startup() -> None:
         deployment = _get_deployment()
         platform   = _get_platform()
         language   = ctx.config.get("language", "en")
+        logger.debug(
+            "Telemetry: sending app_startup (version=%s, deployment=%s, platform=%s)",
+            __version__, deployment, platform,
+        )
         capture("app_startup", {
             "$set": {
                 "app_version":     __version__,
