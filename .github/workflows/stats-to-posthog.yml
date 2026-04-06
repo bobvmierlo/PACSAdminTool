@@ -1,0 +1,143 @@
+name: Sync download statistics to PostHog
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # daily at 06:00 UTC
+  workflow_dispatch:        # allow manual trigger from the Actions tab
+
+jobs:
+  sync-stats:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Fetch GitHub release downloads and Docker Hub pulls, push to PostHog
+        env:
+          POSTHOG_API_KEY:    ${{ secrets.POSTHOG_API_KEY }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          GH_TOKEN:           ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 << 'PYEOF'
+          import json, os, urllib.request, datetime
+
+          POSTHOG_HOST    = "https://eu.i.posthog.com"
+          POSTHOG_KEY     = os.environ["POSTHOG_API_KEY"]
+          REPO            = "bobvmierlo/PACSAdminTool"
+          DOCKERHUB_USER  = os.environ.get("DOCKERHUB_USERNAME", "bobvmierlo")
+          GH_TOKEN        = os.environ["GH_TOKEN"]
+          TODAY           = datetime.date.today().isoformat()
+
+          # ── PostHog helper ────────────────────────────────────────────────
+
+          def capture(distinct_id, event, properties):
+              payload = json.dumps({
+                  "api_key":     POSTHOG_KEY,
+                  "distinct_id": distinct_id,
+                  "event":       event,
+                  "properties":  {"$geoip_disable": True, **properties},
+              }).encode()
+              req = urllib.request.Request(
+                  f"{POSTHOG_HOST}/capture/",
+                  data=payload,
+                  headers={"Content-Type": "application/json"},
+                  method="POST",
+              )
+              with urllib.request.urlopen(req, timeout=15) as r:
+                  pass
+
+          # ── GitHub: per-release asset download counts ─────────────────────
+
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{REPO}/releases",
+              headers={
+                  "Authorization":      f"Bearer {GH_TOKEN}",
+                  "Accept":             "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              },
+          )
+          with urllib.request.urlopen(req, timeout=15) as r:
+              releases = json.loads(r.read())
+
+          total_github_downloads = 0
+          for release in releases:
+              version = release["tag_name"].lstrip("v")
+              for asset in release.get("assets", []):
+                  count = asset.get("download_count", 0)
+                  total_github_downloads += count
+                  capture(
+                      f"stats:github:{version}:{asset['name']}",
+                      "github_asset_downloads",
+                      {
+                          "source":         "github",
+                          "version":        version,
+                          "asset":          asset["name"],
+                          "download_count": count,
+                          "date":           TODAY,
+                          "$set": {
+                              "download_count": count,
+                              "version":        version,
+                              "asset":          asset["name"],
+                          },
+                      },
+                  )
+                  print(f"  GitHub  {version}  {asset['name']:35s}  {count:>6} downloads")
+
+          # Summary event so you can easily chart total GitHub downloads over time
+          capture(
+              "stats:github:total",
+              "github_total_downloads",
+              {
+                  "source":         "github",
+                  "download_count": total_github_downloads,
+                  "date":           TODAY,
+                  "$set": {"download_count": total_github_downloads},
+              },
+          )
+          print(f"  GitHub  TOTAL  {total_github_downloads} downloads")
+
+          # ── Docker Hub: repository-level pull count ───────────────────────
+
+          req = urllib.request.Request(
+              f"https://hub.docker.com/v2/repositories/{DOCKERHUB_USER}/pacsadmintool/",
+          )
+          with urllib.request.urlopen(req, timeout=15) as r:
+              dh_repo = json.loads(r.read())
+
+          dh_pulls = dh_repo.get("pull_count", 0)
+          capture(
+              "stats:dockerhub:total",
+              "dockerhub_pulls",
+              {
+                  "source":     "dockerhub",
+                  "pull_count": dh_pulls,
+                  "date":       TODAY,
+                  "$set": {"pull_count": dh_pulls},
+              },
+          )
+          print(f"  Docker Hub  TOTAL  {dh_pulls} pulls")
+
+          # ── Docker Hub: per-tag pull counts ───────────────────────────────
+
+          req = urllib.request.Request(
+              f"https://hub.docker.com/v2/repositories/{DOCKERHUB_USER}/pacsadmintool/tags/?page_size=50",
+          )
+          with urllib.request.urlopen(req, timeout=15) as r:
+              dh_tags = json.loads(r.read())
+
+          for tag in dh_tags.get("results", []):
+              tag_name  = tag.get("name", "unknown")
+              tag_pulls = tag.get("pull_count", 0)
+              capture(
+                  f"stats:dockerhub:{tag_name}",
+                  "dockerhub_tag_pulls",
+                  {
+                      "source":     "dockerhub",
+                      "tag":        tag_name,
+                      "pull_count": tag_pulls,
+                      "date":       TODAY,
+                      "$set": {"pull_count": tag_pulls, "tag": tag_name},
+                  },
+              )
+              print(f"  Docker Hub  {tag_name:20s}  {tag_pulls:>6} pulls")
+
+          print("Done.")
+          PYEOF
