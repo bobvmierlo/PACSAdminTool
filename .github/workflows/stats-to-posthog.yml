@@ -111,7 +111,7 @@ jobs:
           graphql_query = """
           query($owner: String!, $name: String!) {
             user(login: $owner) {
-              packages(names: [$name], packageType: CONTAINER, first: 1) {
+              packages(names: [$name], packageType: DOCKER, first: 1) {
                 nodes {
                   name
                   statistics { downloadsTotalCount }
@@ -119,11 +119,6 @@ jobs:
                     nodes {
                       version
                       statistics { downloadsTotalCount }
-                      metadata {
-                        ... on DockerImageMetadata {
-                          tags { name }
-                        }
-                      }
                     }
                   }
                 }
@@ -149,10 +144,6 @@ jobs:
           with urllib.request.urlopen(gql_req, timeout=15) as r:
               gql_data = json.loads(r.read())
 
-          # Print raw response so we can see exactly what GitHub returns
-          print("  GHCR raw GraphQL response:")
-          print(json.dumps(gql_data, indent=2))
-
           pkg_nodes = (
               gql_data.get("data", {})
                       .get("user", {})
@@ -164,27 +155,20 @@ jobs:
               pkg = pkg_nodes[0]
               ghcr_total = pkg.get("statistics", {}).get("downloadsTotalCount", 0)
               for v in pkg.get("versions", {}).get("nodes", []):
+                  tag     = v.get("version", "untagged")
                   v_count = v.get("statistics", {}).get("downloadsTotalCount", 0)
-                  raw_tags = (
-                      v.get("metadata", {}).get("tags", []) if v.get("metadata") else []
+                  capture(
+                      f"stats:ghcr:{tag}",
+                      "ghcr_tag_pulls",
+                      {
+                          "source":     "ghcr",
+                          "tag":        tag,
+                          "pull_count": v_count,
+                          "date":       TODAY,
+                          "$set": {"pull_count": v_count, "tag": tag},
+                      },
                   )
-                  tags = [t["name"] for t in raw_tags if isinstance(t, dict)] \
-                         if raw_tags and isinstance(raw_tags[0], dict) \
-                         else [t for t in raw_tags if isinstance(t, str)]
-                  label = ", ".join(tags) if tags else v.get("version", "untagged")[:20]
-                  for tag in (tags or [v.get("version", "untagged")]):
-                      capture(
-                          f"stats:ghcr:{tag}",
-                          "ghcr_tag_pulls",
-                          {
-                              "source":     "ghcr",
-                              "tag":        tag,
-                              "pull_count": v_count,
-                              "date":       TODAY,
-                              "$set": {"pull_count": v_count, "tag": tag},
-                          },
-                      )
-                  print(f"  GHCR  {label:30s}  {v_count:>6} pulls")
+                  print(f"  GHCR  {tag:30s}  {v_count:>6} pulls")
 
           capture(
               "stats:ghcr:total",
@@ -218,9 +202,6 @@ jobs:
               },
           )
           print(f"  Docker Hub  TOTAL  {dh_pulls} pulls")
-
-          # Docker Hub does not expose per-tag pull counts via its public API.
-          # Total pull count (above) is the only reliable metric available.
 
           print("Done.")
           PYEOF
