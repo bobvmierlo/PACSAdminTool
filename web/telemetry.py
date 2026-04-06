@@ -52,7 +52,7 @@ _POSTHOG_API_KEY = os.environ.get(
 _POSTHOG_HOST = "https://eu.i.posthog.com"
 
 # ── Module-level state ───────────────────────────────────────────────────────
-_initialized    = False
+_client         = None   # posthog.Posthog instance, set by init()
 _anonymous_id: str | None = None
 _enabled        = True
 _lock           = threading.Lock()
@@ -88,7 +88,7 @@ def init(config: dict) -> None:
     Called once at server start and again whenever the user saves settings
     that include a telemetry change.
     """
-    global _initialized, _anonymous_id, _enabled
+    global _client, _anonymous_id, _enabled
 
     with _lock:
         tel      = config.get("telemetry", {})
@@ -108,24 +108,28 @@ def init(config: dict) -> None:
         _anonymous_id = anon_id
 
         placeholder = "phc_REPLACE"
+        key_is_placeholder = _POSTHOG_API_KEY.startswith(placeholder)
+
         try:
-            import posthog as _ph
-            _ph.api_key  = _POSTHOG_API_KEY
-            _ph.host     = _POSTHOG_HOST
-            # Disable at the SDK level if the user opted out or the key is
-            # still the placeholder (e.g. during development / CI).
-            _ph.disabled = (not _enabled) or _POSTHOG_API_KEY.startswith(placeholder)
-            _initialized = True
+            from posthog import Posthog
+            # disable_geoip=False lets PostHog derive the country from the
+            # server IP, which is the correct location for a self-hosted tool.
+            _client = Posthog(
+                api_key=_POSTHOG_API_KEY,
+                host=_POSTHOG_HOST,
+                disable_geoip=False,
+                disabled=not _enabled or key_is_placeholder,
+            )
             logger.debug(
                 "Telemetry initialised (enabled=%s, id=%s…)",
                 _enabled, anon_id[:8],
             )
         except ImportError:
             logger.debug("posthog package not installed; telemetry disabled.")
-            _initialized = False
+            _client = None
         except Exception as exc:
             logger.debug("Telemetry init error: %s", exc)
-            _initialized = False
+            _client = None
 
 
 def capture(event: str, properties: dict | None = None) -> None:
@@ -133,14 +137,10 @@ def capture(event: str, properties: dict | None = None) -> None:
     Capture a named telemetry event.  No-op when telemetry is disabled,
     the posthog package is not installed, or init() has not been called yet.
     """
-    if not _enabled or not _initialized or not _anonymous_id:
+    if not _enabled or _client is None or not _anonymous_id:
         return
     try:
-        import posthog as _ph
-        if _ph.disabled:
-            return
-        props = {"$geoip_disable": False, **(properties or {})}
-        _ph.capture(_anonymous_id, event, props)
+        _client.capture(_anonymous_id, event, properties or {})
     except Exception as exc:
         logger.debug("Telemetry capture error (%s): %s", event, exc)
 
@@ -165,7 +165,7 @@ def send_startup() -> None:
                 "os_platform":     platform,
                 "language":        language,
             },
-            # Also available as event properties for funnel / trend queries:
+            # Also as event properties for funnel / trend queries:
             "app_version":     __version__,
             "deployment_type": deployment,
             "os_platform":     platform,
