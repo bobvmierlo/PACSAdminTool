@@ -33,6 +33,21 @@ def _code_meaning(code_seq):
         return str(code_seq)
 
 
+def _code_details(code_seq):
+    """Return (meaning_str, code_value, scheme_designator) from a CodeSequence."""
+    if not code_seq:
+        return "", "", ""
+    try:
+        item    = code_seq[0] if hasattr(code_seq, "__len__") else code_seq
+        meaning = str(getattr(item, "CodeMeaning", ""))
+        code_val = str(getattr(item, "CodeValue", ""))
+        scheme  = str(getattr(item, "CodingSchemeDesignator", ""))
+        label   = f"{meaning} ({scheme}:{code_val})" if meaning and code_val else meaning or code_val
+        return label, code_val, scheme
+    except Exception:
+        return str(code_seq), "", ""
+
+
 def _measurement_str(meas_seq):
     """Format a numeric measurement with units from MeasuredValueSequence."""
     if not meas_seq:
@@ -104,17 +119,22 @@ def _parse_content_item(item, depth=0):
         children     list  – parsed child nodes
     """
     node = {
-        "depth":        depth,
-        "type":         str(getattr(item, "ValueType", "")),
-        "relationship": str(getattr(item, "RelationshipType", "")),
-        "concept":      "",
-        "value":        "",
-        "children":     [],
+        "depth":               depth,
+        "type":                str(getattr(item, "ValueType", "")),
+        "relationship":        str(getattr(item, "RelationshipType", "")),
+        "concept":             "",
+        "concept_code_value":  "",
+        "concept_code_scheme": "",
+        "value":               "",
+        "children":            [],
     }
 
     concept_seq = getattr(item, "ConceptNameCodeSequence", None)
     if concept_seq:
-        node["concept"] = _code_meaning(concept_seq)
+        label, cval, cscheme = _code_details(concept_seq)
+        node["concept"]             = label
+        node["concept_code_value"]  = cval
+        node["concept_code_scheme"] = cscheme
 
     vtype = node["type"]
 
@@ -276,7 +296,11 @@ def _flatten(nodes, out=None):
     if out is None:
         out = []
     for n in nodes:
-        out.append({k: n[k] for k in ("depth", "type", "relationship", "concept", "value")})
+        out.append({k: n[k] for k in (
+            "depth", "type", "relationship",
+            "concept", "concept_code_value", "concept_code_scheme",
+            "value",
+        )})
         _flatten(n["children"], out)
     return out
 
