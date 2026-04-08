@@ -663,12 +663,13 @@ def sr_read():
         parsed      = parse_sr(ds)
         report_text = sr_to_text(parsed)
         return jsonify({
-            "ok":     True,
-            "meta":   parsed["meta"],
-            "title":  parsed["title"],
-            "flat":   parsed["flat"],
-            "text":   report_text,
-            "errors": parsed["errors"],
+            "ok":      True,
+            "meta":    parsed["meta"],
+            "title":   parsed["title"],
+            "content": parsed["content"],
+            "flat":    parsed["flat"],
+            "text":    report_text,
+            "errors":  parsed["errors"],
         })
     except Exception as e:
         logger.exception("SR read error")

@@ -265,6 +265,70 @@
     .seq-nested { width: 100%; border-collapse: collapse; }
     .seq-nested td { border-bottom: 1px solid #f0f0f0; padding: 3px 6px; }
 
+    /* ── SR Tree Viewer ──────────────────────────────────────────── */
+    .sr-tree { font-size: 13px; line-height: 1.5; }
+    .sr-tree-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+    .sr-tree-controls input { flex: 1; min-width: 180px; }
+    .sr-item-count { font-size: 12px; color: #888; white-space: nowrap; }
+    .sr-block { margin: 1px 0; }
+    .sr-container-hdr {
+      display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap;
+      padding: 5px 8px; border-radius: 4px;
+      background: #eff6ff; border-left: 3px solid #2b6cb0;
+      cursor: pointer; user-select: none;
+    }
+    .sr-container-hdr:hover { background: #dbeafe; }
+    .sr-children { padding-left: 20px; border-left: 2px solid #dbeafe; margin-left: 8px; }
+    .sr-row {
+      display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap;
+      padding: 3px 8px; border-radius: 3px;
+    }
+    .sr-row:nth-child(even) { background: #fafafa; }
+    .sr-row:hover { background: #f0f9ff; }
+    /* Type badges */
+    .sr-badge {
+      display: inline-block; font-size: 10px; font-weight: 700;
+      padding: 1px 6px; border-radius: 10px; white-space: nowrap; flex-shrink: 0;
+    }
+    .sr-type-container { background: #2b6cb0; color: #fff; }
+    .sr-type-num       { background: #fbd38d; color: #744210; }
+    .sr-type-code      { background: #d6bcfa; color: #553c9a; }
+    .sr-type-text      { background: #9ae6b4; color: #22543d; }
+    .sr-type-image     { background: #bee3f8; color: #2c5282; }
+    .sr-type-uid       { background: #e2e8f0; color: #4a5568; }
+    .sr-type-pname     { background: #b2f5ea; color: #234e52; }
+    .sr-type-date      { background: #feebc8; color: #7b341e; }
+    .sr-type-scoord    { background: #fed7e2; color: #702459; }
+    .sr-type-composite { background: #e9d8fd; color: #44337a; }
+    .sr-type-other     { background: #edf2f7; color: #4a5568; }
+    /* Relationship badge */
+    .sr-rel-badge { background: #f0f4ff; color: #4a5568; border: 1px solid #c3dafe; }
+    /* Concept / value */
+    .sr-concept-link {
+      color: #2b6cb0; text-decoration: underline dotted;
+      cursor: pointer; font-weight: 500;
+    }
+    .sr-concept-link:hover { color: #1a4080; }
+    .sr-concept-name { font-weight: 500; color: #1a202c; }
+    .sr-value { color: #4a5568; flex: 1; word-break: break-word; }
+    .sr-container-value { font-size: 11px; color: #718096; font-style: italic; }
+    .sr-flat-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .sr-flat-table th { background: #f7fafc; padding: 4px 8px; text-align: left; border-bottom: 1px solid #e2e8f0; font-weight: 600; }
+    .sr-flat-table td { padding: 3px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+    .sr-flat-table tr:hover td { background: #f0f9ff; }
+    .sr-empty { color: #aaa; font-style: italic; padding: 20px 0; text-align: center; }
+    /* Sub-tab bar (reused for DICOMize) */
+    .subtab-bar { display: flex; gap: 0; margin-bottom: 16px; border-bottom: 2px solid #e2e8f0; }
+    .subtab-btn {
+      padding: 8px 18px; background: none; border: none; cursor: pointer;
+      font-size: 13px; color: #4a5568; border-bottom: 2px solid transparent;
+      margin-bottom: -2px; transition: color 0.15s;
+    }
+    .subtab-btn:hover { color: #2b6cb0; }
+    .subtab-btn.active { color: #2b6cb0; border-bottom-color: #2b6cb0; font-weight: 600; }
+    .subtab-panel { display: none; }
+    .subtab-panel.active { display: block; }
+
     /* ── Help tab ─────────────────────────────────────────────────── */
     #help-layout { display: flex; gap: 20px; }
     #help-topics { width: 220px; flex-shrink: 0; }
@@ -647,10 +711,11 @@
   <button class="tab-btn" onclick="showTab('commit')" data-i18n="tabs.commit">Storage Commit</button>
   <button class="tab-btn" onclick="showTab('iocm')" data-i18n="tabs.iocm">IOCM</button>
   <button class="tab-btn" onclick="showTab('inspector')" data-i18n="tabs.inspector">DICOM Inspector</button>
-  <button class="tab-btn" onclick="showTab('anonymizer')" data-i18n="tabs.anonymizer">Anonymizer</button>
-  <button class="tab-btn" onclick="showTab('dicomdir')" data-i18n="tabs.dicomdir">DICOMDIR</button>
   <button class="tab-btn" onclick="showTab('sr_viewer')" data-i18n="tabs.sr_viewer">SR Viewer</button>
   <button class="tab-btn" onclick="showTab('kos_creator')" data-i18n="tabs.kos_creator">KOS Creator</button>
+  <button class="tab-btn" onclick="showTab('dicomize')" data-i18n="tabs.dicomize">DICOMize</button>
+  <button class="tab-btn" onclick="showTab('anonymizer')" data-i18n="tabs.anonymizer">Anonymizer</button>
+  <button class="tab-btn" onclick="showTab('dicomdir')" data-i18n="tabs.dicomdir">DICOMDIR</button>
   <button class="tab-btn" onclick="showTab('hl7')" data-i18n="tabs.hl7">HL7</button>
   <button class="tab-btn" onclick="showTab('settings')" data-i18n="tabs.settings">Settings</button>
   <button class="tab-btn" onclick="showTab('logs')" data-i18n="tabs.logs">Logs</button>
@@ -1651,11 +1716,20 @@
     </div>
     <div class="card" style="flex:1">
       <h3 data-i18n="sr_viewer.report">Parsed Report</h3>
-      <textarea id="sr-report" readonly
-                style="width:100%; height:480px; font-family:Consolas,monospace; font-size:12px;
-                       resize:vertical; background:#fafafa; border:1px solid #e0e0e0;
-                       border-radius:3px; padding:10px; color:#1a1a1a; white-space:pre;
-                       overflow:auto"></textarea>
+      <div class="sr-tree-controls">
+        <input type="text" id="sr-filter"
+               data-i18n-placeholder="sr_viewer.filter_placeholder"
+               placeholder="Filter by concept or value…"
+               oninput="filterSRTree()" style="flex:1">
+        <span id="sr-item-count" class="sr-item-count"></span>
+        <button class="btn" style="font-size:12px; padding:3px 10px"
+                onclick="srExpandAll(true)"
+                data-i18n="sr_viewer.expand_all">Expand all</button>
+        <button class="btn" style="font-size:12px; padding:3px 10px"
+                onclick="srExpandAll(false)"
+                data-i18n="sr_viewer.collapse_all">Collapse all</button>
+      </div>
+      <div id="sr-tree" class="sr-tree" style="max-height:520px; overflow-y:auto; padding-right:4px"></div>
     </div>
     <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-sr"></div></div>
   </div>
@@ -1726,6 +1800,259 @@
     </div>
 
     <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-kos"></div></div>
+  </div>
+
+  <!-- ── DICOMize ────────────────────────────────────────────────── -->
+  <div id="tab-dicomize" class="tab-panel">
+
+    <!-- Shared: Patient & Study Data (collapsible) -->
+    <div class="card">
+      <h3 style="cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px"
+          onclick="toggleDicomizePatient()" id="dicomize-patient-hdr">
+        <span id="dicomize-patient-arrow" class="seq-arrow">▼</span>
+        <span data-i18n="dicomize.patient_study">Patient &amp; Study Data</span>
+      </h3>
+      <div id="dicomize-patient-body">
+        <div class="field-grid">
+          <div class="field">
+            <label data-i18n="dicomize.patient_name">Patient Name</label>
+            <input id="dz-patient-name">
+          </div>
+          <div class="field">
+            <label data-i18n="dicomize.patient_id">Patient ID</label>
+            <input id="dz-patient-id">
+          </div>
+          <div class="field">
+            <label data-i18n="dicomize.patient_dob">Date of Birth</label>
+            <input id="dz-patient-dob" data-i18n-placeholder="dicomize.patient_dob_hint" placeholder="YYYYMMDD">
+          </div>
+          <div class="field">
+            <label data-i18n="dicomize.patient_sex">Sex</label>
+            <select id="dz-patient-sex">
+              <option value="" data-i18n="dicomize.sex_u">Unknown</option>
+              <option value="M" data-i18n="dicomize.sex_m">Male</option>
+              <option value="F" data-i18n="dicomize.sex_f">Female</option>
+              <option value="O" data-i18n="dicomize.sex_o">Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label data-i18n="dicomize.study_date">Study Date</label>
+            <input id="dz-study-date" data-i18n-placeholder="dicomize.study_date_hint" placeholder="YYYYMMDD">
+          </div>
+          <div class="field">
+            <label data-i18n="dicomize.study_time">Study Time</label>
+            <input id="dz-study-time" data-i18n-placeholder="dicomize.study_time_hint" placeholder="HHMMSS">
+          </div>
+          <div class="field" style="grid-column:span 2">
+            <label data-i18n="dicomize.study_description">Study Description</label>
+            <input id="dz-study-desc">
+          </div>
+          <div class="field">
+            <label data-i18n="dicomize.accession_number">Accession #</label>
+            <input id="dz-accession">
+          </div>
+          <div class="field">
+            <label data-i18n="dicomize.institution_name">Institution</label>
+            <input id="dz-institution">
+          </div>
+          <div class="field" style="grid-column:span 2">
+            <label data-i18n="dicomize.study_uid">Study Instance UID</label>
+            <div style="display:flex; gap:6px">
+              <input id="dz-study-uid" style="flex:1; font-family:Consolas; font-size:11px">
+              <button class="btn" onclick="dzGenerateUID()"
+                      data-i18n="dicomize.generate_uid">Generate</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sub-tabs -->
+    <div class="card" style="flex:1">
+      <div class="subtab-bar">
+        <button class="subtab-btn active" id="dz-tab-pdf-btn"
+                onclick="showDicomizeTab('pdf')"
+                data-i18n="dicomize.subtab_pdf">PDF</button>
+        <button class="subtab-btn" id="dz-tab-images-btn"
+                onclick="showDicomizeTab('images')"
+                data-i18n="dicomize.subtab_images">Images</button>
+        <button class="subtab-btn" id="dz-tab-video-btn"
+                onclick="showDicomizeTab('video')"
+                data-i18n="dicomize.subtab_video">Video</button>
+      </div>
+
+      <!-- PDF sub-tab -->
+      <div id="dz-subtab-pdf" class="subtab-panel active">
+        <h3 data-i18n="dicomize.pdf_card_title">PDF to DICOM</h3>
+        <div class="btn-row" style="margin-top:10px">
+          <input type="file" id="dz-pdf-input" accept=".pdf" style="display:none"
+                 onchange="dzPDFSelected()">
+          <button class="btn" onclick="document.getElementById('dz-pdf-input').click()"
+                  data-i18n="dicomize.pdf_browse">Browse…</button>
+          <span id="dz-pdf-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
+                text-overflow:ellipsis; white-space:nowrap"
+                data-i18n="dicomize.pdf_no_file">No PDF selected.</span>
+        </div>
+        <div class="field-grid" style="margin-top:12px">
+          <div class="field" style="grid-column:span 2">
+            <label data-i18n="dicomize.pdf_document_title">Document Title</label>
+            <input id="dz-pdf-title">
+          </div>
+          <div class="field">
+            <label data-i18n="dicomize.series_description">Series Description</label>
+            <input id="dz-pdf-series-desc">
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:16px">
+          <button class="btn primary" onclick="doDicomizePDF('download')"
+                  data-i18n="dicomize.download_btn">Download DICOM</button>
+          <button class="btn" onclick="doDicomizePDF('store')"
+                  data-i18n="dicomize.send_pacs_btn">Send to PACS</button>
+        </div>
+        <!-- AE selector for PACS store -->
+        <div id="dz-pdf-ae" style="margin-top:12px; display:none">
+          <div class="ae-selector">
+            <div class="field preset-field">
+              <label data-i18n="dicomize.select_preset">Select a preset…</label>
+              <select id="dz-pdf-ae-preset" onchange="dzFillAE('pdf')">
+                <option value=""></option>
+              </select>
+            </div>
+            <div class="field">
+              <label data-i18n="dicomize.ae_title">AE Title</label>
+              <input id="dz-pdf-ae-title">
+            </div>
+            <div class="field">
+              <label data-i18n="dicomize.ae_host">Host</label>
+              <input id="dz-pdf-ae-host">
+            </div>
+            <div class="field" style="max-width:90px">
+              <label data-i18n="dicomize.ae_port">Port</label>
+              <input id="dz-pdf-ae-port" type="number" min="1" max="65535">
+            </div>
+            <div class="field" style="align-self:flex-end">
+              <button class="btn primary" onclick="doDicomizePDFStore()"
+                      data-i18n="dicomize.send_pacs_btn">Send to PACS</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Images sub-tab -->
+      <div id="dz-subtab-images" class="subtab-panel">
+        <h3 data-i18n="dicomize.image_card_title">Images to DICOM</h3>
+        <div class="btn-row" style="margin-top:10px">
+          <input type="file" id="dz-images-input" accept="image/*,.jfif,.jpe" multiple
+                 style="display:none" onchange="dzImagesSelected()">
+          <button class="btn" onclick="document.getElementById('dz-images-input').click()"
+                  data-i18n="dicomize.image_browse">Browse…</button>
+          <span id="dz-images-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
+                text-overflow:ellipsis; white-space:nowrap"
+                data-i18n="dicomize.image_no_files">No images selected.</span>
+        </div>
+        <p style="font-size:12px; color:#888; margin:8px 0 0"
+           data-i18n="dicomize.image_accept">JPEG, PNG, BMP, TIFF, WebP, JFIF and other raster formats</p>
+        <div class="field-grid" style="margin-top:12px">
+          <div class="field" style="grid-column:span 2">
+            <label data-i18n="dicomize.series_description">Series Description</label>
+            <input id="dz-images-series-desc">
+          </div>
+        </div>
+        <p style="font-size:12px; color:#888; margin-top:8px"
+           data-i18n="dicomize.image_note">Each image becomes a separate Secondary Capture DICOM file. Multiple files are returned as a ZIP archive.</p>
+        <div class="btn-row" style="margin-top:12px">
+          <button class="btn primary" onclick="doDicomizeImages('download')"
+                  data-i18n="dicomize.download_btn">Download DICOM</button>
+          <button class="btn" onclick="doDicomizeImages('store')"
+                  data-i18n="dicomize.send_pacs_btn">Send to PACS</button>
+        </div>
+        <div id="dz-images-ae" style="margin-top:12px; display:none">
+          <div class="ae-selector">
+            <div class="field preset-field">
+              <label data-i18n="dicomize.select_preset">Select a preset…</label>
+              <select id="dz-images-ae-preset" onchange="dzFillAE('images')">
+                <option value=""></option>
+              </select>
+            </div>
+            <div class="field">
+              <label data-i18n="dicomize.ae_title">AE Title</label>
+              <input id="dz-images-ae-title">
+            </div>
+            <div class="field">
+              <label data-i18n="dicomize.ae_host">Host</label>
+              <input id="dz-images-ae-host">
+            </div>
+            <div class="field" style="max-width:90px">
+              <label data-i18n="dicomize.ae_port">Port</label>
+              <input id="dz-images-ae-port" type="number" min="1" max="65535">
+            </div>
+            <div class="field" style="align-self:flex-end">
+              <button class="btn primary" onclick="doDicomizeImagesStore()"
+                      data-i18n="dicomize.send_pacs_btn">Send to PACS</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Video sub-tab -->
+      <div id="dz-subtab-video" class="subtab-panel">
+        <h3 data-i18n="dicomize.video_card_title">Video to DICOM</h3>
+        <div class="btn-row" style="margin-top:10px">
+          <input type="file" id="dz-video-input"
+                 accept="video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,video/webm,.mp4,.mov,.avi,.mkv,.webm"
+                 style="display:none" onchange="dzVideoSelected()">
+          <button class="btn" onclick="document.getElementById('dz-video-input').click()"
+                  data-i18n="dicomize.video_browse">Browse…</button>
+          <span id="dz-video-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
+                text-overflow:ellipsis; white-space:nowrap"
+                data-i18n="dicomize.video_no_file">No video selected.</span>
+        </div>
+        <p style="font-size:12px; color:#888; margin:8px 0 0"
+           data-i18n="dicomize.video_accept">MP4, MOV and other video formats</p>
+        <div class="field-grid" style="margin-top:12px">
+          <div class="field" style="grid-column:span 2">
+            <label data-i18n="dicomize.series_description">Series Description</label>
+            <input id="dz-video-series-desc">
+          </div>
+        </div>
+        <p style="font-size:12px; color:#888; margin-top:8px"
+           data-i18n="dicomize.video_note">The video is stored as-is using DICOM Encapsulated Video (MPEG-4 AVC/H.264 transfer syntax). Dimensions and frame count are read from the file header.</p>
+        <div class="btn-row" style="margin-top:12px">
+          <button class="btn primary" onclick="doDicomizeVideo('download')"
+                  data-i18n="dicomize.download_btn">Download DICOM</button>
+          <button class="btn" onclick="doDicomizeVideo('store')"
+                  data-i18n="dicomize.send_pacs_btn">Send to PACS</button>
+        </div>
+        <div id="dz-video-ae" style="margin-top:12px; display:none">
+          <div class="ae-selector">
+            <div class="field preset-field">
+              <label data-i18n="dicomize.select_preset">Select a preset…</label>
+              <select id="dz-video-ae-preset" onchange="dzFillAE('video')">
+                <option value=""></option>
+              </select>
+            </div>
+            <div class="field">
+              <label data-i18n="dicomize.ae_title">AE Title</label>
+              <input id="dz-video-ae-title">
+            </div>
+            <div class="field">
+              <label data-i18n="dicomize.ae_host">Host</label>
+              <input id="dz-video-ae-host">
+            </div>
+            <div class="field" style="max-width:90px">
+              <label data-i18n="dicomize.ae_port">Port</label>
+              <input id="dz-video-ae-port" type="number" min="1" max="65535">
+            </div>
+            <div class="field" style="align-self:flex-end">
+              <button class="btn primary" onclick="doDicomizeVideoStore()"
+                      data-i18n="dicomize.send_pacs_btn">Send to PACS</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-dicomize"></div></div>
   </div>
 
 </div><!-- end #tab-content -->
@@ -2002,6 +2329,7 @@ function showTab(name) {
   if (name === "logs")      initLogViewer();
   if (name === "dashboard") loadDashboard();
   if (name === "scp")       loadSCPStudies();
+  if (name === "dicomize")  dzLoadPresets();
 }
 
 function toggleMobileNav() {
@@ -3941,12 +4269,20 @@ const HELP_SECTIONS = [
   [
     {label: "DICOM PS3.3 §C.17 – Structured Reporting IODs (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#chapter_C"},
     {label: "DICOM PS3.3 §A.35 – SR Document Storage SOP Classes (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.35"},
+    {label: "DICOM PS3.16 Chapter D – DICOM Coded Entry Resources (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/chtml/part16/chapter_D.html"},
   ]],
 
   ["help.section_kos_creator", "help.body_kos_creator",
   [
     {label: "DICOM PS3.3 §C.17.6 – Key Object Selection Document IOD (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_C.17.6"},
     {label: "IHE RAD TF Vol. 1 – XDS-I.b Integration Profile (IHE)", url: "https://www.ihe.net/uploadedFiles/Documents/Radiology/IHE_RAD_TF_Vol1.pdf"},
+  ]],
+
+  ["help.section_dicomize", "help.body_dicomize",
+  [
+    {label: "DICOM PS3.3 §A.45 – Encapsulated PDF Storage (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.45"},
+    {label: "DICOM PS3.3 §A.8 – Secondary Capture Image Storage (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.8"},
+    {label: "DICOM PS3.3 §A.32.6 – Video Photographic Image Storage (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.32.6"},
   ]],
 
   ["help.section_cget", "help.body_cget",
@@ -4215,7 +4551,160 @@ async function doLogout() {
 // 18. SR Viewer
 // ─────────────────────────────────────────────────────────────────
 
-let _srRawTags = [];   // tag list from last parsed SR for the modal
+let _srRawTags  = [];   // flat list (for tag modal + filter search)
+let _srContent  = [];   // nested tree from backend
+
+const _SR_NEMA_URL = "https://dicom.nema.org/medical/dicom/current/output/chtml/part16/chapter_D.html";
+
+// Map value-type → CSS badge class
+function _srTypeClass(type) {
+  const map = {
+    CONTAINER: "sr-type-container",
+    NUM:       "sr-type-num",
+    CODE:      "sr-type-code",
+    TEXT:      "sr-type-text",
+    IMAGE:     "sr-type-image",
+    UIDREF:    "sr-type-uid",
+    PNAME:     "sr-type-pname",
+    DATE:      "sr-type-date",
+    TIME:      "sr-type-date",
+    DATETIME:  "sr-type-date",
+    SCOORD:    "sr-type-scoord",
+    SCOORD3D:  "sr-type-scoord",
+    TCOORD:    "sr-type-scoord",
+    COMPOSITE: "sr-type-composite",
+    WAVEFORM:  "sr-type-composite",
+  };
+  return map[type] || "sr-type-other";
+}
+
+// Render the concept name, optionally as a NEMA link (DCM scheme only)
+function _srConceptHtml(concept, codeVal, codeScheme) {
+  if (!concept) return "";
+  if (codeScheme === "DCM" && codeVal) {
+    return `<a class="sr-concept-link" href="${_SR_NEMA_URL}" target="_blank"
+               rel="noopener noreferrer"
+               title="${escapeHtml(i18n("sr_viewer.nema_link_title"))}"
+               onclick="event.stopPropagation()">${escapeHtml(concept)}</a>`;
+  }
+  return `<span class="sr-concept-name">${escapeHtml(concept)}</span>`;
+}
+
+// Recursively build DOM tree nodes
+function _srRenderNode(node, container) {
+  const isContainer = node.type === "CONTAINER";
+  const typeBadge   = `<span class="sr-badge ${_srTypeClass(node.type)}">${escapeHtml(node.type || "")}</span>`;
+  const relBadge    = node.relationship
+    ? `<span class="sr-badge sr-rel-badge">${escapeHtml(node.relationship)}</span>`
+    : "";
+  const conceptHtml = _srConceptHtml(
+    node.concept, node.concept_code_value, node.concept_code_scheme
+  );
+
+  if (isContainer) {
+    const block = document.createElement("div");
+    block.className = "sr-block";
+
+    const hdr = document.createElement("div");
+    hdr.className = "sr-container-hdr";
+    hdr.innerHTML =
+      `<span class="seq-arrow">▼</span>` +
+      typeBadge + relBadge +
+      `<span class="sr-concept-wrap">${conceptHtml}</span>` +
+      (node.value ? `<span class="sr-container-value">${escapeHtml(node.value)}</span>` : "");
+    block.appendChild(hdr);
+
+    const childWrap = document.createElement("div");
+    childWrap.className = "sr-children";
+    block.appendChild(childWrap);
+    container.appendChild(block);
+
+    hdr.addEventListener("click", e => {
+      if (e.target.tagName === "A") return;
+      const open = childWrap.style.display !== "none";
+      childWrap.style.display = open ? "none" : "";
+      hdr.querySelector(".seq-arrow").textContent = open ? "▶" : "▼";
+    });
+
+    if (node.children) {
+      node.children.forEach(child => _srRenderNode(child, childWrap));
+    }
+  } else {
+    const row = document.createElement("div");
+    row.className = "sr-row";
+    row.innerHTML =
+      typeBadge + relBadge +
+      `<span class="sr-concept-wrap">${conceptHtml}</span>` +
+      (node.value ? `<span class="sr-value">${escapeHtml(node.value)}</span>` : "");
+    container.appendChild(row);
+  }
+}
+
+// Render the full tree
+function renderSRTree(nodes) {
+  const treeDiv = document.getElementById("sr-tree");
+  treeDiv.innerHTML = "";
+  if (!nodes || !nodes.length) {
+    treeDiv.innerHTML = `<div class="sr-empty">${i18n("sr_viewer.empty")}</div>`;
+    return;
+  }
+  nodes.forEach(n => _srRenderNode(n, treeDiv));
+  document.getElementById("sr-item-count").textContent =
+    i18n("sr_viewer.item_count", {n: _srRawTags.length});
+}
+
+// Filter: show a flat table of matches instead of the tree
+function filterSRTree() {
+  const q = document.getElementById("sr-filter").value.trim().toLowerCase();
+  const treeDiv = document.getElementById("sr-tree");
+  if (!q) {
+    renderSRTree(_srContent);
+    return;
+  }
+  const matches = _srRawTags.filter(item =>
+    [item.concept, item.value, item.type, item.relationship]
+      .some(v => String(v || "").toLowerCase().includes(q))
+  );
+  treeDiv.innerHTML = "";
+  if (!matches.length) {
+    treeDiv.innerHTML = `<div class="sr-empty">${i18n("sr_viewer.empty")}</div>`;
+    document.getElementById("sr-item-count").textContent = i18n("sr_viewer.filter_matches", {n: 0});
+    return;
+  }
+  const table = document.createElement("table");
+  table.className = "sr-flat-table";
+  table.innerHTML = `<thead><tr>
+    <th>Type</th><th>Relationship</th><th>Concept</th><th>Value</th>
+  </tr></thead>`;
+  const tbody = document.createElement("tbody");
+  matches.forEach(item => {
+    const tr = document.createElement("tr");
+    const conceptHtml = _srConceptHtml(
+      item.concept, item.concept_code_value, item.concept_code_scheme
+    );
+    tr.innerHTML =
+      `<td><span class="sr-badge ${_srTypeClass(item.type)}">${escapeHtml(item.type || "")}</span></td>` +
+      `<td style="font-size:11px; color:#666">${escapeHtml(item.relationship || "")}</td>` +
+      `<td>${conceptHtml}</td>` +
+      `<td style="word-break:break-word">${escapeHtml(item.value || "")}</td>`;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  treeDiv.appendChild(table);
+  document.getElementById("sr-item-count").textContent =
+    i18n("sr_viewer.filter_matches", {n: matches.length});
+}
+
+// Expand or collapse all CONTAINER nodes
+function srExpandAll(open) {
+  document.querySelectorAll("#sr-tree .sr-container-hdr").forEach(hdr => {
+    const childWrap = hdr.nextElementSibling;
+    if (!childWrap) return;
+    childWrap.style.display = open ? "" : "none";
+    const arrow = hdr.querySelector(".seq-arrow");
+    if (arrow) arrow.textContent = open ? "▼" : "▶";
+  });
+}
 
 function srFileSelected() {
   const f = document.getElementById("sr-file-input").files[0];
@@ -4230,9 +4719,12 @@ async function doSRRead() {
   }
   const f = input.files[0];
   appendLog("log-sr", now(), `Parsing: ${f.name}`);
-  document.getElementById("sr-report").value = "";
+  document.getElementById("sr-tree").innerHTML = "";
+  document.getElementById("sr-item-count").textContent = "";
+  document.getElementById("sr-filter").value = "";
   document.getElementById("sr-meta").textContent = "";
   _srRawTags = [];
+  _srContent = [];
 
   const fd = new FormData();
   fd.append("file", f);
@@ -4244,8 +4736,6 @@ async function doSRRead() {
       appendLog("log-sr", now(), `Error: ${data.error}`, "err");
       return;
     }
-    // Display the formatted report text
-    document.getElementById("sr-report").value = data.text || "";
 
     // Build meta summary
     const m = data.meta || {};
@@ -4253,8 +4743,12 @@ async function doSRRead() {
       `${m.SOPClassName || m.SOPClassUID || ""}  |  ` +
       `${m.PatientName || ""} [${m.PatientID || ""}]  |  ${m.StudyDate || ""}`;
 
-    // Store tags for raw-tag modal
-    _srRawTags = data.flat || [];
+    // Store data
+    _srRawTags = data.flat    || [];
+    _srContent = data.content || [];
+
+    // Render interactive tree
+    renderSRTree(_srContent);
 
     const n = _srRawTags.length;
     appendLog("log-sr", now(), i18n("sr_viewer.parsed_ok", {n}), "ok");
@@ -4272,9 +4766,6 @@ function srViewRawTags() {
     appendLog("log-sr", now(), i18n("sr_viewer.no_parsed"), "warn");
     return;
   }
-  // Re-use the existing DICOM tag modal but display the flat SR content items
-  // (concept / type / value columns instead of tag / keyword / vr / value).
-  // We map SR flat items onto the same modal columns for simplicity.
   const tags = _srRawTags.map(item => ({
     tag:     "  ".repeat(item.depth) + (item.type || ""),
     keyword: item.concept || "",
@@ -4417,6 +4908,308 @@ async function doKOSCreate() {
   } catch (e) {
     appendLog("log-kos", now(), `Error: ${e}`, "err");
   }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 20. DICOMize
+// ─────────────────────────────────────────────────────────────────
+
+function showDicomizeTab(sub) {
+  ["pdf", "images", "video"].forEach(s => {
+    document.getElementById(`dz-subtab-${s}`).classList.toggle("active", s === sub);
+    document.getElementById(`dz-tab-${s}-btn`).classList.toggle("active", s === sub);
+  });
+}
+
+function toggleDicomizePatient() {
+  const body  = document.getElementById("dicomize-patient-body");
+  const arrow = document.getElementById("dicomize-patient-arrow");
+  const open  = body.style.display !== "none";
+  body.style.display  = open ? "none" : "";
+  arrow.textContent   = open ? "▶" : "▼";
+}
+
+function dzGenerateUID() {
+  // Generate a simple UID using crypto.randomUUID if available, else Math.random
+  let uid;
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    const u = crypto.randomUUID().replace(/-/g, "");
+    uid = "2.25." + BigInt("0x" + u).toString();
+  } else {
+    uid = "2.25." + Math.floor(Math.random() * 1e18).toString();
+  }
+  document.getElementById("dz-study-uid").value = uid;
+}
+
+function _dzGetMetadata(seriesDescId) {
+  const fd = new FormData();
+  const add = (key, id) => fd.append(key, document.getElementById(id)?.value || "");
+  add("patient_name",      "dz-patient-name");
+  add("patient_id",        "dz-patient-id");
+  add("patient_dob",       "dz-patient-dob");
+  add("patient_sex",       "dz-patient-sex");
+  add("study_uid",         "dz-study-uid");
+  add("study_date",        "dz-study-date");
+  add("study_time",        "dz-study-time");
+  add("study_description", "dz-study-desc");
+  add("accession_number",  "dz-accession");
+  add("institution_name",  "dz-institution");
+  if (seriesDescId) add("series_description", seriesDescId);
+  return fd;
+}
+
+function _dzGetAE(prefix) {
+  return {
+    ae_title: document.getElementById(`dz-${prefix}-ae-title`)?.value || "",
+    ae_host:  document.getElementById(`dz-${prefix}-ae-host`)?.value  || "",
+    ae_port:  document.getElementById(`dz-${prefix}-ae-port`)?.value  || "",
+  };
+}
+
+// Populate AE fields from config preset
+function dzFillAE(prefix) {
+  const sel   = document.getElementById(`dz-${prefix}-ae-preset`);
+  const val   = sel?.value || "";
+  if (!val) return;
+  const nodes = (appConfig.remote_nodes || []);
+  const node  = nodes.find(n => `${n.ae_title}@${n.host}:${n.port}` === val);
+  if (!node) return;
+  document.getElementById(`dz-${prefix}-ae-title`).value = node.ae_title || "";
+  document.getElementById(`dz-${prefix}-ae-host`).value  = node.host     || "";
+  document.getElementById(`dz-${prefix}-ae-port`).value  = node.port     || "";
+}
+
+// Populate AE preset dropdowns from config
+function dzLoadPresets() {
+  const nodes = (appConfig.remote_nodes || []);
+  ["pdf", "images", "video"].forEach(pfx => {
+    const sel = document.getElementById(`dz-${pfx}-ae-preset`);
+    if (!sel) return;
+    sel.innerHTML = `<option value=""></option>`;
+    nodes.forEach(n => {
+      const opt = document.createElement("option");
+      opt.value       = `${n.ae_title}@${n.host}:${n.port}`;
+      opt.textContent = `${n.ae_title}  (${n.host}:${n.port})`;
+      sel.appendChild(opt);
+    });
+  });
+}
+
+// Toggle AE panel visibility
+function _dzToggleAE(prefix, show) {
+  const el = document.getElementById(`dz-${prefix}-ae`);
+  if (el) el.style.display = show ? "" : "none";
+}
+
+// ── PDF ──────────────────────────────────────────────────────────
+
+function dzPDFSelected() {
+  const f = document.getElementById("dz-pdf-input").files[0];
+  document.getElementById("dz-pdf-filename").textContent =
+    f ? f.name : i18n("dicomize.pdf_no_file");
+}
+
+async function doDicomizePDF(action) {
+  const input = document.getElementById("dz-pdf-input");
+  if (!input.files.length) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: "No PDF selected."}), "warn");
+    return;
+  }
+  if (action === "store") {
+    _dzToggleAE("pdf", true);
+    dzLoadPresets();
+    return;
+  }
+  appendLog("log-dicomize", now(), i18n("dicomize.converting"));
+  const fd = _dzGetMetadata("dz-pdf-series-desc");
+  fd.append("document_title", document.getElementById("dz-pdf-title")?.value || "");
+  fd.append("file", input.files[0]);
+  try {
+    const res = await fetch("/api/dicomize/pdf", { method: "POST", body: fd });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({error: res.statusText}));
+      appendLog("log-dicomize", now(), i18n("dicomize.error", {message: err.error || res.statusText}), "err");
+      return;
+    }
+    const blob = await res.blob();
+    const name = res.headers.get("Content-Disposition")?.match(/filename="?([^"]+)"?/)?.[1]
+              || "output.dcm";
+    _dzDownload(blob, name);
+    appendLog("log-dicomize", now(), i18n("dicomize.download_ok"), "ok");
+  } catch (e) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
+  }
+}
+
+async function doDicomizePDFStore() {
+  const input = document.getElementById("dz-pdf-input");
+  if (!input.files.length) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: "No PDF selected."}), "warn");
+    return;
+  }
+  appendLog("log-dicomize", now(), i18n("dicomize.storing"));
+  const fd = _dzGetMetadata("dz-pdf-series-desc");
+  fd.append("document_title", document.getElementById("dz-pdf-title")?.value || "");
+  fd.append("file", input.files[0]);
+  const ae = _dzGetAE("pdf");
+  fd.append("ae_title", ae.ae_title);
+  fd.append("ae_host",  ae.ae_host);
+  fd.append("ae_port",  ae.ae_port);
+  try {
+    const res  = await fetch("/api/dicomize/pdf/store", { method: "POST", body: fd });
+    const data = await res.json();
+    if (data.ok) {
+      appendLog("log-dicomize", now(), i18n("dicomize.store_ok", {message: data.message}), "ok");
+    } else {
+      appendLog("log-dicomize", now(), i18n("dicomize.error", {message: data.error || data.message}), "err");
+    }
+  } catch (e) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
+  }
+}
+
+// ── Images ────────────────────────────────────────────────────────
+
+function dzImagesSelected() {
+  const files = document.getElementById("dz-images-input").files;
+  document.getElementById("dz-images-filename").textContent = files.length
+    ? i18n("dicomize.image_files_selected", {n: files.length})
+    : i18n("dicomize.image_no_files");
+}
+
+async function doDicomizeImages(action) {
+  const input = document.getElementById("dz-images-input");
+  if (!input.files.length) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: "No images selected."}), "warn");
+    return;
+  }
+  if (action === "store") {
+    _dzToggleAE("images", true);
+    dzLoadPresets();
+    return;
+  }
+  appendLog("log-dicomize", now(), i18n("dicomize.converting"));
+  const fd = _dzGetMetadata("dz-images-series-desc");
+  Array.from(input.files).forEach(f => fd.append("files", f));
+  try {
+    const res = await fetch("/api/dicomize/image", { method: "POST", body: fd });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({error: res.statusText}));
+      appendLog("log-dicomize", now(), i18n("dicomize.error", {message: err.error || res.statusText}), "err");
+      return;
+    }
+    const blob = await res.blob();
+    const ct   = res.headers.get("Content-Type") || "";
+    const name = res.headers.get("Content-Disposition")?.match(/filename="?([^"]+)"?/)?.[1]
+              || (ct.includes("zip") ? "images_dicom.zip" : "output.dcm");
+    _dzDownload(blob, name);
+    appendLog("log-dicomize", now(), i18n("dicomize.download_ok"), "ok");
+  } catch (e) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
+  }
+}
+
+async function doDicomizeImagesStore() {
+  const input = document.getElementById("dz-images-input");
+  if (!input.files.length) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: "No images selected."}), "warn");
+    return;
+  }
+  appendLog("log-dicomize", now(), i18n("dicomize.storing"));
+  const fd = _dzGetMetadata("dz-images-series-desc");
+  Array.from(input.files).forEach(f => fd.append("files", f));
+  const ae = _dzGetAE("images");
+  fd.append("ae_title", ae.ae_title);
+  fd.append("ae_host",  ae.ae_host);
+  fd.append("ae_port",  ae.ae_port);
+  try {
+    const res  = await fetch("/api/dicomize/image/store", { method: "POST", body: fd });
+    const data = await res.json();
+    if (data.ok) {
+      appendLog("log-dicomize", now(), i18n("dicomize.store_ok", {message: data.message}), "ok");
+    } else {
+      appendLog("log-dicomize", now(), i18n("dicomize.error", {message: data.error || data.message}), "err");
+    }
+  } catch (e) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
+  }
+}
+
+// ── Video ─────────────────────────────────────────────────────────
+
+function dzVideoSelected() {
+  const f = document.getElementById("dz-video-input").files[0];
+  document.getElementById("dz-video-filename").textContent =
+    f ? f.name : i18n("dicomize.video_no_file");
+}
+
+async function doDicomizeVideo(action) {
+  const input = document.getElementById("dz-video-input");
+  if (!input.files.length) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: "No video selected."}), "warn");
+    return;
+  }
+  if (action === "store") {
+    _dzToggleAE("video", true);
+    dzLoadPresets();
+    return;
+  }
+  appendLog("log-dicomize", now(), i18n("dicomize.converting"));
+  const fd = _dzGetMetadata("dz-video-series-desc");
+  fd.append("file", input.files[0]);
+  try {
+    const res = await fetch("/api/dicomize/video", { method: "POST", body: fd });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({error: res.statusText}));
+      appendLog("log-dicomize", now(), i18n("dicomize.error", {message: err.error || res.statusText}), "err");
+      return;
+    }
+    const blob = await res.blob();
+    const name = res.headers.get("Content-Disposition")?.match(/filename="?([^"]+)"?/)?.[1]
+              || "output.dcm";
+    _dzDownload(blob, name);
+    appendLog("log-dicomize", now(), i18n("dicomize.download_ok"), "ok");
+  } catch (e) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
+  }
+}
+
+async function doDicomizeVideoStore() {
+  const input = document.getElementById("dz-video-input");
+  if (!input.files.length) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: "No video selected."}), "warn");
+    return;
+  }
+  appendLog("log-dicomize", now(), i18n("dicomize.storing"));
+  const fd = _dzGetMetadata("dz-video-series-desc");
+  fd.append("file", input.files[0]);
+  const ae = _dzGetAE("video");
+  fd.append("ae_title", ae.ae_title);
+  fd.append("ae_host",  ae.ae_host);
+  fd.append("ae_port",  ae.ae_port);
+  try {
+    const res  = await fetch("/api/dicomize/video/store", { method: "POST", body: fd });
+    const data = await res.json();
+    if (data.ok) {
+      appendLog("log-dicomize", now(), i18n("dicomize.store_ok", {message: data.message}), "ok");
+    } else {
+      appendLog("log-dicomize", now(), i18n("dicomize.error", {message: data.error || data.message}), "err");
+    }
+  } catch (e) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
+  }
+}
+
+// Trigger a browser download from a Blob
+function _dzDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement("a");
+  a.href    = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 // ─────────────────────────────────────────────────────────────────
