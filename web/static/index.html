@@ -711,11 +711,11 @@
   <button class="tab-btn" onclick="showTab('commit')" data-i18n="tabs.commit">Storage Commit</button>
   <button class="tab-btn" onclick="showTab('iocm')" data-i18n="tabs.iocm">IOCM</button>
   <button class="tab-btn" onclick="showTab('inspector')" data-i18n="tabs.inspector">DICOM Inspector</button>
-  <button class="tab-btn" onclick="showTab('anonymizer')" data-i18n="tabs.anonymizer">Anonymizer</button>
-  <button class="tab-btn" onclick="showTab('dicomdir')" data-i18n="tabs.dicomdir">DICOMDIR</button>
   <button class="tab-btn" onclick="showTab('sr_viewer')" data-i18n="tabs.sr_viewer">SR Viewer</button>
   <button class="tab-btn" onclick="showTab('kos_creator')" data-i18n="tabs.kos_creator">KOS Creator</button>
   <button class="tab-btn" onclick="showTab('dicomize')" data-i18n="tabs.dicomize">DICOMize</button>
+  <button class="tab-btn" onclick="showTab('anonymizer')" data-i18n="tabs.anonymizer">Anonymizer</button>
+  <button class="tab-btn" onclick="showTab('dicomdir')" data-i18n="tabs.dicomdir">DICOMDIR</button>
   <button class="tab-btn" onclick="showTab('hl7')" data-i18n="tabs.hl7">HL7</button>
   <button class="tab-btn" onclick="showTab('settings')" data-i18n="tabs.settings">Settings</button>
   <button class="tab-btn" onclick="showTab('logs')" data-i18n="tabs.logs">Logs</button>
@@ -4269,12 +4269,20 @@ const HELP_SECTIONS = [
   [
     {label: "DICOM PS3.3 §C.17 – Structured Reporting IODs (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#chapter_C"},
     {label: "DICOM PS3.3 §A.35 – SR Document Storage SOP Classes (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.35"},
+    {label: "DICOM PS3.16 Chapter D – DICOM Coded Entry Resources (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/chtml/part16/chapter_D.html"},
   ]],
 
   ["help.section_kos_creator", "help.body_kos_creator",
   [
     {label: "DICOM PS3.3 §C.17.6 – Key Object Selection Document IOD (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_C.17.6"},
     {label: "IHE RAD TF Vol. 1 – XDS-I.b Integration Profile (IHE)", url: "https://www.ihe.net/uploadedFiles/Documents/Radiology/IHE_RAD_TF_Vol1.pdf"},
+  ]],
+
+  ["help.section_dicomize", "help.body_dicomize",
+  [
+    {label: "DICOM PS3.3 §A.45 – Encapsulated PDF Storage (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.45"},
+    {label: "DICOM PS3.3 §A.8 – Secondary Capture Image Storage (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.8"},
+    {label: "DICOM PS3.3 §A.32.6 – Video Photographic Image Storage (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.32.6"},
   ]],
 
   ["help.section_cget", "help.body_cget",

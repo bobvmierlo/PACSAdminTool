@@ -18,16 +18,17 @@ Can also be run locally with Python and pip, or deployed as a Docker container.
 | **Dashboard** | AE connectivity health check (batch C-ECHO all presets at once), service status, recent audit activity |
 | **C-FIND / Q-R** | Patient/Study/Series/Image level C-FIND with query builder; multi-select results with checkboxes; bulk C-MOVE or C-GET retrieve |
 | **C-STORE** | Send single files or entire folder trees to any Storage SCP |
+| **DICOM Receiver** | Embedded DICOM SCP — receive C-STORE and C-ECHO; auto-saves files; inspect tags or delete files per-row; auto-purges files older than 24 h |
 | **DMWL** | Full Modality Worklist query with export to CSV |
 | **Storage Commit** | Send N-ACTION storage commitment requests; receive async N-EVENT-REPORT responses with committed/failed breakdown |
 | **IOCM** | Send Instance Availability Notifications (delete/change notifications) |
-| **HL7** | Send/receive HL7 v2 messages over MLLP; built-in templates for ORM, ORU, ADT, SIU, OML, QBP |
-| **DICOM Receiver** | Embedded DICOM SCP — receive C-STORE and C-ECHO; auto-saves files; inspect tags or delete files per-row; auto-purges files older than 24 h |
 | **DICOM Inspector** | Upload any `.dcm` file and browse all DICOM tags in a searchable, collapsible tree |
+| **SR Viewer** | Parse any DICOM Structured Report as an interactive collapsible tree; colour-coded type/relationship badges; DCM-coded concepts link to the NEMA PS3.16 standard; filter bar |
+| **KOS Creator** | Build a DICOM Key Object Selection document (XDS-I manifest) from existing DICOM files |
+| **DICOMize** | Convert non-DICOM files to DICOM: PDF → Encapsulated PDF, images (JPEG/PNG/BMP/TIFF/WebP) → Secondary Capture, video (MP4/MOV) → Encapsulated Video; download or send directly to a PACS via C-STORE |
 | **Anonymizer** | Strip PHI from one or more DICOM files using a Basic or Full profile; download result as a ZIP |
 | **DICOMDIR** | Read a DICOMDIR file and browse the Patient → Study → Series → Instance hierarchy; or generate a standards-compliant DICOMDIR from uploaded files/folder and download as ZIP |
-| **SR Viewer** | Parse and display any DICOM Structured Report in a human-readable format |
-| **KOS Creator** | Build a DICOM Key Object Selection document (XDS-I manifest) from existing DICOM files |
+| **HL7** | Send/receive HL7 v2 messages over MLLP; built-in templates for ORM, ORU, ADT, SIU, OML, QBP |
 | **Settings** | Manage local AE title/port, remote AE presets, HL7 defaults, language, log level |
 | **Logs** | Live view of application logs from `~/.pacs_admin_tool/logs/` |
 
@@ -309,7 +310,7 @@ The UI supports English and Dutch. Switch languages in the **Settings** tab.
 - **Generator**: upload individual DICOM files or an entire folder; a standards-compliant DICOM File Set (DICOMDIR + organised instance files) is generated using `pydicom.FileSet` and returned as a downloadable ZIP
 
 ### SR Viewer
-Reads and displays any DICOM Structured Report in a readable, indented format.
+Parses any DICOM Structured Report and renders it as an **interactive collapsible tree**.
 
 **Supported SR SOP classes:**
 - Basic Text SR, Enhanced SR, Comprehensive SR, Comprehensive 3D SR
@@ -322,7 +323,31 @@ Reads and displays any DICOM Structured Report in a readable, indented format.
 
 **Supported content item types:** `CONTAINER`, `NUM` (with units), `TEXT`, `CODE`, `IMAGE`, `UIDREF`, `PNAME`, `DATE`, `TIME`, `DATETIME`, `SCOORD`, `SCOORD3D`, `TCOORD`, `COMPOSITE`, `WAVEFORM`
 
-The formatted report shows measurements with their units (mm, HU, mGy, mSv, %, bpm, …), nested containers with indented hierarchy, and referenced image UIDs. A "View Raw DICOM Tags" button opens the full tag list for deeper inspection.
+**Tree viewer features:**
+- `CONTAINER` items render as collapsible sections with a ▼/▶ toggle; click to expand/collapse
+- Colour-coded type badges (amber for NUM, purple for CODE, green for TEXT, …)
+- Relationship badges (CONTAINS, HAS OBS CONTEXT, INFERRED FROM, …)
+- Concept names coded in the DCM scheme are clickable links to **NEMA PS3.16** (opens in a new tab)
+- Filter bar — live search across concept names and values; results shown as a flat table
+- Expand all / Collapse all controls
+- "View Raw DICOM Tags" button opens the full attribute list for low-level inspection
+
+### DICOMize
+Converts non-DICOM files into valid DICOM objects using only the libraries already bundled in the tool (pydicom + Pillow — no extra packages required).
+
+**Sub-tabs:**
+
+| Sub-tab | Input | Output DICOM SOP Class | Notes |
+|---------|-------|------------------------|-------|
+| PDF | Any PDF file | Encapsulated PDF Storage (`1.2.840.10008.5.1.4.1.1.104.1`) | PDF bytes stored verbatim |
+| Images | JPEG, PNG, BMP, TIFF, WebP, JFIF … | Secondary Capture Image Storage (`1.2.840.10008.5.1.4.1.1.7`) | Converted to 8-bit RGB; one `.dcm` per image |
+| Video | MP4, MOV … | Video Photographic Image Storage (`1.2.840.10008.5.1.4.1.1.77.1.2.1`) | MPEG-4 AVC/H.264 transfer syntax; video stored verbatim |
+
+**Shared patient & study data card** sits above the sub-tabs and is shared across all three. Fill it in once per session. Click the header to collapse it after filling.
+
+- Study Instance UID — enter to link to an existing study, or click **Generate** (RFC 4122 / `2.25.…` style UID)
+- **Download DICOM** — converts and triggers a browser download (`.dcm` or `.zip` for multiple images)
+- **Send to PACS** — converts then immediately C-STOREs to the specified remote AE; supports presets from Settings
 
 ### KOS Creator
 Builds a DICOM **Key Object Selection** document (SOP `1.2.840.10008.5.1.4.1.1.88.59`) that can be used as an **XDS-I manifest** when publishing a study to an IHE XDS domain.
