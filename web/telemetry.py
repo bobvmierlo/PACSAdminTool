@@ -150,7 +150,10 @@ def capture(event: str, properties: dict | None = None) -> None:
         )
         return
     try:
-        _client.capture(_anonymous_id, event, properties or {})
+        # posthog ≥7.x swapped the argument order:
+        #   old (≤6.x):  capture(distinct_id, event, properties)
+        #   new (≥7.x):  capture(event, distinct_id=..., properties=...)
+        _client.capture(event, distinct_id=_anonymous_id, properties=properties or {})
         logger.debug(
             "Telemetry event sent: %s | props: %s",
             event,
