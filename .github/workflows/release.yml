@@ -1,0 +1,193 @@
+name: Release
+
+# Triggered when a GitHub release is published.
+# Job order:
+#   1. update-version  — writes the release tag into __version__.py,
+#                        syncs version_info_*.py, and commits to main.
+#   2. docker          — builds and pushes the Docker image (needs: 1)
+#   3. executables     — builds Windows EXEs and attaches them to the
+#                        release (needs: 1)
+# Jobs 2 and 3 run in parallel once job 1 succeeds, and both check out
+# the version-bumped commit so the correct version number is embedded.
+
+on:
+  release:
+    types: [published]
+
+jobs:
+
+  # ── 1. Bump __version__.py ────────────────────────────────────────
+  update-version:
+    name: Bump version in __version__.py
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    outputs:
+      sha: ${{ steps.push.outputs.sha }}
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Write version from release tag into __version__.py
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"   # strip leading 'v' if present
+          python - <<EOF
+          import re, pathlib
+          version = "${VERSION}"
+          p = pathlib.Path("__version__.py")
+          new = re.sub(
+              r'(__version__\s*=\s*)["\'][^"\']*["\']',
+              f'\\g<1>"{version}"',
+              p.read_text(),
+          )
+          p.write_text(new)
+          print(f"__version__.py → {version}")
+          EOF
+
+      # Re-run the same helper that sync-version-info.yml uses
+      - name: Sync version_info_*.py
+        run: python update_version_info.py
+
+      - name: Commit and push
+        id: push
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add __version__.py version_info_gui.py version_info_web.py
+          # Only commit if something actually changed
+          git diff --cached --quiet \
+            || git commit -m "chore: bump version to ${VERSION} [skip ci]"
+          git push
+          # Always output the current HEAD (new commit or unchanged)
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+
+  # ── 2. Docker image ───────────────────────────────────────────────
+  docker:
+    name: Build and push Docker image
+    needs: update-version
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout version-bumped commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.update-version.outputs.sha }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract image metadata (tags and labels)
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Inject PostHog API key
+        env:
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: |
+          sed -i "s|phc_REPLACE_WITH_YOUR_POSTHOG_PROJECT_API_KEY|${POSTHOG_API_KEY}|g" \
+            web/telemetry.py
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Sync README to Docker Hub
+        uses: peter-evans/dockerhub-description@v5
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: >-
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
+
+
+  # ── 3. Windows executables ────────────────────────────────────────
+  executables:
+    name: Build and attach release executables
+    needs: update-version
+    runs-on: windows-latest
+
+    permissions:
+      contents: write   # needed to upload assets to the release
+
+    steps:
+      - name: Checkout version-bumped commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.update-version.outputs.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Inject PostHog API key
+        env:
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: |
+          python -c "
+          import os, pathlib
+          key = os.environ.get('POSTHOG_API_KEY', '')
+          if key:
+              p = pathlib.Path('web/telemetry.py')
+              p.write_text(p.read_text().replace(
+                  'phc_REPLACE_WITH_YOUR_POSTHOG_PROJECT_API_KEY', key))
+          "
+
+      - name: Build GUI executable
+        run: pyinstaller pacs_tool.spec
+
+      - name: Build Web Server executable
+        run: pyinstaller pacs_web.spec
+
+      - name: Upload executables to release
+        uses: softprops/action-gh-release@v2.6.1
+        with:
+          files: |
+            dist/PacsAdminTool.exe
+            dist/PacsAdminToolWeb.exe
