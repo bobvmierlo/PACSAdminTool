@@ -4450,6 +4450,12 @@ function renderTagTable(rows) {
 // ─────────────────────────────────────────────────────────────────
 
 const HELP_SECTIONS = [
+  // Order matches the tab bar: Dashboard → C-FIND → C-STORE → Receiver →
+  // DMWL → Commit → IOCM → Inspector → SR Viewer → KOS → DICOMize →
+  // Anonymizer → DICOMDIR → HL7 → Settings → Logs → About
+  ["help.section_dashboard", "help.body_dashboard",
+  []],
+
   ["help.section_cfind", "help.body_cfind",
   [
     {label: "DICOM PS3.4 §C – Query/Retrieve Service Class (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_C"},
@@ -4457,7 +4463,18 @@ const HELP_SECTIONS = [
     {label: "PS3.4 Table C.6-2 – Patient Root Attributes", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#table_C.6-2"},
   ]],
 
+  ["help.section_cget", "help.body_cget",
+  [
+    {label: "DICOM PS3.4 §C.4.3 – C-GET Service (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#sect_C.4.3"},
+    {label: "DICOM PS3.4 §C.4.2 – C-MOVE Service (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#sect_C.4.2"},
+  ]],
+
   ["help.section_cstore", "help.body_cstore",
+  [
+    {label: "DICOM PS3.4 §B – Storage Service Class (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_B"},
+  ]],
+
+  ["help.section_receiver", "help.body_receiver",
   [
     {label: "DICOM PS3.4 §B – Storage Service Class (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_B"},
   ]],
@@ -4475,6 +4492,36 @@ const HELP_SECTIONS = [
   ["help.section_iocm", "help.body_iocm",
   [
     {label: "DICOM PS3.4 §KK – Instance Availability Notification (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_KK"},
+  ]],
+
+  ["help.section_inspector", "help.body_inspector", []],
+
+  ["help.section_sr_viewer", "help.body_sr_viewer",
+  [
+    {label: "DICOM PS3.3 §C.17 – Structured Reporting IODs (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#chapter_C"},
+    {label: "DICOM PS3.3 §A.35 – SR Document Storage SOP Classes (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.35"},
+    {label: "DICOM PS3.16 Chapter D – DICOM Coded Entry Resources (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/chtml/part16/chapter_D.html"},
+  ]],
+
+  ["help.section_kos_creator", "help.body_kos_creator",
+  [
+    {label: "DICOM PS3.3 §C.17.6 – Key Object Selection Document IOD (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_C.17.6"},
+    {label: "IHE RAD TF Vol. 1 – XDS-I.b Integration Profile (IHE)", url: "https://www.ihe.net/uploadedFiles/Documents/Radiology/IHE_RAD_TF_Vol1.pdf"},
+  ]],
+
+  ["help.section_dicomize", "help.body_dicomize",
+  [
+    {label: "DICOM PS3.3 §A.45 – Encapsulated PDF Storage (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.45"},
+    {label: "DICOM PS3.3 §A.8 – Secondary Capture Image Storage (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.8"},
+    {label: "DICOM PS3.3 §A.32.6 – Video Photographic Image Storage (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.32.6"},
+    {label: "DICOM PS3.3 §A.8.19 – Multi-frame True Color Secondary Capture (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.8.19"},
+  ]],
+
+  ["help.section_anonymizer", "help.body_anonymizer", []],
+
+  ["help.section_dicomdir", "help.body_dicomdir",
+  [
+    {label: "DICOM PS3.10 §8 – DICOMDIR File (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part10.html#sect_8"},
   ]],
 
   ["help.section_hl7_send", "help.body_hl7_send",
@@ -4496,44 +4543,16 @@ const HELP_SECTIONS = [
     {label: "MLLP Transport Specification (HL7 TN)", url: "https://www.hl7.org/documentcenter/public/wg/inm/mllp_transport_specification.PDF"},
   ]],
 
-  ["help.section_receiver", "help.body_receiver",
-  [
-    {label: "DICOM PS3.4 §B – Storage Service Class (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#chapter_B"},
-  ]],
-
   ["help.section_settings", "help.body_settings",
   []],
 
-  ["help.section_sr_viewer", "help.body_sr_viewer",
-  [
-    {label: "DICOM PS3.3 §C.17 – Structured Reporting IODs (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#chapter_C"},
-    {label: "DICOM PS3.3 §A.35 – SR Document Storage SOP Classes (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.35"},
-    {label: "DICOM PS3.16 Chapter D – DICOM Coded Entry Resources (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/chtml/part16/chapter_D.html"},
-  ]],
+  ["help.section_logs", "help.body_logs",
+  []],
 
-  ["help.section_kos_creator", "help.body_kos_creator",
+  ["help.section_about", "help.body_about",
   [
-    {label: "DICOM PS3.3 §C.17.6 – Key Object Selection Document IOD (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_C.17.6"},
-    {label: "IHE RAD TF Vol. 1 – XDS-I.b Integration Profile (IHE)", url: "https://www.ihe.net/uploadedFiles/Documents/Radiology/IHE_RAD_TF_Vol1.pdf"},
+    {label: "GitHub Releases – PACSAdminTool", url: "https://github.com/bobvmierlo/PACSAdminTool/releases"},
   ]],
-
-  ["help.section_dicomize", "help.body_dicomize",
-  [
-    {label: "DICOM PS3.3 §A.45 – Encapsulated PDF Storage (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.45"},
-    {label: "DICOM PS3.3 §A.8 – Secondary Capture Image Storage (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.8"},
-    {label: "DICOM PS3.3 §A.32.6 – Video Photographic Image Storage (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#sect_A.32.6"},
-  ]],
-
-  ["help.section_cget", "help.body_cget",
-  [
-    {label: "DICOM PS3.4 §C.4.3 – C-GET Service (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#sect_C.4.3"},
-    {label: "DICOM PS3.4 §C.4.2 – C-MOVE Service (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part04.html#sect_C.4.2"},
-  ]],
-
-  ["help.section_inspector", "help.body_inspector", []],
-  ["help.section_anonymizer", "help.body_anonymizer", []],
-  ["help.section_dicomdir",   "help.body_dicomdir",   []],
-  ["help.section_dashboard",  "help.body_dashboard",  []],
 ];
 
 function buildHelp() {
