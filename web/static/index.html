@@ -5220,28 +5220,27 @@ function _dzGetAE(prefix) {
 
 // Populate AE fields from config preset
 function dzFillAE(prefix) {
-  const sel   = document.getElementById(`dz-${prefix}-ae-preset`);
-  const val   = sel?.value || "";
-  if (!val) return;
-  const nodes = (appConfig.remote_nodes || []);
-  const node  = nodes.find(n => `${n.ae_title}@${n.host}:${n.port}` === val);
-  if (!node) return;
-  document.getElementById(`dz-${prefix}-ae-title`).value = node.ae_title || "";
-  document.getElementById(`dz-${prefix}-ae-host`).value  = node.host     || "";
-  document.getElementById(`dz-${prefix}-ae-port`).value  = node.port     || "";
+  const sel  = document.getElementById(`dz-${prefix}-ae-preset`);
+  const name = sel?.value || "";
+  if (!name) return;
+  const ae = (appConfig.remote_aes || []).find(a => a.name === name);
+  if (!ae) return;
+  document.getElementById(`dz-${prefix}-ae-title`).value = ae.ae_title || "";
+  document.getElementById(`dz-${prefix}-ae-host`).value  = ae.host     || "";
+  document.getElementById(`dz-${prefix}-ae-port`).value  = ae.port     || "";
 }
 
 // Populate AE preset dropdowns from config
 function dzLoadPresets() {
-  const nodes = (appConfig.remote_nodes || []);
+  const presets = (appConfig.remote_aes || []);
   ["pdf", "images", "video"].forEach(pfx => {
     const sel = document.getElementById(`dz-${pfx}-ae-preset`);
     if (!sel) return;
     sel.innerHTML = `<option value=""></option>`;
-    nodes.forEach(n => {
+    presets.forEach(ae => {
       const opt = document.createElement("option");
-      opt.value       = `${n.ae_title}@${n.host}:${n.port}`;
-      opt.textContent = `${n.ae_title}  (${n.host}:${n.port})`;
+      opt.value       = ae.name;
+      opt.textContent = ae.name;
       sel.appendChild(opt);
     });
   });
@@ -5476,23 +5475,22 @@ function closeDzWorklistModal() {
 function dzWlLoadPresets() {
   const sel = document.getElementById("dz-wl-ae-preset");
   sel.innerHTML = '<option value=""></option>';
-  (appConfig.ae_list || []).forEach(ae => {
+  (appConfig.remote_aes || []).forEach(ae => {
     const opt = document.createElement("option");
-    opt.value = JSON.stringify(ae);
-    opt.textContent = ae.name || ae.ae_title || `${ae.host}:${ae.port}`;
+    opt.value       = ae.name;
+    opt.textContent = ae.name;
     sel.appendChild(opt);
   });
 }
 
 function dzWlFillAE() {
-  const val = document.getElementById("dz-wl-ae-preset").value;
-  if (!val) return;
-  try {
-    const ae = JSON.parse(val);
-    document.getElementById("dz-wl-host").value = ae.host      || "";
-    document.getElementById("dz-wl-port").value = ae.port      || "";
-    document.getElementById("dz-wl-aet").value  = ae.ae_title  || "";
-  } catch (_) {}
+  const name = document.getElementById("dz-wl-ae-preset").value;
+  if (!name) return;
+  const ae = (appConfig.remote_aes || []).find(a => a.name === name);
+  if (!ae) return;
+  document.getElementById("dz-wl-host").value = ae.host      || "";
+  document.getElementById("dz-wl-port").value = ae.port      || "";
+  document.getElementById("dz-wl-aet").value  = ae.ae_title  || "";
 }
 
 async function dzWlQuery() {

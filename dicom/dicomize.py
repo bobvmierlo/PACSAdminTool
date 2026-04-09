@@ -205,10 +205,8 @@ def pdf_to_dicom(pdf_bytes: bytes, metadata: dict) -> bytes:
     content_date, content_time = _now_strs()
 
     ds = Dataset()
-    ds.preamble        = b"\x00" * 128
-    ds.is_implicit_VR  = False
-    ds.is_little_endian = True
-    ds.file_meta       = _make_file_meta(SOP_CLASS, sop_inst, TRANSFER_SYNTAX)
+    ds.preamble  = b"\x00" * 128
+    ds.file_meta = _make_file_meta(SOP_CLASS, sop_inst, TRANSFER_SYNTAX)
 
     _apply_patient_study(ds, metadata)
     _finalize_ds(
@@ -267,10 +265,8 @@ def image_to_dicom(image_bytes: bytes, filename: str, metadata: dict,
     content_date, content_time = _now_strs()
 
     ds = Dataset()
-    ds.preamble        = b"\x00" * 128
-    ds.is_implicit_VR  = False
-    ds.is_little_endian = True
-    ds.file_meta       = _make_file_meta(SOP_CLASS, sop_inst, TRANSFER_SYNTAX)
+    ds.preamble  = b"\x00" * 128
+    ds.file_meta = _make_file_meta(SOP_CLASS, sop_inst, TRANSFER_SYNTAX)
 
     _apply_patient_study(ds, metadata)
     _finalize_ds(
@@ -337,10 +333,8 @@ def video_to_dicom(video_bytes: bytes, filename: str, metadata: dict) -> bytes:
     content_date, content_time = _now_strs()
 
     ds = Dataset()
-    ds.preamble        = b"\x00" * 128
-    ds.is_implicit_VR  = False
-    ds.is_little_endian = True
-    ds.file_meta       = _make_file_meta(SOP_CLASS, sop_inst, TRANSFER_SYNTAX)
+    ds.preamble  = b"\x00" * 128
+    ds.file_meta = _make_file_meta(SOP_CLASS, sop_inst, TRANSFER_SYNTAX)
 
     _apply_patient_study(ds, metadata)
     _finalize_ds(
@@ -476,10 +470,8 @@ def video_to_multiframe_dicom(video_bytes: bytes, filename: str, metadata: dict,
     content_date, content_time = _now_strs()
 
     ds = Dataset()
-    ds.preamble         = b"\x00" * 128
-    ds.is_implicit_VR   = False
-    ds.is_little_endian = True
-    ds.file_meta        = _make_file_meta(MULTIFRAME_SC, sop_inst, JPEG_BASELINE)
+    ds.preamble  = b"\x00" * 128
+    ds.file_meta = _make_file_meta(MULTIFRAME_SC, sop_inst, JPEG_BASELINE)
 
     _apply_patient_study(ds, metadata)
     _finalize_ds(

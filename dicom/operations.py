@@ -304,11 +304,41 @@ def c_store(local_ae_title: str, remote_host: str, remote_port: int,
             callback: Optional[Callable] = None) -> tuple[bool, str]:
     """
     Send one or more DICOM files via C-STORE.
+
+    Presentation contexts are negotiated dynamically from the files so that
+    non-standard SOP classes (e.g. Multi-frame True Color Secondary Capture,
+    Video Photographic Image Storage) and compressed transfer syntaxes
+    (JPEG Baseline, MPEG-4, …) are accepted by the peer.
     """
     check_available()
     ae = AE(ae_title=local_ae_title)
+
+    # Start with the standard storage SOPs (Explicit VR LE)
     for sop in STORAGE_SOPS:
         ae.add_requested_context(sop)
+
+    # Extend with the actual SOP class + transfer syntax from each file so
+    # that any SOP class or compressed syntax is explicitly proposed.
+    _seen: set = set()
+    EXPLICIT_LE = "1.2.840.10008.1.2.1"
+    for path in dicom_paths:
+        try:
+            ds = pydicom.dcmread(path, stop_before_pixels=True)
+            sop_class = str(getattr(ds, "SOPClassUID", "")).strip()
+            fm = getattr(ds, "file_meta", None)
+            ts = str(getattr(fm, "TransferSyntaxUID", EXPLICIT_LE)).strip()
+            if not sop_class:
+                continue
+            for syntax in {ts, EXPLICIT_LE}:   # propose both the native TS and Explicit LE
+                key = (sop_class, syntax)
+                if key not in _seen:
+                    _seen.add(key)
+                    try:
+                        ae.add_requested_context(sop_class, syntax)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
     assoc = ae.associate(remote_host, remote_port, ae_title=remote_ae_title)
     if not assoc.is_established:
