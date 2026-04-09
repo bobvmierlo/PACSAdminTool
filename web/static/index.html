@@ -1937,11 +1937,15 @@
 
     <!-- Shared: Patient & Study Data (collapsible) -->
     <div class="card">
-      <h3 style="cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px"
-          onclick="toggleDicomizePatient()" id="dicomize-patient-hdr">
-        <span id="dicomize-patient-arrow" class="seq-arrow">▼</span>
-        <span data-i18n="dicomize.patient_study">Patient &amp; Study Data</span>
-      </h3>
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px">
+        <h3 style="cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px; margin:0"
+            onclick="toggleDicomizePatient()" id="dicomize-patient-hdr">
+          <span id="dicomize-patient-arrow" class="seq-arrow">▼</span>
+          <span data-i18n="dicomize.patient_study">Patient &amp; Study Data</span>
+        </h3>
+        <button class="btn" onclick="openDzWorklistModal()"
+                data-i18n="dicomize.fill_from_wl">Fill from Worklist…</button>
+      </div>
       <div id="dicomize-patient-body">
         <div class="field-grid">
           <div class="field">
@@ -2145,8 +2149,27 @@
             <input id="dz-video-series-desc">
           </div>
         </div>
-        <p style="font-size:12px; color:#888; margin-top:8px"
-           data-i18n="dicomize.video_note">The video is stored as-is using DICOM Encapsulated Video (MPEG-4 AVC/H.264 transfer syntax). Dimensions and frame count are read from the file header.</p>
+        <div class="field-grid" style="margin-top:10px">
+          <div class="field" style="grid-column:span 2">
+            <label data-i18n="dicomize.video_format_label">Output Format</label>
+            <div style="display:flex; flex-wrap:wrap; gap:16px; margin-top:4px">
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px">
+                <input type="radio" name="dz-video-format" value="encapsulated" checked>
+                <span>
+                  <strong data-i18n="dicomize.video_format_enc_name">Encapsulated video</strong>
+                  <span style="color:#888; font-size:11px" data-i18n="dicomize.video_format_enc_note"> — stores MP4/MOV as-is, small file, MPEG-4 transfer syntax</span>
+                </span>
+              </label>
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px">
+                <input type="radio" name="dz-video-format" value="multiframe">
+                <span>
+                  <strong data-i18n="dicomize.video_format_mf_name">Multi-frame JPEG</strong>
+                  <span style="color:#888; font-size:11px" data-i18n="dicomize.video_format_mf_note"> — extracts frames, native playback in all viewers, requires ffmpeg on server</span>
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
         <div class="btn-row" style="margin-top:12px">
           <button class="btn primary" onclick="doDicomizeVideo('download')"
                   data-i18n="dicomize.download_btn">Download DICOM</button>
@@ -2186,6 +2209,92 @@
   </div>
 
 </div><!-- end #tab-content -->
+
+
+<!-- ══════════════════════════════════════════════════════════════════
+     DICOMIZE — WORKLIST SELECTION MODAL
+══════════════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="dz-wl-modal"
+     onclick="if(event.target===this)closeDzWorklistModal()">
+  <div class="modal" style="width:min(96vw,960px); max-height:90vh">
+    <div class="modal-header">
+      <span data-i18n="dicomize.wl_modal_title">Select Worklist Item</span>
+      <button class="modal-close" onclick="closeDzWorklistModal()">✕</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto; gap:10px">
+
+      <!-- AE selector -->
+      <div class="ae-selector">
+        <div class="field preset-field">
+          <label data-i18n="dicomize.select_preset">Select a preset…</label>
+          <select id="dz-wl-ae-preset" onchange="dzWlFillAE()">
+            <option value=""></option>
+          </select>
+        </div>
+        <div class="field">
+          <label data-i18n="dicomize.ae_host">Host</label>
+          <input id="dz-wl-host">
+        </div>
+        <div class="field" style="max-width:90px">
+          <label data-i18n="dicomize.ae_port">Port</label>
+          <input id="dz-wl-port" type="number" min="1" max="65535" value="104">
+        </div>
+        <div class="field">
+          <label data-i18n="dicomize.ae_title">AE Title</label>
+          <input id="dz-wl-aet">
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="field-grid">
+        <div class="field">
+          <label data-i18n="dicomize.wl_filter_name">Patient Name (wildcard *)</label>
+          <input id="dz-wl-filter-name" placeholder="*">
+        </div>
+        <div class="field">
+          <label data-i18n="dicomize.wl_filter_id">Patient ID</label>
+          <input id="dz-wl-filter-id">
+        </div>
+        <div class="field">
+          <label data-i18n="dicomize.wl_filter_date">Scheduled Date (YYYYMMDD)</label>
+          <input id="dz-wl-filter-date" placeholder="today">
+        </div>
+        <div class="field">
+          <label data-i18n="dicomize.wl_filter_mod">Modality</label>
+          <input id="dz-wl-filter-mod" placeholder="CT, MR, …">
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn primary" onclick="dzWlQuery()"
+                data-i18n="dicomize.wl_query_btn">Query Worklist</button>
+        <span id="dz-wl-status" style="font-size:12px; color:#888"></span>
+      </div>
+
+      <!-- Results table -->
+      <div style="overflow-x:auto; border:1px solid #e2e8f0; border-radius:4px; flex:1; min-height:140px">
+        <table class="sr-flat-table" style="min-width:700px">
+          <thead><tr>
+            <th data-i18n="dicomize.wl_col_name">Patient Name</th>
+            <th data-i18n="dicomize.wl_col_id">ID</th>
+            <th data-i18n="dicomize.wl_col_acc">Accession</th>
+            <th data-i18n="dicomize.wl_col_mod">Mod</th>
+            <th data-i18n="dicomize.wl_col_date">Scheduled Date</th>
+            <th data-i18n="dicomize.wl_col_proc">Procedure</th>
+          </tr></thead>
+          <tbody id="dz-wl-results-body">
+            <tr><td colspan="6" style="color:#aaa; text-align:center; padding:20px"
+                    data-i18n="dicomize.wl_empty">Query a worklist to see items here.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:11px; color:#888; margin:0" data-i18n="dicomize.wl_select_hint">
+        Click a row to fill Patient &amp; Study data in the DICOMize form.
+      </p>
+
+    </div><!-- /modal-body -->
+  </div><!-- /modal -->
+</div><!-- /dz-wl-modal -->
 
 
 <!-- ══════════════════════════════════════════════════════════════════
@@ -5286,6 +5395,11 @@ function dzVideoSelected() {
     f ? f.name : i18n("dicomize.video_no_file");
 }
 
+function _dzVideoFormat() {
+  const checked = document.querySelector('input[name="dz-video-format"]:checked');
+  return checked ? checked.value : "encapsulated";
+}
+
 async function doDicomizeVideo(action) {
   const input = document.getElementById("dz-video-input");
   if (!input.files.length) {
@@ -5297,9 +5411,12 @@ async function doDicomizeVideo(action) {
     dzLoadPresets();
     return;
   }
-  appendLog("log-dicomize", now(), i18n("dicomize.converting"));
+  const fmt = _dzVideoFormat();
+  appendLog("log-dicomize", now(), i18n("dicomize.converting") +
+    (fmt === "multiframe" ? " (multi-frame…)" : ""));
   const fd = _dzGetMetadata("dz-video-series-desc");
   fd.append("file", input.files[0]);
+  fd.append("video_format", fmt);
   try {
     const res = await fetch("/api/dicomize/video", { method: "POST", body: fd });
     if (!res.ok) {
@@ -5326,6 +5443,7 @@ async function doDicomizeVideoStore() {
   appendLog("log-dicomize", now(), i18n("dicomize.storing"));
   const fd = _dzGetMetadata("dz-video-series-desc");
   fd.append("file", input.files[0]);
+  fd.append("video_format", _dzVideoFormat());
   const ae = _dzGetAE("video");
   fd.append("ae_title", ae.ae_title);
   fd.append("ae_host",  ae.ae_host);
@@ -5341,6 +5459,123 @@ async function doDicomizeVideoStore() {
   } catch (e) {
     appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
   }
+}
+
+// ── Worklist → DICOMize ────────────────────────────────────────────
+let _dzWlResults = [];
+
+function openDzWorklistModal() {
+  dzWlLoadPresets();
+  document.getElementById("dz-wl-modal").classList.add("open");
+}
+
+function closeDzWorklistModal() {
+  document.getElementById("dz-wl-modal").classList.remove("open");
+}
+
+function dzWlLoadPresets() {
+  const sel = document.getElementById("dz-wl-ae-preset");
+  sel.innerHTML = '<option value=""></option>';
+  (appConfig.ae_list || []).forEach(ae => {
+    const opt = document.createElement("option");
+    opt.value = JSON.stringify(ae);
+    opt.textContent = ae.name || ae.ae_title || `${ae.host}:${ae.port}`;
+    sel.appendChild(opt);
+  });
+}
+
+function dzWlFillAE() {
+  const val = document.getElementById("dz-wl-ae-preset").value;
+  if (!val) return;
+  try {
+    const ae = JSON.parse(val);
+    document.getElementById("dz-wl-host").value = ae.host      || "";
+    document.getElementById("dz-wl-port").value = ae.port      || "";
+    document.getElementById("dz-wl-aet").value  = ae.ae_title  || "";
+  } catch (_) {}
+}
+
+async function dzWlQuery() {
+  const host  = document.getElementById("dz-wl-host").value.trim();
+  const port  = document.getElementById("dz-wl-port").value.trim();
+  const aet   = document.getElementById("dz-wl-aet").value.trim();
+  const pname = document.getElementById("dz-wl-filter-name").value.trim() || "*";
+  const pid   = document.getElementById("dz-wl-filter-id").value.trim();
+  const date  = document.getElementById("dz-wl-filter-date").value.trim();
+  const mod   = document.getElementById("dz-wl-filter-mod").value.trim();
+  const statusEl = document.getElementById("dz-wl-status");
+  const tbody    = document.getElementById("dz-wl-results-body");
+
+  if (!host || !port || !aet) {
+    statusEl.textContent = i18n("dicomize.wl_need_ae");
+    return;
+  }
+  statusEl.textContent = i18n("dicomize.wl_querying");
+  tbody.innerHTML = `<tr><td colspan="6" style="color:#888;text-align:center">${escapeHtml(i18n("dicomize.wl_querying"))}</td></tr>`;
+
+  try {
+    const res  = await fetch("/api/dicom/dmwl", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        host, port: parseInt(port, 10), ae_title: aet,
+        patient_name: pname, patient_id: pid,
+        accession: "", modality: mod, study_date: date, station_aet: "",
+      }),
+    });
+    const data = await res.json();
+    _dzWlResults = data.results || [];
+    statusEl.textContent = data.ok
+      ? i18n("dicomize.wl_found", {n: _dzWlResults.length})
+      : `Error: ${escapeHtml(data.message || "")}`;
+
+    if (!_dzWlResults.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="color:#aaa;text-align:center;padding:20px">${escapeHtml(i18n("dicomize.wl_no_results"))}</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = _dzWlResults.map((r, i) =>
+      `<tr style="cursor:pointer" onclick="dzWlSelectItem(${i})">
+        <td>${escapeHtml(r.PatientName  || "")}</td>
+        <td>${escapeHtml(r.PatientID    || "")}</td>
+        <td>${escapeHtml(r.Accession    || "")}</td>
+        <td>${escapeHtml(r.Modality     || "")}</td>
+        <td>${escapeHtml(r.ScheduledDate|| "")}</td>
+        <td>${escapeHtml(r.Procedure    || "")}</td>
+      </tr>`
+    ).join("");
+  } catch (e) {
+    statusEl.textContent = `Error: ${e}`;
+    tbody.innerHTML = "";
+  }
+}
+
+function dzWlSelectItem(idx) {
+  const r = _dzWlResults[idx];
+  if (!r) return;
+
+  document.getElementById("dz-patient-name").value = r.PatientName      || "";
+  document.getElementById("dz-patient-id").value   = r.PatientID        || "";
+  document.getElementById("dz-patient-dob").value  = r.PatientBirthDate || "";
+  document.getElementById("dz-patient-sex").value  = r.PatientSex       || "";
+  document.getElementById("dz-study-date").value   = r.ScheduledDate    || "";
+  document.getElementById("dz-study-desc").value   = r.Procedure        || "";
+  document.getElementById("dz-accession").value    = r.Accession        || "";
+  document.getElementById("dz-institution").value  = r.InstitutionName  || "";
+  if (r.StudyInstanceUID) {
+    document.getElementById("dz-study-uid").value = r.StudyInstanceUID;
+  }
+
+  // Expand patient card if collapsed
+  const body  = document.getElementById("dicomize-patient-body");
+  const arrow = document.getElementById("dicomize-patient-arrow");
+  if (body.style.display === "none") {
+    body.style.display = "";
+    if (arrow) arrow.textContent = "▼";
+  }
+
+  closeDzWorklistModal();
+  appendLog("log-dicomize", now(),
+    `Worklist: ${r.PatientName || "?"} [${r.PatientID || "?"}]  —  ${r.Procedure || ""}`, "ok");
 }
 
 // Trigger a browser download from a Blob

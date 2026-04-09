@@ -344,14 +344,19 @@ def dicom_dmwl():
             sps_seq  = getattr(r, "ScheduledProcedureStepSequence", [])
             sps_item = sps_seq[0] if sps_seq else None
             rows.append({
-                "PatientID":     _safe_str(getattr(r, "PatientID",      "")),
-                "PatientName":   _safe_str(getattr(r, "PatientName",     "")),
-                "Accession":     _safe_str(getattr(r, "AccessionNumber", "")),
-                "Modality":      _safe_str(getattr(sps_item, "Modality", "") if sps_item else ""),
-                "ScheduledDate": _safe_str(getattr(sps_item, "ScheduledProcedureStepStartDate", "") if sps_item else ""),
-                "StationAET":    _safe_str(getattr(sps_item, "ScheduledStationAETitle", "") if sps_item else ""),
-                "Procedure":     _safe_str(getattr(r, "RequestedProcedureDescription", "")),
-                "tags":          _dataset_to_tag_list(r),
+                "PatientID":          _safe_str(getattr(r, "PatientID",                    "")),
+                "PatientName":        _safe_str(getattr(r, "PatientName",                   "")),
+                "PatientBirthDate":   _safe_str(getattr(r, "PatientBirthDate",              "")),
+                "PatientSex":         _safe_str(getattr(r, "PatientSex",                    "")),
+                "Accession":          _safe_str(getattr(r, "AccessionNumber",               "")),
+                "StudyInstanceUID":   _safe_str(getattr(r, "StudyInstanceUID",              "")),
+                "InstitutionName":    _safe_str(getattr(r, "InstitutionName",               "")),
+                "RequestedProcedureID": _safe_str(getattr(r, "RequestedProcedureID",       "")),
+                "Modality":           _safe_str(getattr(sps_item, "Modality",              "") if sps_item else ""),
+                "ScheduledDate":      _safe_str(getattr(sps_item, "ScheduledProcedureStepStartDate", "") if sps_item else ""),
+                "StationAET":         _safe_str(getattr(sps_item, "ScheduledStationAETitle","") if sps_item else ""),
+                "Procedure":          _safe_str(getattr(r, "RequestedProcedureDescription", "")),
+                "tags":               _dataset_to_tag_list(r),
             })
         _capture("feature_used", {"feature": "dicom_dmwl", "result": "ok" if ok else "error"})
         return jsonify({"ok": ok, "message": msg, "results": rows})
