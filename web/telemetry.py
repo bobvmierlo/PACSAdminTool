@@ -114,8 +114,10 @@ def init(config: dict) -> None:
             from posthog import Posthog
             # disable_geoip=False lets PostHog derive the country from the
             # server IP, which is the correct location for a self-hosted tool.
+            # Pass the API key positionally — the kwarg was renamed from
+            # `api_key` to `project_api_key` in posthog SDK v3+.
             _client = Posthog(
-                api_key=_POSTHOG_API_KEY,
+                _POSTHOG_API_KEY,
                 host=_POSTHOG_HOST,
                 disable_geoip=False,
                 disabled=not _enabled or key_is_placeholder,
