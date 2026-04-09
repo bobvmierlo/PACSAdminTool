@@ -245,9 +245,19 @@ def dicomize_image_store():
 # Video to DICOM
 # ---------------------------------------------------------------------------
 
+def _convert_video(video_bytes: bytes, filename: str, metadata: dict,
+                    fmt: str) -> bytes:
+    """Dispatch video conversion based on *fmt* ('encapsulated' or 'multiframe')."""
+    if fmt == "multiframe":
+        from dicom.dicomize import video_to_multiframe_dicom
+        return video_to_multiframe_dicom(video_bytes, filename, metadata)
+    from dicom.dicomize import video_to_dicom
+    return video_to_dicom(video_bytes, filename, metadata)
+
+
 @bp.route("/api/dicomize/video", methods=["POST"])
 def dicomize_video():
-    """Convert an uploaded video to an encapsulated Video Photographic DICOM."""
+    """Convert an uploaded video to a DICOM file (encapsulated or multi-frame)."""
     if "file" not in request.files:
         return jsonify({"ok": False, "error": "No file uploaded"}), 400
     f = request.files["file"]
@@ -256,16 +266,16 @@ def dicomize_video():
 
     video_bytes = f.read()
     metadata    = _get_metadata()
+    fmt         = request.form.get("video_format", "encapsulated")
 
     try:
-        from dicom.dicomize import video_to_dicom
-        dcm_bytes = video_to_dicom(video_bytes, f.filename, metadata)
+        dcm_bytes = _convert_video(video_bytes, f.filename, metadata, fmt)
     except Exception as exc:
         logger.exception("Video to DICOM conversion failed")
         return jsonify({"ok": False, "error": str(exc)}), 500
 
     _audit("dicomize.video", ip=_req_ip(), user=_req_user(),
-           detail={"filename": f.filename})
+           detail={"filename": f.filename, "format": fmt})
 
     stem = os.path.splitext(os.path.basename(f.filename))[0]
     return send_file(
@@ -284,15 +294,15 @@ def dicomize_video_store():
     f = request.files["file"]
     video_bytes = f.read()
     metadata    = _get_metadata()
+    fmt         = request.form.get("video_format", "encapsulated")
 
     try:
-        from dicom.dicomize import video_to_dicom
-        dcm_bytes = video_to_dicom(video_bytes, f.filename, metadata)
+        dcm_bytes = _convert_video(video_bytes, f.filename, metadata, fmt)
     except Exception as exc:
         logger.exception("Video to DICOM conversion failed")
         return jsonify({"ok": False, "error": str(exc)}), 500
 
     ok, msg = _store_bytes(dcm_bytes, "")
     _audit("dicomize.video.store", ip=_req_ip(), user=_req_user(),
-           detail={"filename": f.filename, "ok": ok})
+           detail={"filename": f.filename, "format": fmt, "ok": ok})
     return jsonify({"ok": ok, "message": msg})

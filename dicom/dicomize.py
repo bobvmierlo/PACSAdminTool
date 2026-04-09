@@ -5,12 +5,17 @@ PDF  → Encapsulated PDF Storage (1.2.840.10008.5.1.4.1.1.104.1)
 Image → Secondary Capture Image Storage (1.2.840.10008.5.1.4.1.1.7)
 Video → Video Photographic Image Storage (1.2.840.10008.5.1.4.1.1.77.1.2.1)
         with MPEG-4 AVC/H.264 encapsulation (Supplement 218 / encapsulated video)
+     OR Multi-frame True Color Secondary Capture (1.2.840.10008.5.1.4.1.1.7.4)
+        with JPEG Baseline per-frame encoding (requires ffmpeg on PATH)
 """
 
 import io
 import logging
 import os
+import shutil
 import struct
+import subprocess
+import tempfile
 
 logger = logging.getLogger(__name__)
 
@@ -368,5 +373,145 @@ def video_to_dicom(video_bytes: bytes, filename: str, metadata: dict) -> bytes:
     except Exception:
         # Fallback: store raw bytes (may not be valid for all viewers)
         ds.PixelData = video_bytes
+
+    return _save_ds(ds)
+
+
+def ffmpeg_available() -> bool:
+    """Return True if ffmpeg is accessible on the system PATH."""
+    return shutil.which("ffmpeg") is not None
+
+
+def video_to_multiframe_dicom(video_bytes: bytes, filename: str, metadata: dict,
+                               fps_limit: int = 10) -> bytes:
+    """
+    Convert a video to a Multi-frame True Color Secondary Capture DICOM by
+    extracting frames at up to *fps_limit* fps using ffmpeg.
+
+    SOP Class:        Multi-frame True Color Secondary Capture
+                      (1.2.840.10008.5.1.4.1.1.7.4)
+    Transfer Syntax:  JPEG Baseline (1.2.840.10008.1.2.4.50)
+
+    Each frame becomes one JPEG-compressed frame in the DICOM pixel-data
+    encapsulation, which plays natively as a cine loop in any DICOM viewer.
+
+    Requires ffmpeg to be installed on the server.  Raises RuntimeError if
+    ffmpeg is not found or frame extraction fails.
+    """
+    if not ffmpeg_available():
+        raise RuntimeError(
+            "ffmpeg is not installed on the server. "
+            "Multi-frame conversion requires ffmpeg on PATH."
+        )
+
+    from PIL import Image
+    from pydicom.dataset import Dataset
+    from pydicom.uid import generate_uid
+    from pydicom.encaps import encapsulate
+
+    MULTIFRAME_SC   = "1.2.840.10008.5.1.4.1.1.7.4"   # Multi-frame True Color SC
+    JPEG_BASELINE   = "1.2.840.10008.1.2.4.50"
+
+    # Write video bytes to a temp file so ffmpeg can read it
+    suffix = os.path.splitext(filename.lower())[1] or ".mp4"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp_in:
+        tmp_in.write(video_bytes)
+        in_path = tmp_in.name
+
+    tmp_dir = tempfile.mkdtemp()
+    frame_pattern = os.path.join(tmp_dir, "frame_%04d.jpg")
+
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg", "-y",
+                "-i", in_path,
+                "-vf", f"fps={fps_limit}",
+                "-q:v", "3",            # JPEG quality (2 = best … 31 = worst)
+                "-pix_fmt", "yuvj420p", # JPEG-compatible colour space
+                frame_pattern,
+            ],
+            capture_output=True,
+            timeout=300,
+        )
+        if result.returncode != 0:
+            stderr = result.stderr.decode("utf-8", errors="replace")
+            raise RuntimeError(f"ffmpeg failed (exit {result.returncode}): {stderr[-600:]}")
+
+        frame_files = sorted(
+            f for f in (os.path.join(tmp_dir, n) for n in os.listdir(tmp_dir))
+            if f.endswith(".jpg")
+        )
+        if not frame_files:
+            raise RuntimeError("ffmpeg produced no frames — is the file a supported video?")
+
+        # Dimensions from first frame
+        first_img = Image.open(frame_files[0])
+        width, height = first_img.size
+        num_frames = len(frame_files)
+        logger.info(
+            "Multiframe DICOM: %d frames @ %d fps  %dx%d  from '%s'",
+            num_frames, fps_limit, width, height, filename,
+        )
+
+        # Collect raw JPEG bytes for each frame
+        jpeg_frames = []
+        for fp in frame_files:
+            with open(fp, "rb") as fh:
+                jpeg_frames.append(fh.read())
+
+    finally:
+        try:
+            os.unlink(in_path)
+        except OSError:
+            pass
+        try:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+        except OSError:
+            pass
+
+    # ── Build the DICOM dataset ───────────────────────────────────────────
+    sop_inst   = generate_uid()
+    series_uid = generate_uid()
+    content_date, content_time = _now_strs()
+
+    ds = Dataset()
+    ds.preamble         = b"\x00" * 128
+    ds.is_implicit_VR   = False
+    ds.is_little_endian = True
+    ds.file_meta        = _make_file_meta(MULTIFRAME_SC, sop_inst, JPEG_BASELINE)
+
+    _apply_patient_study(ds, metadata)
+    _finalize_ds(
+        ds, MULTIFRAME_SC, sop_inst,
+        modality     = "OT",
+        series_desc  = metadata.get("series_description", "") or "Multi-frame Video",
+        series_uid   = series_uid,
+        content_date = content_date,
+        content_time = content_time,
+    )
+
+    ds.NumberOfFrames            = num_frames
+    ds.Rows                      = height
+    ds.Columns                   = width
+    ds.SamplesPerPixel           = 3
+    ds.PhotometricInterpretation = "YBR_FULL_422"
+    ds.PlanarConfiguration       = 0
+    ds.BitsAllocated             = 8
+    ds.BitsStored                = 8
+    ds.HighBit                   = 7
+    ds.PixelRepresentation       = 0
+    ds.LossyImageCompression     = "01"
+    ds.LossyImageCompressionMethod = "ISO_10918_1"   # JPEG baseline
+    ds.ConversionType            = "WSD"
+    ds.BurnedInAnnotation        = "NO"
+
+    # Frame timing — CineRate and FrameTime for cine playback
+    ds.CineRate  = fps_limit
+    ds.FrameTime = round(1000.0 / fps_limit, 2)       # ms per frame
+    ds.FrameIncrementPointer = (0x0018, 0x1063)        # → FrameTime tag
+
+    ds.PixelData = encapsulate(jpeg_frames)
+    ds["PixelData"].is_undefined_length = True
 
     return _save_ds(ds)

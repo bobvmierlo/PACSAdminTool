@@ -2,6 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# System packages: ffmpeg is required for the multi-frame video DICOM converter
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install Python dependencies first (layer-cached until requirements change)
 COPY requirements-web.txt ./
 RUN pip install --no-cache-dir -r requirements-web.txt
