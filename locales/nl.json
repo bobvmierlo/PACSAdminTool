@@ -59,7 +59,14 @@
     "running": "Actief",
     "actions": "Acties",
     "username": "Gebruikersnaam",
-    "role": "Rol"
+    "role": "Rol",
+    "copied": "Gekopieerd naar klembord",
+    "copy_failed": "Kopiëren mislukt — kopieer handmatig",
+    "copy": "Kopieer",
+    "autoscroll": "Automatisch scrollen",
+    "dark_mode": "Donkere modus",
+    "light_mode": "Lichte modus",
+    "invalid_port": "Ongeldige poort: \"{port}\". Moet een getal zijn tussen 1 en 65535."
   },
   "cfind": {
     "query_scp": "Query / Retrieve SCP",
@@ -278,6 +285,8 @@
     "language": "Taal",
     "language_label": "Interfacetaal:",
     "language_note": "Wijzigingen worden van kracht na herstart (desktop) of pagina vernieuwen (web).",
+    "appearance": "Weergave",
+    "appearance_note": "Schakel tussen licht en donker kleurenschema. Uw voorkeur wordt opgeslagen in de browser.",
     "user_management": "Gebruikersbeheer",
     "add_user": "Gebruiker toevoegen…",
     "create_user": "Gebruiker aanmaken",

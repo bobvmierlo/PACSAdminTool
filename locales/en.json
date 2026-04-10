@@ -59,7 +59,14 @@
     "running": "Running",
     "actions": "Actions",
     "username": "Username",
-    "role": "Role"
+    "role": "Role",
+    "copied": "Copied to clipboard",
+    "copy_failed": "Copy failed — please copy manually",
+    "copy": "Copy",
+    "autoscroll": "Auto-scroll",
+    "dark_mode": "Dark mode",
+    "light_mode": "Light mode",
+    "invalid_port": "Invalid port: \"{port}\". Must be a number between 1 and 65535."
   },
   "cfind": {
     "query_scp": "Query / Retrieve SCP",
@@ -278,6 +285,8 @@
     "language": "Language",
     "language_label": "Interface Language:",
     "language_note": "Changes take effect after restart (desktop) or page reload (web).",
+    "appearance": "Appearance",
+    "appearance_note": "Toggle between light and dark colour scheme. Your preference is saved in the browser.",
     "user_management": "User Management",
     "add_user": "Add user…",
     "create_user": "Create user",

@@ -639,6 +639,136 @@
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
     #offline-box .reconnecting { margin-top: 18px; font-size: 12px; color: #999;
                                  animation: pulse 1.8s ease-in-out infinite; }
+
+    /* ── Toast notifications ─────────────────────────────────────── */
+    #toast-container {
+      position: fixed; bottom: 20px; right: 20px;
+      display: flex; flex-direction: column; gap: 8px;
+      z-index: 10000; pointer-events: none;
+    }
+    .toast {
+      display: flex; align-items: flex-start; gap: 10px;
+      background: #1e293b; color: #f1f5f9;
+      padding: 10px 16px; border-radius: 6px;
+      font-size: 13px; line-height: 1.4;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.28);
+      max-width: 380px; pointer-events: auto;
+      border-left: 3px solid #64748b;
+      animation: toast-in 0.2s ease;
+    }
+    .toast-ok   { border-left-color: #15803d; }
+    .toast-err  { border-left-color: #dc2626; }
+    .toast-warn { border-left-color: #b45309; }
+    .toast-info { border-left-color: #2b6cb0; }
+    .toast-out  { animation: toast-out 0.25s ease forwards; }
+    @keyframes toast-in  { from { opacity:0; transform:translateX(24px); } to { opacity:1; transform:none; } }
+    @keyframes toast-out { from { opacity:1; transform:none; } to { opacity:0; transform:translateX(24px); } }
+
+    /* ── Clearable inputs ────────────────────────────────────────── */
+    .clearable-wrap { position:relative; display:flex; align-items:center; }
+    .clearable-wrap input { padding-right: 22px; }
+    .clearable-wrap .inp-clear {
+      position: absolute; right: 5px;
+      background: none; border: none; cursor: pointer;
+      font-size: 13px; color: #bbb; line-height: 1;
+      padding: 0 2px; display: none;
+    }
+    .clearable-wrap .inp-clear:hover { color: #555; }
+    .clearable-wrap input:not([value=""]):valid + .inp-clear { display: block; }
+
+    /* ── AE health indicator dot ─────────────────────────────────── */
+    .ae-dot {
+      display: inline-block; width: 7px; height: 7px;
+      border-radius: 50%; background: #d1d5db;
+      flex-shrink: 0; transition: background 0.4s;
+      margin-right: 4px; vertical-align: middle;
+    }
+    .ae-dot.ok   { background: #15803d; }
+    .ae-dot.err  { background: #dc2626; }
+    .ae-dot.busy { background: #b45309; animation: pulse 1s ease-in-out infinite; }
+
+    /* ── AE Title character counter ──────────────────────────────── */
+    .ae-title-wrap { position:relative; }
+    .ae-title-wrap input { padding-right: 34px; }
+    .ae-title-counter {
+      position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+      font-size: 10px; color: #bbb; pointer-events: none; white-space: nowrap;
+    }
+    .ae-title-counter.warn { color: #b45309; font-weight: 600; }
+
+    /* ── Log box auto-scroll toggle ──────────────────────────────── */
+    .log-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .log-scroll-toggle {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 11px; color: #888; cursor: pointer; user-select: none;
+    }
+    .log-scroll-toggle input[type=checkbox] { width: 12px; height: 12px; margin: 0; cursor: pointer; }
+
+    /* ── UID copy button ─────────────────────────────────────────── */
+    .uid-copy-btn {
+      padding: 4px 7px; font-size: 11px; flex-shrink: 0;
+      color: #888; background: none; border: 1px solid #d0d0d0; border-radius: 3px;
+      cursor: pointer; transition: color 0.15s, border-color 0.15s;
+    }
+    .uid-copy-btn:hover { color: #2b6cb0; border-color: #2b6cb0; }
+
+    /* ── Dark mode ───────────────────────────────────────────────── */
+    [data-theme="dark"] body { background: #0f1117; color: #e2e8f0; }
+    [data-theme="dark"] #header,
+    [data-theme="dark"] #tab-bar { background: #1a1f2e; border-color: #2d3448; }
+    [data-theme="dark"] #header h1 { color: #e2e8f0; }
+    [data-theme="dark"] #header span { color: #64748b; }
+    [data-theme="dark"] .card { background: #1a1f2e; border-color: #2d3448; }
+    [data-theme="dark"] .card h3 { color: #64748b; }
+    [data-theme="dark"] .field label { color: #94a3b8; }
+    [data-theme="dark"] input:not([type=checkbox]):not([type=radio]):not([type=date]):not([type=time]),
+    [data-theme="dark"] select,
+    [data-theme="dark"] textarea { background: #252a3d; color: #e2e8f0; border-color: #3d4460; }
+    [data-theme="dark"] input[type=date],
+    [data-theme="dark"] input[type=time] { background: #252a3d; color: #e2e8f0; border-color: #3d4460; color-scheme: dark; }
+    [data-theme="dark"] input:focus, [data-theme="dark"] select:focus,
+    [data-theme="dark"] textarea:focus { border-color: #4299e1; }
+    [data-theme="dark"] .btn { background: #252a3d; border-color: #3d4460; color: #e2e8f0; }
+    [data-theme="dark"] .btn:hover { background: #2f3650; }
+    [data-theme="dark"] .btn.primary { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }
+    [data-theme="dark"] .btn.primary:hover { background: #245a99; }
+    [data-theme="dark"] .btn.danger  { background: #dc2626; border-color: #dc2626; color: #fff; }
+    [data-theme="dark"] .btn.success { background: #15803d; border-color: #15803d; color: #fff; }
+    [data-theme="dark"] .btn:disabled { opacity: 0.4; }
+    [data-theme="dark"] .tab-btn { color: #94a3b8; }
+    [data-theme="dark"] .tab-btn:hover { color: #e2e8f0; background: #1f2437; }
+    [data-theme="dark"] .tab-btn.active { color: #4299e1; border-bottom-color: #4299e1; }
+    [data-theme="dark"] .log-box { background: #0d1117; border-color: #2d3448; }
+    [data-theme="dark"] .log-dim { color: #94a3b8; }
+    [data-theme="dark"] table th { background: #1f2437; color: #94a3b8; border-color: #2d3448; }
+    [data-theme="dark"] table td { border-color: #2d3448; }
+    [data-theme="dark"] table tr:hover td,
+    [data-theme="dark"] #cfind-tbody tr:hover { background: #1f2437; }
+    [data-theme="dark"] #cfind-tbody tr.selected { background: #1a3a5c !important; box-shadow: inset 3px 0 0 #4299e1; }
+    [data-theme="dark"] .modal { background: #1a1f2e; }
+    [data-theme="dark"] .modal-header { border-color: #2d3448; color: #e2e8f0; }
+    [data-theme="dark"] .modal-body { background: #1a1f2e; }
+    [data-theme="dark"] .modal-backdrop { background: rgba(0,0,0,0.65); }
+    [data-theme="dark"] .result-table-wrap { border-color: #2d3448; }
+    [data-theme="dark"] .badge { background: #252a3d; }
+    [data-theme="dark"] .badge.stopped { background: #2d2020; color: #f87171; }
+    [data-theme="dark"] .badge.running { background: #1a2e1a; color: #4ade80; }
+    [data-theme="dark"] .subtab-btn { background: #1f2437; color: #94a3b8; border-color: #2d3448; }
+    [data-theme="dark"] .subtab-btn.active { background: #1a1f2e; color: #4299e1; border-bottom-color: #4299e1; }
+    [data-theme="dark"] .ae-title-counter { color: #4a5568; }
+    [data-theme="dark"] #offline-box { background: #1a1f2e; }
+    [data-theme="dark"] #offline-box h2 { color: #e2e8f0; }
+    [data-theme="dark"] #offline-box p { color: #94a3b8; }
+    [data-theme="dark"] .modal-close:hover { background: #252a3d; color: #e2e8f0; }
+    [data-theme="dark"] .uid-copy-btn { border-color: #3d4460; color: #94a3b8; }
+    [data-theme="dark"] .uid-copy-btn:hover { color: #4299e1; border-color: #4299e1; }
+    [data-theme="dark"] .inp-clear { color: #4a5568; }
+    [data-theme="dark"] .inp-clear:hover { color: #94a3b8; }
+    [data-theme="dark"] .ae-dot { background: #374151; }
+    [data-theme="dark"] details summary { color: #94a3b8; }
   </style>
 </head>
 
@@ -662,6 +792,17 @@
     <div class="reconnecting" data-i18n="offline.reconnecting">Reconnecting…</div>
   </div>
 </div>
+
+<!-- ── Toast notification container ─────────────────────────────────────── -->
+<div id="toast-container"></div>
+
+<!-- ── Modality datalist ─────────────────────────────────────────────────── -->
+<datalist id="modality-list">
+  <option value="CT"><option value="MR"><option value="US"><option value="CR">
+  <option value="DX"><option value="PT"><option value="NM"><option value="RF">
+  <option value="MG"><option value="XA"><option value="SC"><option value="SR">
+  <option value="OT"><option value="PR"><option value="KO"><option value="SEG">
+</datalist>
 
 <!-- ── Telemetry consent banner ───────────────────────────────────────────── -->
 <div id="telemetry-consent" role="dialog" aria-labelledby="tc-title" aria-modal="false">
@@ -835,8 +976,10 @@
             <input type="date" id="cfind-date-to" style="flex:1" title="To date">
           </div>
         </div>
-        <div class="field"><label data-i18n="cfind.modality">Modality</label><input id="cfind-mod"></div>
-        <div class="field"><label data-i18n="cfind.study_uid">Study UID</label><input id="cfind-suid"></div>
+        <div class="field"><label data-i18n="cfind.modality">Modality</label><input id="cfind-mod" list="modality-list"></div>
+        <div class="field"><label data-i18n="cfind.study_uid">Study UID</label>
+          <div style="display:flex;gap:4px"><input id="cfind-suid" style="flex:1;font-family:Consolas;font-size:11px">
+          <button class="uid-copy-btn" onclick="copyToClipboard(document.getElementById('cfind-suid').value)" title="Copy UID">⎘</button></div></div>
       </div>
       <div class="btn-row" style="margin-top:12px">
         <div class="field" style="width:130px">
@@ -954,7 +1097,7 @@
                     data-i18n="common.today">Today</button>
           </div>
         </div>
-        <div class="field"><label data-i18n="cfind.modality">Modality</label><input id="dmwl-mod"></div>
+        <div class="field"><label data-i18n="cfind.modality">Modality</label><input id="dmwl-mod" list="modality-list"></div>
         <div class="field"><label data-i18n="cfind.accession">Accession #</label><input id="dmwl-acc"></div>
         <div class="field"><label data-i18n="dmwl.station_aet">Station AET</label><input id="dmwl-aet"></div>
       </div>
@@ -998,10 +1141,18 @@
     <div class="card">
       <h3 data-i18n="iocm.notification">Instance Availability Notification</h3>
       <div class="field-grid">
-        <div class="field"><label data-i18n="iocm.study_uid">Study UID</label><input id="iocm-suid"></div>
-        <div class="field"><label data-i18n="iocm.series_uid">Series UID</label><input id="iocm-seruid"></div>
-        <div class="field"><label data-i18n="iocm.sop_class">SOP Class UID</label><input id="iocm-sopclass"></div>
-        <div class="field"><label data-i18n="iocm.sop_inst_web">SOP Instance UID</label><input id="iocm-sopinst"></div>
+        <div class="field"><label data-i18n="iocm.study_uid">Study UID</label>
+          <div style="display:flex;gap:4px"><input id="iocm-suid" style="flex:1;font-family:Consolas;font-size:11px">
+          <button class="uid-copy-btn" onclick="copyToClipboard(document.getElementById('iocm-suid').value)" title="Copy UID">⎘</button></div></div>
+        <div class="field"><label data-i18n="iocm.series_uid">Series UID</label>
+          <div style="display:flex;gap:4px"><input id="iocm-seruid" style="flex:1;font-family:Consolas;font-size:11px">
+          <button class="uid-copy-btn" onclick="copyToClipboard(document.getElementById('iocm-seruid').value)" title="Copy UID">⎘</button></div></div>
+        <div class="field"><label data-i18n="iocm.sop_class">SOP Class UID</label>
+          <div style="display:flex;gap:4px"><input id="iocm-sopclass" style="flex:1;font-family:Consolas;font-size:11px">
+          <button class="uid-copy-btn" onclick="copyToClipboard(document.getElementById('iocm-sopclass').value)" title="Copy UID">⎘</button></div></div>
+        <div class="field"><label data-i18n="iocm.sop_inst_web">SOP Instance UID</label>
+          <div style="display:flex;gap:4px"><input id="iocm-sopinst" style="flex:1;font-family:Consolas;font-size:11px">
+          <button class="uid-copy-btn" onclick="copyToClipboard(document.getElementById('iocm-sopinst').value)" title="Copy UID">⎘</button></div></div>
         <div class="field"><label data-i18n="iocm.availability">Availability</label>
           <select id="iocm-avail">
             <option>ONLINE</option><option>NEARLINE</option>
@@ -1060,8 +1211,10 @@
           <div class="field"><label data-i18n="hl7.accession">Accession #</label><input id="hl7-acc"></div>
           <div class="field"><label data-i18n="hl7.proc_code_web">Procedure Code</label><input id="hl7-code"></div>
           <div class="field"><label data-i18n="hl7.proc_desc_web">Procedure Description</label><input id="hl7-desc"></div>
-          <div class="field"><label data-i18n="hl7.modality">Modality</label><input id="hl7-mod" value="CT"></div>
-          <div class="field"><label data-i18n="hl7.study_uid">Study UID</label><input id="hl7-suid"></div>
+          <div class="field"><label data-i18n="hl7.modality">Modality</label><input id="hl7-mod" value="CT" list="modality-list"></div>
+          <div class="field"><label data-i18n="hl7.study_uid">Study UID</label>
+            <div style="display:flex;gap:4px"><input id="hl7-suid" style="flex:1;font-family:Consolas;font-size:11px">
+            <button class="uid-copy-btn" onclick="copyToClipboard(document.getElementById('hl7-suid').value)" title="Copy UID">⎘</button></div></div>
           <div class="field"><label data-i18n="hl7.sending_app">Sending App</label><input id="hl7-sapp" value="RIS"></div>
           <div class="field"><label data-i18n="hl7.sending_facility">Sending Facility</label><input id="hl7-sfac" value="HOSPITAL"></div>
           <div class="field"><label data-i18n="hl7.recv_app">Receiving App</label><input id="hl7-rapp" value="PACS"></div>
@@ -1526,6 +1679,11 @@
       </p>
     </div>
     <div class="card">
+      <h3 data-i18n="settings.appearance">Appearance</h3>
+      <button id="dark-mode-btn" class="btn" onclick="toggleDarkMode()" data-i18n="common.dark_mode">☾ Dark mode</button>
+      <p style="font-size:12px; color:#888; margin:8px 0 0" data-i18n="settings.appearance_note">Toggle between light and dark colour scheme. Preference is saved in the browser.</p>
+    </div>
+    <div class="card">
       <h3 data-i18n="settings.web_server">Web Server</h3>
       <div class="field-grid">
         <div class="field"><label data-i18n="settings.web_host">Host</label><input id="set-web-host" value="0.0.0.0"></div>
@@ -1925,7 +2083,10 @@
       <div class="field-grid">
         <div class="field" style="grid-column:span 2">
           <label data-i18n="kos_creator.study_uid">Study UID</label>
-          <input id="kos-study-uid">
+          <div style="display:flex;gap:4px">
+            <input id="kos-study-uid" style="flex:1;font-family:Consolas;font-size:11px">
+            <button class="uid-copy-btn" onclick="copyToClipboard(document.getElementById('kos-study-uid').value)" title="Copy UID">⎘</button>
+          </div>
         </div>
         <div class="field"><label data-i18n="kos_creator.patient_id">Patient ID</label><input id="kos-pid"></div>
         <div class="field"><label data-i18n="kos_creator.patient_name">Patient Name</label><input id="kos-pname"></div>
@@ -2032,6 +2193,7 @@
             <label data-i18n="dicomize.study_uid">Study Instance UID</label>
             <div style="display:flex; gap:6px">
               <input id="dz-study-uid" style="flex:1; font-family:Consolas; font-size:11px">
+              <button class="uid-copy-btn" onclick="copyToClipboard(document.getElementById('dz-study-uid').value)" title="Copy UID">⎘</button>
               <button class="btn" onclick="dzGenerateUID()"
                       data-i18n="dicomize.generate_uid">Generate</button>
             </div>
@@ -2305,7 +2467,7 @@
         </div>
         <div class="field">
           <label data-i18n="dicomize.wl_filter_mod">Modality</label>
-          <input id="dz-wl-filter-mod" placeholder="CT, MR, …">
+          <input id="dz-wl-filter-mod" list="modality-list" placeholder="CT, MR, …">
         </div>
       </div>
 
@@ -2572,6 +2734,177 @@ function cfindDateRange() {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// 0c. Toast notifications
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Show a non-blocking toast notification.
+ * @param {string} message
+ * @param {"ok"|"err"|"warn"|"info"|"dim"} level
+ * @param {number} duration  milliseconds before auto-dismiss
+ */
+function toast(message, level = "dim", duration = 4000) {
+  const container = document.getElementById("toast-container");
+  const el = document.createElement("div");
+  el.className = `toast toast-${level}`;
+  el.textContent = message;
+  // Click to dismiss early
+  el.style.cursor = "pointer";
+  el.addEventListener("click", () => dismiss());
+  container.appendChild(el);
+  const timer = setTimeout(dismiss, duration);
+  function dismiss() {
+    clearTimeout(timer);
+    el.classList.add("toast-out");
+    el.addEventListener("animationend", () => el.remove(), { once: true });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 0d. Clipboard copy helper
+// ─────────────────────────────────────────────────────────────────
+
+async function copyToClipboard(text) {
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(i18n("common.copied"), "ok", 2000);
+  } catch {
+    // Fallback for non-HTTPS contexts
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      toast(i18n("common.copied"), "ok", 2000);
+    } catch { toast(i18n("common.copy_failed"), "err", 2500); }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 0e. DICOM date display formatting
+// ─────────────────────────────────────────────────────────────────
+
+/** Format YYYYMMDD for display as DD-MM-YYYY. Returns raw value if not 8 digits. */
+function formatDicomDate(val) {
+  if (!val || val.length !== 8 || !/^\d{8}$/.test(val)) return val || "";
+  return `${val.slice(6,8)}-${val.slice(4,6)}-${val.slice(0,4)}`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 0f. AE Title character counter
+// ─────────────────────────name─────────────────────────────────────
+
+/** Wrap an AE title input with a live character counter (max 16 per DICOM). */
+function wrapAETitleInput(input) {
+  if (!input || input.dataset.aeTitleWrapped) return;
+  input.dataset.aeTitleWrapped = "1";
+  input.maxLength = 16;
+  const wrap = document.createElement("div");
+  wrap.className = "ae-title-wrap";
+  input.parentNode.insertBefore(wrap, input);
+  wrap.appendChild(input);
+  const counter = document.createElement("span");
+  counter.className = "ae-title-counter";
+  wrap.appendChild(counter);
+  const update = () => {
+    const len = input.value.length;
+    counter.textContent = `${len}/16`;
+    counter.classList.toggle("warn", len >= 13);
+  };
+  input.addEventListener("input", update);
+  update();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 0g. AE health tracking
+// ─────────────────────────────────────────────────────────────────
+
+const _aeHealth = {};  // key → "ok" | "err" | "busy" | null
+
+function _aeKey(ae) { return `${ae.ae_title}@${ae.host}:${ae.port}`; }
+
+function _setAEHealth(ae, state) {
+  const key = _aeKey(ae);
+  _aeHealth[key] = state;
+  document.querySelectorAll(`.ae-dot[data-ae-key="${key}"]`).forEach(d => {
+    d.className = "ae-dot" + (state ? " " + state : "");
+    d.title = state === "ok" ? "Reachable" : state === "err" ? "Unreachable" : "";
+  });
+}
+
+/** Run a C-ECHO for preset and update the health dot. */
+async function pingPreset(ae) {
+  _setAEHealth(ae, "busy");
+  try {
+    const res  = await fetch("/api/dicom/echo", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(ae),
+    });
+    const data = await res.json();
+    _setAEHealth(ae, data.ok ? "ok" : "err");
+  } catch { _setAEHealth(ae, "err"); }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 0h. Dark mode
+// ─────────────────────────────────────────────────────────────────
+
+function _applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem("pacsadmin_theme", theme);
+  const btn = document.getElementById("dark-mode-btn");
+  if (btn) btn.textContent = theme === "dark" ? "☀ Light mode" : "☾ Dark mode";
+}
+
+function toggleDarkMode() {
+  const current = document.documentElement.getAttribute("data-theme") || "light";
+  _applyTheme(current === "dark" ? "light" : "dark");
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 0i. Log box auto-scroll management
+// ─────────────────────────────────────────────────────────────────
+
+/** Toggle auto-scroll for a specific log box. */
+function toggleLogScroll(boxId, checked) {
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  box.dataset.autoscroll = checked ? "true" : "false";
+  if (checked) box.scrollTop = box.scrollHeight;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 0j. Clearable input helpers
+// ─────────────────────────────────────────────────────────────────
+
+/** Wrap an input in a clearable-wrap div with a × clear button. */
+function makeClearable(input) {
+  if (!input || input.dataset.clearableWrapped) return;
+  input.dataset.clearableWrapped = "1";
+  const wrap = document.createElement("div");
+  wrap.className = "clearable-wrap";
+  input.parentNode.insertBefore(wrap, input);
+  wrap.appendChild(input);
+  const btn = document.createElement("button");
+  btn.className = "inp-clear";
+  btn.type = "button";
+  btn.textContent = "×";
+  btn.title = "Clear";
+  btn.addEventListener("click", () => {
+    input.value = "";
+    input.dispatchEvent(new Event("input", {bubbles: true}));
+    input.focus();
+    btn.style.display = "none";
+  });
+  wrap.appendChild(btn);
+  const update = () => { btn.style.display = input.value ? "block" : "none"; };
+  input.addEventListener("input", update);
+  update();
+}
+
+// ─────────────────────────────────────────────────────────────────
 // 1. WebSocket / Socket.IO setup
 // ─────────────────────────────────────────────────────────────────
 
@@ -2825,8 +3158,8 @@ function addPreset() {
   const aet  = document.getElementById("new-ae-aet").value.trim();
   const host = document.getElementById("new-ae-host").value.trim();
   const port = parsePort(document.getElementById("new-ae-port").value);
-  if (!name) { alert(i18n("settings.name_required")); return; }
-  if (port === null) { alert('Invalid port. Must be a number between 1 and 65535.'); return; }
+  if (!name) { toast(i18n("settings.name_required"), "warn"); return; }
+  if (port === null) { toast(i18n("common.invalid_port", {port: document.getElementById("new-ae-port").value.trim()}), "err"); return; }
   if (!appConfig.remote_aes) appConfig.remote_aes = [];
   appConfig.remote_aes.push({ name, ae_title: aet, host, port });
   renderPresetTable();
@@ -2843,15 +3176,15 @@ function deletePreset(i) {
 
 async function saveSettings() {
   const localPort = parsePort(document.getElementById("set-ae-port").value);
-  if (localPort === null) { alert('Invalid local AE port. Must be a number between 1 and 65535.'); return; }
+  if (localPort === null) { toast(i18n("common.invalid_port", {port: document.getElementById("set-ae-port").value.trim()}), "err"); return; }
   const hl7Port = parsePort(document.getElementById("set-hl7-port").value);
-  if (hl7Port === null) { alert('Invalid HL7 listen port. Must be a number between 1 and 65535.'); return; }
+  if (hl7Port === null) { toast(i18n("common.invalid_port", {port: document.getElementById("set-hl7-port").value.trim()}), "err"); return; }
   appConfig.local_ae = {
     ae_title: document.getElementById("set-ae-title").value.trim(),
     port:     localPort,
   };
   const hl7DefaultPort = parsePort(document.getElementById("set-hl7-default-port").value);
-  if (hl7DefaultPort === null) { alert('Invalid HL7 default destination port. Must be a number between 1 and 65535.'); return; }
+  if (hl7DefaultPort === null) { toast(i18n("common.invalid_port", {port: document.getElementById("set-hl7-default-port").value.trim()}), "err"); return; }
   appConfig.hl7 = {
     ...appConfig.hl7,
     listen_port:  hl7Port,
@@ -2859,7 +3192,7 @@ async function saveSettings() {
     default_port: hl7DefaultPort,
   };
   const webPort = parsePort(document.getElementById("set-web-port").value);
-  if (webPort === null) { alert('Invalid web server port. Must be a number between 1 and 65535.'); return; }
+  if (webPort === null) { toast(i18n("common.invalid_port", {port: document.getElementById("set-web-port").value.trim()}), "err"); return; }
   appConfig.web = {
     ...appConfig.web,
     host: document.getElementById("set-web-host").value.trim(),
@@ -2930,9 +3263,12 @@ function buildAESelector(containerId, prefix) {
     <div class="ae-selector">
       <div class="field preset-field">
         <label>${i18n("common.preset")}</label>
-        <select id="${prefix}-preset" onchange="loadPreset('${prefix}')">
-          <option value="">${i18n("common.manual")}</option>
-        </select>
+        <div style="display:flex;align-items:center;gap:6px">
+          <select id="${prefix}-preset" onchange="loadPreset('${prefix}')">
+            <option value="">${i18n("common.manual")}</option>
+          </select>
+          <span class="ae-dot" id="${prefix}-ae-dot" title=""></span>
+        </div>
       </div>
       <div class="field"><label>${i18n("common.ae_title")}</label><input id="${prefix}-ae" value="REMOTE_AE"></div>
       <div class="field"><label>${i18n("common.host")}</label><input id="${prefix}-host" value="127.0.0.1"></div>
@@ -2963,6 +3299,15 @@ function loadPreset(prefix) {
   document.getElementById(prefix + "-ae").value   = ae.ae_title;
   document.getElementById(prefix + "-host").value = ae.host;
   document.getElementById(prefix + "-port").value = ae.port;
+  // Sync health dot key and restore any cached health state
+  const dot = document.getElementById(prefix + "-ae-dot");
+  if (dot) {
+    const key = _aeKey(ae);
+    dot.dataset.aeKey = key;
+    const state = _aeHealth[key];
+    dot.className = "ae-dot" + (state ? " " + state : "");
+    dot.title = state === "ok" ? "Reachable" : state === "err" ? "Unreachable" : "";
+  }
 }
 
 // Validate and parse a port string.  Returns the numeric port (1-65535)
@@ -2978,7 +3323,7 @@ function getAE(prefix) {
   const portStr = document.getElementById(prefix + "-port").value;
   const port = parsePort(portStr);
   if (port === null) {
-    alert(`Invalid port: "${portStr}". Must be a number between 1 and 65535.`);
+    toast(i18n("common.invalid_port", {port: portStr}), "err");
     return null;
   }
   return {
@@ -2995,14 +3340,24 @@ function getAE(prefix) {
 async function doEcho(prefix) {
   const ae = getAE(prefix);
   if (!ae) return;
+  // Sync health dot to current AE fields before pinging
+  const dot = document.getElementById(prefix + "-ae-dot");
+  if (dot) { dot.dataset.aeKey = _aeKey(ae); }
+  _setAEHealth(ae, "busy");
   appendLog(`log-${prefix}`, now(), `C-ECHO → ${ae.ae_title}@${ae.host}:${ae.port}`);
-  const res  = await fetch("/api/dicom/echo", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(ae),
-  });
-  const data = await res.json();
-  appendLog(`log-${prefix}`, now(), data.message, data.ok ? "ok" : "err");
+  try {
+    const res  = await fetch("/api/dicom/echo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ae),
+    });
+    const data = await res.json();
+    _setAEHealth(ae, data.ok ? "ok" : "err");
+    appendLog(`log-${prefix}`, now(), data.message, data.ok ? "ok" : "err");
+  } catch (e) {
+    _setAEHealth(ae, "err");
+    appendLog(`log-${prefix}`, now(), "Error: " + e, "err");
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -3078,7 +3433,7 @@ async function doCFind() {
     tr.appendChild(tdChk);
 
     const cells = [
-      r.PatientID, r.PatientName, r.StudyDate, r.Modality,
+      r.PatientID, r.PatientName, formatDicomDate(r.StudyDate), r.Modality,
       r.Accession, r.Description,
     ];
     cells.forEach(v => {
@@ -3112,7 +3467,7 @@ async function doRetrieve() {
     const idx = [...cb.closest("tbody").querySelectorAll("input[type=checkbox]")].indexOf(cb);
     if (cfindResults[idx]) uids.push(cfindResults[idx].StudyUID);
   });
-  if (uids.length === 0) { alert(i18n("cfind.select_row_first")); return; }
+  if (uids.length === 0) { toast(i18n("cfind.select_row_first"), "warn"); return; }
 
   const model = document.getElementById("cfind-model").value;
 
@@ -3146,7 +3501,7 @@ async function doCMove() { return doRetrieve(); }
 
 // ── C-FIND: CSV export ──────────────────────────────────────────
 function exportCFindCSV() {
-  if (!cfindResults.length) { alert("No results to export."); return; }
+  if (!cfindResults.length) { toast("No results to export.", "warn"); return; }
   const cols = ["PatientID","PatientName","StudyDate","Modality","Accession","Description","StudyUID"];
   const esc  = v => `"${String(v).replace(/"/g, '""')}"`;
   const rows = [cols.join(",")].concat(
@@ -3265,7 +3620,7 @@ async function doCStore() {
   const ae    = getAE("cstore");
   if (!ae) return;
   const input = document.getElementById("cstore-files");
-  if (!input.files.length) { alert(i18n("cstore.no_files")); return; }
+  if (!input.files.length) { toast(i18n("cstore.no_files"), "warn"); return; }
 
   // Build a FormData object (the standard way to upload files via fetch)
   const form = new FormData();
@@ -3316,14 +3671,14 @@ async function doDMWL() {
   dmwlResults.forEach((r, i) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${r.PatientID}</td><td>${r.PatientName}</td><td>${r.Accession}</td>
-      <td>${r.Modality}</td><td>${r.ScheduledDate}</td><td>${r.StationAET}</td><td>${r.Procedure}</td>`;
+      <td>${r.Modality}</td><td>${formatDicomDate(r.ScheduledDate)}</td><td>${r.StationAET}</td><td>${r.Procedure}</td>`;
     tr.onclick = () => showTagModal(`Worklist: ${r.PatientName} / ${r.PatientID}`, r.tags);
     tbody.appendChild(tr);
   });
 }
 
 function exportDMWLCsv() {
-  if (!dmwlResults.length) { alert(i18n("dmwl.no_results")); return; }
+  if (!dmwlResults.length) { toast(i18n("dmwl.no_results"), "warn"); return; }
   const header = "PatientID,PatientName,Accession,Modality,ScheduledDate,StationAET,Procedure\n";
   const rows   = dmwlResults.map(r =>
     [r.PatientID, r.PatientName, r.Accession, r.Modality,
@@ -3341,7 +3696,7 @@ async function doCommit() {
   if (!ae) return;
   const raw  = document.getElementById("commit-uids").value;
   const uids = raw.split("\n").map(s => s.trim()).filter(Boolean);
-  if (!uids.length) { alert(i18n("commit.enter_uid")); return; }
+  if (!uids.length) { toast(i18n("commit.enter_uid"), "warn"); return; }
   appendLog("log-commit", now(), `N-ACTION → ${ae.ae_title} (${uids.length} UIDs)`);
   const res  = await fetch("/api/dicom/commit", {
     method: "POST",
@@ -3704,16 +4059,16 @@ async function loadHL7Template() {
   // Fetch the full body of the selected template from the server,
   // then substitute placeholders from the quick-fill fields.
   const filename = document.getElementById("hl7-template").value;
-  if (!filename) { alert(i18n("hl7.no_template_selected")); return; }
+  if (!filename) { toast(i18n("hl7.no_template_selected"), "warn"); return; }
 
   let body;
   try {
     const res  = await fetch(`/api/hl7/templates/${encodeURIComponent(filename)}`);
     const data = await res.json();
-    if (data.error) { alert(data.error); return; }
+    if (data.error) { toast(data.error, "err"); return; }
     body = data.body;   // raw template with {placeholders}
   } catch (e) {
-    alert(`Could not load template: ${e}`); return;
+    toast(`Could not load template: ${e}`, "err"); return;
   }
 
   // Build substitution values from the quick-fill fields
@@ -3758,9 +4113,9 @@ async function doHL7Send() {
   const host    = document.getElementById("hl7-host").value.trim();
   const portStr = document.getElementById("hl7-port").value.trim();
   const port    = parsePort(portStr);
-  if (port === null) { alert(`Invalid port: "${portStr}". Must be a number between 1 and 65535.`); return; }
+  if (port === null) { toast(i18n("common.invalid_port", {port: portStr}), "err"); return; }
   const msg  = document.getElementById("hl7-message").value.trim();
-  if (!msg) { alert(i18n("hl7.no_message")); return; }
+  if (!msg) { toast(i18n("hl7.no_message"), "warn"); return; }
   appendLog("log-hl7-send", now(), `Sending to ${host}:${port}`);
 
   const res  = await fetch("/api/hl7/send", {
@@ -3896,7 +4251,7 @@ async function toggleHL7Listener() {
   } else {
     const portStr = document.getElementById("hl7-listen-port").value;
     const port = parsePort(portStr);
-    if (port === null) { alert(`Invalid port: "${portStr}". Must be a number between 1 and 65535.`); return; }
+    if (port === null) { toast(i18n("common.invalid_port", {port: portStr}), "err"); return; }
     const res  = await fetch("/api/hl7/listener/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -3948,7 +4303,7 @@ async function toggleSCP() {
   } else {
     const scpPortStr = document.getElementById("scp-port").value;
     const scpPort = parsePort(scpPortStr);
-    if (scpPort === null) { alert(`Invalid port: "${scpPortStr}". Must be a number between 1 and 65535.`); return; }
+    if (scpPort === null) { toast(i18n("common.invalid_port", {port: scpPortStr}), "err"); return; }
     const res  = await fetch("/api/scp/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -4069,10 +4424,10 @@ async function scpFileInspect(name) {
   try {
     const res  = await fetch(`/api/scp/files/inspect?name=${encodeURIComponent(name)}`);
     const data = await res.json();
-    if (!data.ok) { alert("Error: " + data.error); return; }
+    if (!data.ok) { toast("Error: " + data.error, "err"); return; }
     showTagModal(name, data.tags);
   } catch (e) {
-    alert("Error: " + e);
+    toast("Error: " + e, "err");
   }
 }
 
@@ -4414,7 +4769,7 @@ async function scpDeleteStudy(studyUid, seriesUids, rowEl) {
       if (!d.ok) ok = false;
     } catch { ok = false; }
   }
-  if (!ok) alert("Some series could not be deleted.");
+  if (!ok) toast("Some series could not be deleted.", "err");
   rowEl.remove();
 }
 
@@ -4425,12 +4780,12 @@ async function scpDeleteSeries(studyUid, serUid, rowEl) {
       { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ study: studyUid, series: serUid }) });
     const data = await res.json();
-    if (!data.ok) { alert("Error: " + data.error); return; }
+    if (!data.ok) { toast("Error: " + data.error, "err"); return; }
     rowEl.remove();
     // Reload tree so study disappears if now empty
     loadSCPStudies();
   } catch (e) {
-    alert("Error: " + e);
+    toast("Error: " + e, "err");
   }
 }
 
@@ -4442,7 +4797,7 @@ async function scpFileDelete(name, rowEl) {
                                headers: { "Content-Type": "application/json" },
                                body: JSON.stringify({ name }) });
     const data = await res.json();
-    if (!data.ok) { alert("Error: " + data.error); return; }
+    if (!data.ok) { toast("Error: " + data.error, "err"); return; }
     rowEl.remove();
     // Update the count in the info line
     const info = document.getElementById("scp-disk-info");
@@ -4453,7 +4808,7 @@ async function scpFileDelete(name, rowEl) {
       if (n === 0) document.getElementById("scp-disk-wrap").style.display = "none";
     }
   } catch (e) {
-    alert("Error: " + e);
+    toast("Error: " + e, "err");
   }
 }
 
@@ -4748,7 +5103,7 @@ function appendLog(boxId, ts, message, level = "dim") {
   span.className = "log-" + level;
   span.textContent = `[${ts}] ${message}\n`;
   box.appendChild(span);
-  box.scrollTop = box.scrollHeight;
+  if (box.dataset.autoscroll !== "false") box.scrollTop = box.scrollHeight;
 }
 
 function clearTable(tbodyId) {
@@ -4832,7 +5187,7 @@ async function deleteUser(username, btn) {
   if (data.ok) {
     loadUsers();
   } else {
-    alert(data.error || "Delete failed.");
+    toast(data.error || "Delete failed.", "err");
     btn.disabled = false;
   }
 }
@@ -4947,6 +5302,126 @@ async function doLogout() {
       appendLog("log-cfind", now(), i18n("cfind.warn_patient_level"), "warn");
     }
   });
+
+  // ── Log box upgrades: add auto-scroll toggle to every log box ────────
+  document.querySelectorAll(".log-box").forEach(box => {
+    const card = box.closest(".card");
+    if (!card) return;
+    const h3 = card.querySelector("h3");
+    if (!h3) return;
+    // Replace plain <h3> with a flex header row containing the toggle
+    const header = document.createElement("div");
+    header.className = "log-header";
+    const title = document.createElement("span");
+    title.textContent = h3.textContent;
+    title.setAttribute("data-i18n", h3.getAttribute("data-i18n") || "");
+    title.style.cssText = h3.style.cssText || "";
+    title.className = h3.className;
+    header.appendChild(title);
+    // Auto-scroll label + checkbox
+    const toggleLabel = document.createElement("label");
+    toggleLabel.className = "log-scroll-toggle";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = true;
+    cb.addEventListener("change", () => toggleLogScroll(box.id, cb.checked));
+    const lbl = document.createElement("span");
+    lbl.textContent = i18n("common.autoscroll");
+    lbl.setAttribute("data-i18n", "common.autoscroll");
+    toggleLabel.appendChild(cb);
+    toggleLabel.appendChild(lbl);
+    header.appendChild(toggleLabel);
+    h3.parentNode.insertBefore(header, h3);
+    h3.remove();
+  });
+
+  // ── AE title inputs: add maxlength counter ───────────────────────────
+  document.querySelectorAll("input[id$='-ae'], input[id='set-ae-title'], input[id='new-ae-aet']").forEach(wrapAETitleInput);
+
+  // ── Clearable inputs: search/filter fields ───────────────────────────
+  ["cfind-pid","cfind-pname","cfind-acc","cfind-mod",
+   "dmwl-pid","dmwl-pname","dmwl-acc","dmwl-mod","dmwl-aet",
+   "dz-wl-filter-name","dz-wl-filter-id","dz-wl-filter-mod"
+  ].forEach(id => makeClearable(document.getElementById(id)));
+
+  // ── Keyboard shortcuts ────────────────────────────────────────────────
+  document.addEventListener("keydown", e => {
+    // Escape → close the topmost visible modal
+    if (e.key === "Escape") {
+      if (document.getElementById("dwv-overlay")?.style.display === "flex") {
+        closeDwvViewer(); return;
+      }
+      if (document.getElementById("preview-modal")?.style.display !== "none") {
+        closePreviewModal(); return;
+      }
+      if (document.getElementById("tag-modal")?.classList.contains("open")) {
+        closeTagModal(); return;
+      }
+      if (document.getElementById("dz-wl-modal")?.classList.contains("open")) {
+        closeDzWorklistModal(); return;
+      }
+      if (document.getElementById("anon-profile-modal")?.style.display === "flex") {
+        closeAnonProfileManager(); return;
+      }
+    }
+
+    // Enter → trigger primary tab action (not in textarea/button/select, no modals open)
+    if (e.key === "Enter" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      const tag = document.activeElement?.tagName;
+      if (tag === "TEXTAREA" || tag === "BUTTON" || tag === "SELECT" || tag === "A") return;
+      const anyModalOpen = [
+        () => document.getElementById("dwv-overlay")?.style.display === "flex",
+        () => document.getElementById("preview-modal")?.style.display !== "none",
+        () => document.getElementById("tag-modal")?.classList.contains("open"),
+        () => document.getElementById("dz-wl-modal")?.classList.contains("open"),
+        () => document.getElementById("anon-profile-modal")?.style.display === "flex",
+      ].some(f => f());
+      if (anyModalOpen) return;
+      const tabActions = {
+        cfind:     doCFind,
+        dmwl:      doDMWL,
+        cstore:    doCStore,
+        hl7:       doHL7Send,
+        inspector: doInspect,
+      };
+      const activeTab = localStorage.getItem("activeTab") || "dashboard";
+      const fn = tabActions[activeTab];
+      if (fn) { e.preventDefault(); fn(); }
+    }
+  });
+
+  // ── Persist key form fields ──────────────────────────────────────────
+  const _FORM_FIELDS_KEY = "pacsadmin_form_fields";
+  const _PERSIST_IDS = [
+    "cfind-pid","cfind-pname","cfind-acc","cfind-mod",
+    "cfind-date-from","cfind-date-to","cfind-suid",
+    "dmwl-pid","dmwl-pname","dmwl-acc","dmwl-mod","dmwl-aet","dmwl-date",
+  ];
+  // Restore
+  try {
+    const saved = JSON.parse(localStorage.getItem(_FORM_FIELDS_KEY) || "{}");
+    _PERSIST_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && saved[id] !== undefined) el.value = saved[id];
+    });
+  } catch { /* ignore */ }
+  // Save on any change
+  function _saveFormFields() {
+    const snap = {};
+    _PERSIST_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) snap[id] = el.value;
+    });
+    try { localStorage.setItem(_FORM_FIELDS_KEY, JSON.stringify(snap)); } catch { /* ignore */ }
+  }
+  _PERSIST_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", _saveFormFields);
+  });
+
+  // ── Restore theme ────────────────────────────────────────────────────
+  const savedTheme = localStorage.getItem("pacsadmin_theme") || "light";
+  _applyTheme(savedTheme);
 })();
 
 // ─────────────────────────────────────────────────────────────────
@@ -5944,7 +6419,7 @@ function inspectorFileSelected() {
 async function doInspect() {
   const input = document.getElementById("inspector-file-input");
   if (!input.files || !input.files[0]) {
-    alert("Select a DICOM file first.");
+    toast("Select a DICOM file first.", "warn");
     return;
   }
   _inspectorSetFile(input.files[0]);
@@ -5955,7 +6430,7 @@ async function doInspect() {
   try {
     const res  = await fetch("/api/dicom/inspect", { method: "POST", body: fd });
     const data = await res.json();
-    if (!data.ok) { alert("Error: " + data.error); return; }
+    if (!data.ok) { toast("Error: " + data.error, "err"); return; }
 
     _inspectorTags = data.tags || [];
     const grid = document.getElementById("inspector-meta-grid");
@@ -5979,7 +6454,7 @@ async function doInspect() {
     });
     document.getElementById("inspector-meta-card").style.display = "";
   } catch (e) {
-    alert("Error: " + e);
+    toast("Error: " + e, "err");
   }
 }
 
@@ -5996,7 +6471,7 @@ let _inspectorFile  = null; // the raw File object for the inspector
 function _inspectorSetFile(file) { _inspectorFile = file; }
 
 function openTagEditor() {
-  if (!_inspectorTags.length) { alert(i18n("tag_editor.parse_first")); return; }
+  if (!_inspectorTags.length) { toast(i18n("tag_editor.parse_first"), "warn"); return; }
   _tagEdits = {};
   _populateTagEditorAEDropdown();
   document.getElementById("tag-editor-card").style.display = "";
@@ -6093,7 +6568,7 @@ function editTagInline(tag, vr) {
 }
 
 async function downloadEdited() {
-  if (!_inspectorFile) { alert(i18n("tag_editor.no_file")); return; }
+  if (!_inspectorFile) { toast(i18n("tag_editor.no_file"), "warn"); return; }
   const status = document.getElementById("tag-editor-status");
   status.textContent = i18n("tag_editor.preparing");
   const fd = new FormData();
@@ -6121,13 +6596,13 @@ async function downloadEdited() {
 }
 
 async function sendEditedToPACS() {
-  if (!_inspectorFile) { alert(i18n("tag_editor.no_file")); return; }
+  if (!_inspectorFile) { toast(i18n("tag_editor.no_file"), "warn"); return; }
   const aeTitle = document.getElementById("tag-editor-ae-title").value.trim();
   const host    = document.getElementById("tag-editor-ae-host").value.trim();
   const portStr = document.getElementById("tag-editor-ae-port").value.trim();
   const port    = parsePort(portStr);
   if (!aeTitle || !host || port === null) {
-    alert(i18n("tag_editor.fill_ae_fields"));
+    toast(i18n("tag_editor.fill_ae_fields"), "warn");
     return;
   }
   const status = document.getElementById("tag-editor-status");
@@ -6216,7 +6691,7 @@ function _buildAnonFD() {
 }
 
 async function doAnonymize() {
-  if (_anonFiles.length === 0) { alert("Add at least one DICOM file first."); return; }
+  if (_anonFiles.length === 0) { toast("Add at least one DICOM file first.", "warn"); return; }
   const status = document.getElementById("anon-status");
   status.textContent = "Anonymising…";
   const fd = _buildAnonFD();
@@ -6243,13 +6718,13 @@ async function doAnonymize() {
 }
 
 async function doAnonymizeAndSend() {
-  if (_anonFiles.length === 0) { alert("Add at least one DICOM file first."); return; }
+  if (_anonFiles.length === 0) { toast("Add at least one DICOM file first.", "warn"); return; }
   const aeTitle = document.getElementById("anon-ae-title").value.trim();
   const host    = document.getElementById("anon-ae-host").value.trim();
   const portStr = document.getElementById("anon-ae-port").value.trim();
   const port    = parsePort(portStr);
   if (!aeTitle || !host || port === null) {
-    alert("Fill in AE Title, Host, and a valid Port before sending."); return;
+    toast("Fill in AE Title, Host, and a valid Port before sending.", "warn"); return;
   }
   const status = document.getElementById("anon-status");
   status.textContent = "Anonymising and sending…";
@@ -6544,7 +7019,7 @@ function renderApmTagList() {
 
 async function anonProfileSave() {
   const name = document.getElementById("apm-name").value.trim();
-  if (!name) { alert(i18n("anonymizer.mgr_err_no_name")); return; }
+  if (!name) { toast(i18n("anonymizer.mgr_err_no_name"), "warn"); return; }
   const tags = [..._apmCurrentChecked];
   const statusEl = document.getElementById("apm-status");
   try {
@@ -6554,7 +7029,7 @@ async function anonProfileSave() {
       body: JSON.stringify({ name, tags }),
     });
     const data = await res.json();
-    if (!data.ok) { alert(i18n("anonymizer.mgr_err_save", {error: data.error})); return; }
+    if (!data.ok) { toast(i18n("anonymizer.mgr_err_save", {error: data.error}), "err"); return; }
     if (_apmEditingKey && _apmEditingKey !== name) {
       await fetch(`/api/dicom/anon_profiles/${encodeURIComponent(_apmEditingKey)}`,
                   { method: "DELETE" });
@@ -6564,7 +7039,7 @@ async function anonProfileSave() {
     renderApmProfileList();
     statusEl.textContent = i18n("anonymizer.mgr_saved", {name});
     setTimeout(() => { statusEl.textContent = ""; }, 2500);
-  } catch (e) { alert("Error: " + e); }
+  } catch (e) { toast("Error: " + e, "err"); }
 }
 
 async function anonProfileDelete() {
@@ -6578,7 +7053,7 @@ async function anonProfileDelete() {
     await _loadAnonProfilesFromServer();
     renderApmProfileList();
     _apmHideEditor();
-  } catch (e) { alert("Error: " + e); }
+  } catch (e) { toast("Error: " + e, "err"); }
 }
 
 // Wire up profile selection → set _anonCustomTags when a custom profile is chosen
@@ -6606,13 +7081,13 @@ function dicomdirFileSelected() {
 
 async function doDicomDir() {
   const input = document.getElementById("dicomdir-file-input");
-  if (!input.files || !input.files[0]) { alert("Select a DICOMDIR file first."); return; }
+  if (!input.files || !input.files[0]) { toast("Select a DICOMDIR file first.", "warn"); return; }
   const fd = new FormData();
   fd.append("file", input.files[0]);
   try {
     const res  = await fetch("/api/dicom/dicomdir", { method: "POST", body: fd });
     const data = await res.json();
-    if (!data.ok) { alert("Error: " + data.error); return; }
+    if (!data.ok) { toast("Error: " + data.error, "err"); return; }
 
     document.getElementById("dicomdir-summary").textContent =
       `${data.total_patients} patient(s) · ${data.total_instances} instance(s)`;
@@ -6638,7 +7113,7 @@ async function doDicomDir() {
     });
     document.getElementById("dicomdir-result-card").style.display = "";
   } catch (e) {
-    alert("Error: " + e);
+    toast("Error: " + e, "err");
   }
 }
 
@@ -6682,7 +7157,7 @@ async function doGenerateDicomDir() {
           : null;
   }
   if (!input || !input.files || !input.files.length) {
-    alert("Select files or a folder first.");
+    toast("Select files or a folder first.", "warn");
     return;
   }
   const fd = new FormData();
@@ -6696,7 +7171,7 @@ async function doGenerateDicomDir() {
                             { method: "POST", body: fd });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
-      alert("Error: " + (d.error || res.statusText));
+      toast("Error: " + (d.error || res.statusText), "err");
       return;
     }
     const blob = await res.blob();
@@ -6709,7 +7184,7 @@ async function doGenerateDicomDir() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   } catch (e) {
-    alert("Error: " + e);
+    toast("Error: " + e, "err");
   } finally {
     btn.disabled    = false;
     btn.textContent = orig;
