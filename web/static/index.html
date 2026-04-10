@@ -2828,9 +2828,25 @@ function _aeKey(ae) { return `${ae.ae_title}@${ae.host}:${ae.port}`; }
 function _setAEHealth(ae, state) {
   const key = _aeKey(ae);
   _aeHealth[key] = state;
+  // Update dots already tagged with this key (e.g. from a previous loadPreset/doEcho)
   document.querySelectorAll(`.ae-dot[data-ae-key="${key}"]`).forEach(d => {
     d.className = "ae-dot" + (state ? " " + state : "");
     d.title = state === "ok" ? "Reachable" : state === "err" ? "Unreachable" : "";
+  });
+  // Also sweep selector dots whose current input values match this AE
+  // (handles the case where a preset is loaded but data-ae-key wasn't yet set,
+  //  or a user typed in fields matching a freshly-pinged AE)
+  ["cfind","cstore","dmwl","commit","iocm"].forEach(prefix => {
+    const aeEl   = document.getElementById(prefix + "-ae");
+    const hostEl = document.getElementById(prefix + "-host");
+    const portEl = document.getElementById(prefix + "-port");
+    const dot    = document.getElementById(prefix + "-ae-dot");
+    if (!aeEl || !hostEl || !portEl || !dot) return;
+    if (_aeKey({ ae_title: aeEl.value, host: hostEl.value, port: portEl.value }) === key) {
+      dot.dataset.aeKey = key;
+      dot.className = "ae-dot" + (state ? " " + state : "");
+      dot.title = state === "ok" ? "Reachable" : state === "err" ? "Unreachable" : "";
+    }
   });
 }
 
@@ -6394,6 +6410,9 @@ socket.on("batch_echo_result", data => {
     badge.textContent = data.ok ? "OK" : "Fail";
   }
   if (msg) msg.textContent = data.message || "";
+  // Populate _aeHealth so selector dots reflect results immediately
+  const ae = (appConfig.remote_aes || []).find(a => a.ae_title === data.ae_title);
+  if (ae) _setAEHealth(ae, data.ok ? "ok" : "err");
 });
 
 socket.on("batch_echo_done", () => {
