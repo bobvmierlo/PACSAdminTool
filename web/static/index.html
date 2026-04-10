@@ -234,9 +234,18 @@
       justify-content: space-between;
       font-weight: 600;
     }
-    .modal-header .close-btn {
+    .modal-header .close-btn,
+    .modal-close {
       background: none; border: none; cursor: pointer;
-      font-size: 20px; color: #888; line-height: 1;
+      font-size: 18px; color: #9ca3af; line-height: 1;
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+    .modal-header .close-btn:hover,
+    .modal-close:hover {
+      background: #f3f4f6; color: #374151;
     }
     .modal-body { padding: 12px 18px; flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
     .modal-body .log-box { height: unset; flex: 1; }
@@ -695,7 +704,7 @@
 <div id="header">
   <h1 data-i18n="app.title">PACS Admin Tool</h1>
   <span id="header-subtitle" data-i18n="app.subtitle">DICOM &amp; HL7 Administration Utility</span>
-  <span id="ws-status" style="margin-left:auto; font-size:12px; color:#aaa" data-i18n="common.connecting">⬤ connecting…</span>
+  <span id="ws-status" style="margin-left:auto; font-size:12px; color:#aaa">⬤ connecting…</span>
   <span id="header-user" style="font-size:12px; color:#555; display:none"></span>
   <button id="btn-logout" onclick="doLogout()" style="display:none; padding:4px 10px; font-size:12px; border:1px solid #d0d0d0; border-radius:3px; background:#fff; cursor:pointer; color:#555" data-i18n="auth.logout">Sign out</button>
 </div>
@@ -818,7 +827,14 @@
         <div class="field"><label data-i18n="cfind.patient_id">Patient ID</label><input id="cfind-pid"></div>
         <div class="field"><label data-i18n="cfind.patient_name">Patient Name</label><input id="cfind-pname"></div>
         <div class="field"><label data-i18n="cfind.accession">Accession #</label><input id="cfind-acc"></div>
-        <div class="field"><label data-i18n="cfind.study_date_hint">Study Date (YYYYMMDD)</label><input id="cfind-date"></div>
+        <div class="field" style="grid-column:span 2">
+          <label data-i18n="cfind.study_date">Study Date</label>
+          <div style="display:flex; gap:6px; align-items:center">
+            <input type="date" id="cfind-date-from" style="flex:1" title="From date">
+            <span style="color:#888; font-size:12px; flex-shrink:0" data-i18n="common.to">to</span>
+            <input type="date" id="cfind-date-to" style="flex:1" title="To date">
+          </div>
+        </div>
         <div class="field"><label data-i18n="cfind.modality">Modality</label><input id="cfind-mod"></div>
         <div class="field"><label data-i18n="cfind.study_uid">Study UID</label><input id="cfind-suid"></div>
       </div>
@@ -929,7 +945,15 @@
       <div class="field-grid">
         <div class="field"><label data-i18n="cfind.patient_id">Patient ID</label><input id="dmwl-pid"></div>
         <div class="field"><label data-i18n="cfind.patient_name">Patient Name</label><input id="dmwl-pname"></div>
-        <div class="field"><label data-i18n="dmwl.sched_date_web">Scheduled Date</label><input id="dmwl-date"></div>
+        <div class="field">
+          <label data-i18n="dmwl.sched_date_web">Scheduled Date</label>
+          <div style="display:flex; gap:4px">
+            <input type="date" id="dmwl-date" style="flex:1">
+            <button class="btn" style="padding:4px 8px; font-size:11px; flex-shrink:0"
+                    onclick="document.getElementById('dmwl-date').value=todayInputDate()"
+                    data-i18n="common.today">Today</button>
+          </div>
+        </div>
         <div class="field"><label data-i18n="cfind.modality">Modality</label><input id="dmwl-mod"></div>
         <div class="field"><label data-i18n="cfind.accession">Accession #</label><input id="dmwl-acc"></div>
         <div class="field"><label data-i18n="dmwl.station_aet">Station AET</label><input id="dmwl-aet"></div>
@@ -1023,8 +1047,16 @@
         <div class="field-grid" style="margin-top:10px">
           <div class="field"><label data-i18n="hl7.patient_id">Patient ID</label><input id="hl7-pid"></div>
           <div class="field"><label data-i18n="hl7.patient_name_web">Patient Name (LAST^FIRST)</label><input id="hl7-pname"></div>
-          <div class="field"><label data-i18n="hl7.dob">DOB (YYYYMMDD)</label><input id="hl7-dob"></div>
-          <div class="field"><label data-i18n="hl7.sex">Sex (M/F/U)</label><input id="hl7-sex" value="M"></div>
+          <div class="field"><label data-i18n="hl7.dob">Date of Birth</label><input type="date" id="hl7-dob"></div>
+          <div class="field">
+            <label data-i18n="hl7.sex">Sex</label>
+            <select id="hl7-sex">
+              <option value="M" selected data-i18n="dicomize.sex_m">Male</option>
+              <option value="F" data-i18n="dicomize.sex_f">Female</option>
+              <option value="U" data-i18n="dicomize.sex_u">Unknown</option>
+              <option value="O" data-i18n="dicomize.sex_o">Other</option>
+            </select>
+          </div>
           <div class="field"><label data-i18n="hl7.accession">Accession #</label><input id="hl7-acc"></div>
           <div class="field"><label data-i18n="hl7.proc_code_web">Procedure Code</label><input id="hl7-code"></div>
           <div class="field"><label data-i18n="hl7.proc_desc_web">Procedure Description</label><input id="hl7-desc"></div>
@@ -1299,9 +1331,8 @@
 
       <!-- Header -->
       <div style="padding:14px 20px; border-bottom:1px solid #e5e7eb; display:flex; justify-content:space-between; align-items:center; flex-shrink:0">
-        <span style="font-size:16px; font-weight:700">Anonymisation Profile Manager</span>
-        <button onclick="closeAnonProfileManager()"
-                style="background:none; border:none; font-size:22px; cursor:pointer; color:#6b7280; line-height:1">×</button>
+        <span style="font-size:16px; font-weight:700" data-i18n="anonymizer.mgr_title">Anonymisation Profile Manager</span>
+        <button onclick="closeAnonProfileManager()" class="modal-close" aria-label="Close">&times;</button>
       </div>
 
       <div style="display:flex; flex:1; overflow:hidden; min-height:0">
@@ -1310,26 +1341,30 @@
         <div style="width:240px; border-right:1px solid #e5e7eb; display:flex; flex-direction:column; flex-shrink:0">
           <div style="padding:10px 10px 6px">
             <button class="btn primary" style="width:100%; margin-bottom:6px; font-size:12px"
-                    onclick="anonProfileNew()">+ New Profile</button>
+                    onclick="anonProfileNew()" data-i18n="anonymizer.mgr_new">+ New Profile</button>
             <!-- Built-in profiles (read-only labels, click to copy) -->
             <div style="font-size:10px; font-weight:700; color:#9ca3af; text-transform:uppercase;
-                        letter-spacing:.06em; padding:6px 4px 2px">Built-in (read-only)</div>
+                        letter-spacing:.06em; padding:6px 4px 2px"
+                 data-i18n="anonymizer.mgr_builtin">Built-in (read-only)</div>
             <button onclick="anonProfileCopyBuiltin('basic')"
                     style="display:block; width:100%; text-align:left; padding:5px 8px; font-size:12px;
                            background:none; border:1px solid #e5e7eb; border-radius:4px; cursor:pointer;
                            color:#374151; margin-bottom:4px"
+                    data-i18n-title="anonymizer.mgr_copy_title"
                     title="Click to copy to a new custom profile">
-              📋 Basic <span style="float:right;font-size:10px;color:#9ca3af">copy</span>
+              📋 Basic <span style="float:right;font-size:10px;color:#9ca3af" data-i18n="anonymizer.mgr_copy">copy</span>
             </button>
             <button onclick="anonProfileCopyBuiltin('full')"
                     style="display:block; width:100%; text-align:left; padding:5px 8px; font-size:12px;
                            background:none; border:1px solid #e5e7eb; border-radius:4px; cursor:pointer;
                            color:#374151; margin-bottom:8px"
+                    data-i18n-title="anonymizer.mgr_copy_title"
                     title="Click to copy to a new custom profile">
-              📋 Full <span style="float:right;font-size:10px;color:#9ca3af">copy</span>
+              📋 Full <span style="float:right;font-size:10px;color:#9ca3af" data-i18n="anonymizer.mgr_copy">copy</span>
             </button>
             <div style="font-size:10px; font-weight:700; color:#9ca3af; text-transform:uppercase;
-                        letter-spacing:.06em; padding:2px 4px 4px">Custom Profiles</div>
+                        letter-spacing:.06em; padding:2px 4px 4px"
+                 data-i18n="anonymizer.mgr_custom">Custom Profiles</div>
           </div>
           <div id="anon-profile-list" style="overflow-y:auto; flex:1; padding:0 10px 10px;
                display:flex; flex-direction:column; gap:4px"></div>
@@ -1342,29 +1377,33 @@
           <div style="padding:14px 20px 10px; border-bottom:1px solid #f3f4f6; flex-shrink:0">
             <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap">
               <div class="field" style="flex:1; min-width:200px; margin:0">
-                <label style="font-weight:600; font-size:13px">Profile Name</label>
-                <input id="apm-name" style="margin-top:4px; font-size:13px" placeholder="My Custom Profile">
+                <label style="font-weight:600; font-size:13px" data-i18n="anonymizer.mgr_profile_name">Profile Name</label>
+                <input id="apm-name" style="margin-top:4px; font-size:13px"
+                       data-i18n-placeholder="anonymizer.mgr_profile_placeholder"
+                       placeholder="My Custom Profile">
               </div>
               <div class="field" style="min-width:220px; margin:0">
-                <label style="font-size:11px; color:#6b7280">Copy tags from…</label>
+                <label style="font-size:11px; color:#6b7280" data-i18n="anonymizer.mgr_copy_from">Copy tags from…</label>
                 <select id="apm-copy-from" style="margin-top:4px; font-size:12px"
                         onchange="apmApplyCopyFrom()">
-                  <option value="">(no copy — start from current selection)</option>
-                  <option value="basic">Basic – patient identifiers &amp; institution</option>
-                  <option value="full">Full – all PHI including descriptions</option>
-                  <option value="__sep__" disabled>── Custom Profiles ──</option>
+                  <option value="" data-i18n="anonymizer.mgr_no_copy">(no copy — start from current selection)</option>
+                  <option value="basic" data-i18n="anonymizer.mgr_copy_basic">Basic – patient identifiers &amp; institution</option>
+                  <option value="full" data-i18n="anonymizer.mgr_copy_full">Full – all PHI including descriptions</option>
+                  <option value="__sep__" disabled data-i18n="anonymizer.mgr_custom_sep">── Custom Profiles ──</option>
                 </select>
               </div>
             </div>
-            <div style="font-size:11px; color:#6b7280; margin-top:8px">
+            <div style="font-size:11px; color:#6b7280; margin-top:8px"
+                 data-i18n-html="anonymizer.mgr_hint">
               Check the tags that should be <strong>cleared (removed/blanked)</strong> when anonymising.
-              Future: per-tag replacement values for research pseudonymisation.
             </div>
           </div>
 
           <!-- Tag search + list -->
           <div style="padding:10px 20px 6px; flex-shrink:0">
-            <input id="apm-tag-filter" type="text" placeholder="Search tags by name or code…"
+            <input id="apm-tag-filter" type="text"
+                   data-i18n-placeholder="anonymizer.mgr_search"
+                   placeholder="Search tags by name or code…"
                    style="width:100%; box-sizing:border-box; font-size:12px;
                           padding:6px 10px; border:1px solid #d1d5db; border-radius:6px"
                    oninput="renderApmTagList()">
@@ -1375,9 +1414,9 @@
 
           <!-- Footer actions -->
           <div style="padding:10px 20px 14px; border-top:1px solid #e5e7eb; display:flex; gap:8px; flex-wrap:wrap; flex-shrink:0">
-            <button class="btn primary" onclick="anonProfileSave()">Save Profile</button>
-            <button class="btn danger" id="apm-delete-btn" onclick="anonProfileDelete()" style="display:none">Delete Profile</button>
-            <button class="btn" onclick="closeAnonProfileManager()">Close</button>
+            <button class="btn primary" onclick="anonProfileSave()" data-i18n="anonymizer.mgr_save">Save Profile</button>
+            <button class="btn danger" id="apm-delete-btn" onclick="anonProfileDelete()" style="display:none" data-i18n="anonymizer.mgr_delete">Delete Profile</button>
+            <button class="btn" onclick="closeAnonProfileManager()" data-i18n="common.close">Close</button>
             <span id="apm-status" style="font-size:12px; color:#6b7280; align-self:center"></span>
           </div>
         </div>
@@ -1386,7 +1425,7 @@
              style="flex:1; display:flex; align-items:center; justify-content:center;
                     color:#9ca3af; font-size:13px; flex-direction:column; gap:10px">
           <div style="font-size:32px">📋</div>
-          <div>Select a profile on the left, or create a new one.</div>
+          <div data-i18n="anonymizer.mgr_placeholder">Select a profile on the left, or create a new one.</div>
         </div>
       </div>
     </div>
@@ -1891,7 +1930,7 @@
         <div class="field"><label data-i18n="kos_creator.patient_id">Patient ID</label><input id="kos-pid"></div>
         <div class="field"><label data-i18n="kos_creator.patient_name">Patient Name</label><input id="kos-pname"></div>
         <div class="field"><label data-i18n="kos_creator.accession">Accession #</label><input id="kos-acc"></div>
-        <div class="field"><label data-i18n="kos_creator.study_date">Study Date</label><input id="kos-date" placeholder="YYYYMMDD"></div>
+        <div class="field"><label data-i18n="kos_creator.study_date">Study Date</label><input type="date" id="kos-date"></div>
         <div class="field"><label data-i18n="kos_creator.institution">Institution</label><input id="kos-inst"></div>
       </div>
     </div>
@@ -1958,7 +1997,7 @@
           </div>
           <div class="field">
             <label data-i18n="dicomize.patient_dob">Date of Birth</label>
-            <input id="dz-patient-dob" data-i18n-placeholder="dicomize.patient_dob_hint" placeholder="YYYYMMDD">
+            <input type="date" id="dz-patient-dob">
           </div>
           <div class="field">
             <label data-i18n="dicomize.patient_sex">Sex</label>
@@ -1971,11 +2010,11 @@
           </div>
           <div class="field">
             <label data-i18n="dicomize.study_date">Study Date</label>
-            <input id="dz-study-date" data-i18n-placeholder="dicomize.study_date_hint" placeholder="YYYYMMDD">
+            <input type="date" id="dz-study-date">
           </div>
           <div class="field">
             <label data-i18n="dicomize.study_time">Study Time</label>
-            <input id="dz-study-time" data-i18n-placeholder="dicomize.study_time_hint" placeholder="HHMMSS">
+            <input type="time" step="1" id="dz-study-time">
           </div>
           <div class="field" style="grid-column:span 2">
             <label data-i18n="dicomize.study_description">Study Description</label>
@@ -2219,7 +2258,7 @@
   <div class="modal" style="width:min(96vw,960px); max-height:90vh">
     <div class="modal-header">
       <span data-i18n="dicomize.wl_modal_title">Select Worklist Item</span>
-      <button class="modal-close" onclick="closeDzWorklistModal()">✕</button>
+      <button class="modal-close" onclick="closeDzWorklistModal()" aria-label="Close">&times;</button>
     </div>
     <div class="modal-body" style="overflow-y:auto; gap:10px">
 
@@ -2256,8 +2295,13 @@
           <input id="dz-wl-filter-id">
         </div>
         <div class="field">
-          <label data-i18n="dicomize.wl_filter_date">Scheduled Date (YYYYMMDD)</label>
-          <input id="dz-wl-filter-date" placeholder="today">
+          <label data-i18n="dicomize.wl_filter_date">Scheduled Date</label>
+          <div style="display:flex; gap:4px">
+            <input type="date" id="dz-wl-filter-date" style="flex:1">
+            <button class="btn" style="padding:4px 8px; font-size:11px; flex-shrink:0"
+                    onclick="document.getElementById('dz-wl-filter-date').value=todayInputDate()"
+                    data-i18n="common.today">Today</button>
+          </div>
         </div>
         <div class="field">
           <label data-i18n="dicomize.wl_filter_mod">Modality</label>
@@ -2418,6 +2462,17 @@ function applyTranslations() {
     const text = i18n(key);
     if (text !== key) el.textContent = text;
   });
+  // Re-apply the WebSocket status label so language changes don't reset it
+  // to "connecting…". _applyWsStatus is defined in the Socket.IO section.
+  if (typeof _applyWsStatus === "function") {
+    if (typeof socket !== "undefined" && socket.connected) {
+      _applyWsStatus("connected");
+    } else if (typeof socket !== "undefined" && !socket.connected) {
+      // Could be disconnected or still trying to connect on first load
+      _applyWsStatus(document.getElementById("offline-overlay")?.classList.contains("visible")
+        ? "reconnecting" : "connecting");
+    }
+  }
   document.querySelectorAll("[data-i18n-html]").forEach(el => {
     const key = el.getAttribute("data-i18n-html");
     const text = i18n(key);
@@ -2427,6 +2482,11 @@ function applyTranslations() {
     const key = el.getAttribute("data-i18n-placeholder");
     const text = i18n(key);
     if (text !== key) el.placeholder = text;
+  });
+  document.querySelectorAll("[data-i18n-title]").forEach(el => {
+    const key = el.getAttribute("data-i18n-title");
+    const text = i18n(key);
+    if (text !== key) el.title = text;
   });
   // Update page title
   const titleKey = document.querySelector("title")?.getAttribute("data-i18n");
@@ -2467,6 +2527,51 @@ async function loadLanguageOptions() {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// 0b. Date / Time helpers
+// ─────────────────────────────────────────────────────────────────
+
+/** Today as YYYY-MM-DD, suitable for setting an <input type="date"> value. */
+function todayInputDate() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+/** YYYY-MM-DD (HTML date input) → YYYYMMDD (DICOM). Returns "" when empty. */
+function dateToDisom(val) { return val ? val.replace(/-/g, "") : ""; }
+
+/** HH:MM[:SS] (HTML time input) → HHMMSS (DICOM). Returns "" when empty. */
+function timeToDisom(val) {
+  if (!val) return "";
+  const p = val.split(":");
+  return (p[0]||"00").padStart(2,"0") + (p[1]||"00").padStart(2,"0") + (p[2]||"00").padStart(2,"0");
+}
+
+/** YYYYMMDD (DICOM) → YYYY-MM-DD (HTML date input). Returns "" when invalid. */
+function dicomDateToInput(val) {
+  return (val && val.length >= 8) ? `${val.slice(0,4)}-${val.slice(4,6)}-${val.slice(6,8)}` : "";
+}
+
+/** HHMMSS (DICOM) → HH:MM:SS (HTML time input). Returns "" when invalid. */
+function dicomTimeToInput(val) {
+  if (!val || val.length < 4) return "";
+  return `${val.slice(0,2)}:${val.slice(2,4)}:${(val.slice(4,6)||"00")}`;
+}
+
+/**
+ * Build a DICOM date-range string from the two C-FIND date pickers.
+ * Returns: "" | "YYYYMMDD" | "YYYYMMDD-YYYYMMDD" | "YYYYMMDD-" | "-YYYYMMDD"
+ */
+function cfindDateRange() {
+  const from = dateToDisom(document.getElementById("cfind-date-from").value);
+  const to   = dateToDisom(document.getElementById("cfind-date-to").value);
+  if (from && to && from === to) return from;
+  if (from && to) return `${from}-${to}`;
+  if (from)       return `${from}-`;
+  if (to)         return `-${to}`;
+  return "";
+}
+
+// ─────────────────────────────────────────────────────────────────
 // 1. WebSocket / Socket.IO setup
 // ─────────────────────────────────────────────────────────────────
 
@@ -2474,9 +2579,36 @@ async function loadLanguageOptions() {
 // Socket.IO handles reconnection automatically.
 const socket = io();
 
+/**
+ * Update the header status indicator.
+ * Called from socket events AND after applyTranslations() so language changes
+ * never reset the text back to "connecting…".
+ * @param {"connected"|"reconnecting"|"disconnected"|"connecting"} state
+ */
+function _applyWsStatus(state) {
+  const el = document.getElementById("ws-status");
+  if (!el) return;
+  switch (state) {
+    case "connected":
+      el.textContent = "⬤ " + i18n("common.connected");
+      el.style.color = "#15803d";
+      break;
+    case "reconnecting":
+      el.textContent = "⬤ " + i18n("common.reconnecting");
+      el.style.color = "#b45309";
+      break;
+    case "disconnected":
+      el.textContent = "⬤ " + i18n("common.disconnected");
+      el.style.color = "#dc2626";
+      break;
+    default: // "connecting"
+      el.textContent = "⬤ " + i18n("common.connecting");
+      el.style.color = "#aaa";
+  }
+}
+
 socket.on("connect", () => {
-  document.getElementById("ws-status").textContent = "⬤ " + i18n("common.connected");
-  document.getElementById("ws-status").style.color = "#15803d";
+  _applyWsStatus("connected");
   // If a restart was triggered by an update, reload the page now that the
   // new server is accepting connections — don't just hide the overlay.
   if (_updInstalling) {
@@ -2487,13 +2619,17 @@ socket.on("connect", () => {
 });
 
 socket.on("disconnect", () => {
-  document.getElementById("ws-status").textContent = "⬤ " + i18n("common.disconnected");
-  document.getElementById("ws-status").style.color = "#dc2626";
+  _applyWsStatus("disconnected");
   // Don't overwrite the update overlay (already visible with custom text).
   if (!_updInstalling) {
     document.getElementById("offline-overlay").classList.add("visible");
   }
 });
+
+// Show "reconnecting…" in the status bar while Socket.IO is attempting
+// to re-establish the connection after a drop.
+socket.io.on("reconnect_attempt", () => { _applyWsStatus("reconnecting"); });
+socket.io.on("reconnect",         () => { /* "connect" event fires immediately after */ });
 
 // Server pushes this when a background update download has finished.
 socket.on("update_ready", data => { _onUpdateReady(data); });
@@ -2916,7 +3052,7 @@ async function doCFind() {
       patient_id:  document.getElementById("cfind-pid").value,
       patient_name: document.getElementById("cfind-pname").value,
       accession:   document.getElementById("cfind-acc").value,
-      study_date:  document.getElementById("cfind-date").value,
+      study_date:  cfindDateRange(),
       modality:    document.getElementById("cfind-mod").value,
       study_uid:   document.getElementById("cfind-suid").value,
     }),
@@ -3030,17 +3166,18 @@ function _cfindHistorySave() {
     port:         document.getElementById("cfind-port")?.value ?? "",
     query_level:  document.getElementById("cfind-level").value,
     query_model:  document.getElementById("cfind-model").value,
-    patient_id:   document.getElementById("cfind-pid").value,
-    patient_name: document.getElementById("cfind-pname").value,
-    accession:    document.getElementById("cfind-acc").value,
-    study_date:   document.getElementById("cfind-date").value,
-    modality:     document.getElementById("cfind-mod").value,
-    study_uid:    document.getElementById("cfind-suid").value,
+    patient_id:      document.getElementById("cfind-pid").value,
+    patient_name:    document.getElementById("cfind-pname").value,
+    accession:       document.getElementById("cfind-acc").value,
+    study_date_from: document.getElementById("cfind-date-from").value,
+    study_date_to:   document.getElementById("cfind-date-to").value,
+    modality:        document.getElementById("cfind-mod").value,
+    study_uid:       document.getElementById("cfind-suid").value,
     ts: new Date().toISOString(),
   };
   const existing = _cfindHistoryLoad();
   // Deduplicate by a quick key (ignore ts)
-  const key = q => `${q.host}:${q.port}|${q.patient_id}|${q.patient_name}|${q.accession}|${q.study_date}|${q.modality}|${q.study_uid}`;
+  const key = q => `${q.host}:${q.port}|${q.patient_id}|${q.patient_name}|${q.accession}|${q.study_date_from||q.study_date||""}-${q.study_date_to||""}|${q.modality}|${q.study_uid}`;
   const deduped = existing.filter(q => key(q) !== key(query));
   deduped.unshift(query);
   try {
@@ -3084,10 +3221,17 @@ function renderCFindHistory() {
 function loadCFindHistory(i) {
   const q = _cfindHistoryLoad()[i];
   if (!q) return;
-  if (q.patient_id)   document.getElementById("cfind-pid").value   = q.patient_id;
-  if (q.patient_name) document.getElementById("cfind-pname").value = q.patient_name;
-  if (q.accession)    document.getElementById("cfind-acc").value   = q.accession;
-  if (q.study_date)   document.getElementById("cfind-date").value  = q.study_date;
+  if (q.patient_id)      document.getElementById("cfind-pid").value        = q.patient_id;
+  if (q.patient_name)    document.getElementById("cfind-pname").value      = q.patient_name;
+  if (q.accession)       document.getElementById("cfind-acc").value        = q.accession;
+  if (q.study_date_from) document.getElementById("cfind-date-from").value  = q.study_date_from;
+  if (q.study_date_to)   document.getElementById("cfind-date-to").value    = q.study_date_to;
+  // Backward compat: old history entries stored a raw YYYYMMDD (or range) string
+  if (q.study_date && !q.study_date_from && !q.study_date_to) {
+    const raw = q.study_date.split("-");
+    if (raw[0] && raw[0].length === 8) document.getElementById("cfind-date-from").value = dicomDateToInput(raw[0]);
+    if (raw[1] && raw[1].length === 8) document.getElementById("cfind-date-to").value   = dicomDateToInput(raw[1]);
+  }
   if (q.modality)     document.getElementById("cfind-mod").value   = q.modality;
   if (q.study_uid)    document.getElementById("cfind-suid").value  = q.study_uid;
   if (q.query_level)  document.getElementById("cfind-level").value = q.query_level;
@@ -3157,7 +3301,7 @@ async function doDMWL() {
       ...ae,
       patient_id:   document.getElementById("dmwl-pid").value,
       patient_name: document.getElementById("dmwl-pname").value,
-      study_date:   document.getElementById("dmwl-date").value,
+      study_date:   dateToDisom(document.getElementById("dmwl-date").value),
       modality:     document.getElementById("dmwl-mod").value,
       accession:    document.getElementById("dmwl-acc").value,
       station_aet:  document.getElementById("dmwl-aet").value,
@@ -3585,7 +3729,7 @@ async function loadHL7Template() {
     name:            nm,
     name_last:       parts[0] || "PATIENT",
     name_first:      parts[1] || "TEST",
-    dob:             document.getElementById("hl7-dob").value   || "19800101",
+    dob:             dateToDisom(document.getElementById("hl7-dob").value) || "19800101",
     sex:             document.getElementById("hl7-sex").value   || "U",
     acc:             document.getElementById("hl7-acc").value   || "ACC001",
     proc_code:       document.getElementById("hl7-code").value  || "RADPROC",
@@ -5080,7 +5224,7 @@ async function doKOSExtract() {
     document.getElementById("kos-pid").value        = data.patient_id         || "";
     document.getElementById("kos-pname").value      = data.patient_name       || "";
     document.getElementById("kos-acc").value         = data.accession_number  || "";
-    document.getElementById("kos-date").value        = data.study_date        || "";
+    document.getElementById("kos-date").value        = dicomDateToInput(data.study_date || "");
     document.getElementById("kos-inst").value        = data.institution_name  || "";
 
     // Build instances textarea
@@ -5146,7 +5290,7 @@ async function doKOSCreate() {
     patient_id:         document.getElementById("kos-pid").value.trim(),
     patient_name:       document.getElementById("kos-pname").value.trim(),
     accession_number:   document.getElementById("kos-acc").value.trim(),
-    study_date:         document.getElementById("kos-date").value.trim(),
+    study_date:         dateToDisom(document.getElementById("kos-date").value),
     institution_name:   document.getElementById("kos-inst").value.trim(),
     doc_title_key:      document.getElementById("kos-doc-title").value,
     referenced_series:  referencedSeries,
@@ -5217,11 +5361,11 @@ function _dzGetMetadata(seriesDescId) {
   const add = (key, id) => fd.append(key, document.getElementById(id)?.value || "");
   add("patient_name",      "dz-patient-name");
   add("patient_id",        "dz-patient-id");
-  add("patient_dob",       "dz-patient-dob");
+  fd.append("patient_dob", dateToDisom(document.getElementById("dz-patient-dob")?.value || ""));
   add("patient_sex",       "dz-patient-sex");
   add("study_uid",         "dz-study-uid");
-  add("study_date",        "dz-study-date");
-  add("study_time",        "dz-study-time");
+  fd.append("study_date",  dateToDisom(document.getElementById("dz-study-date")?.value || ""));
+  fd.append("study_time",  timeToDisom(document.getElementById("dz-study-time")?.value || ""));
   add("study_description", "dz-study-desc");
   add("accession_number",  "dz-accession");
   add("institution_name",  "dz-institution");
@@ -5518,7 +5662,7 @@ async function dzWlQuery() {
   const aet   = document.getElementById("dz-wl-aet").value.trim();
   const pname = document.getElementById("dz-wl-filter-name").value.trim() || "*";
   const pid   = document.getElementById("dz-wl-filter-id").value.trim();
-  const date  = document.getElementById("dz-wl-filter-date").value.trim();
+  const date  = dateToDisom(document.getElementById("dz-wl-filter-date").value.trim());
   const mod   = document.getElementById("dz-wl-filter-mod").value.trim();
   const statusEl = document.getElementById("dz-wl-status");
   const tbody    = document.getElementById("dz-wl-results-body");
@@ -5572,9 +5716,9 @@ function dzWlSelectItem(idx) {
 
   document.getElementById("dz-patient-name").value = r.PatientName      || "";
   document.getElementById("dz-patient-id").value   = r.PatientID        || "";
-  document.getElementById("dz-patient-dob").value  = r.PatientBirthDate || "";
+  document.getElementById("dz-patient-dob").value  = dicomDateToInput(r.PatientBirthDate || "");
   document.getElementById("dz-patient-sex").value  = r.PatientSex       || "";
-  document.getElementById("dz-study-date").value   = r.ScheduledDate    || "";
+  document.getElementById("dz-study-date").value   = dicomDateToInput(r.ScheduledDate    || "");
   document.getElementById("dz-study-desc").value   = r.Procedure        || "";
   document.getElementById("dz-accession").value    = r.Accession        || "";
   document.getElementById("dz-institution").value  = r.InstitutionName  || "";
@@ -6285,7 +6429,7 @@ function renderApmProfileList() {
   list.innerHTML = "";
   const names = Object.keys(_anonCustomProfiles);
   if (!names.length) {
-    list.innerHTML = '<div style="color:#9ca3af;font-size:12px;padding:4px 2px">No custom profiles yet.<br>Create one with "+ New Profile".</div>';
+    list.innerHTML = `<div style="color:#9ca3af;font-size:12px;padding:4px 2px">${i18n("anonymizer.mgr_no_profiles")}</div>`;
     return;
   }
   names.forEach(n => {
@@ -6400,7 +6544,7 @@ function renderApmTagList() {
 
 async function anonProfileSave() {
   const name = document.getElementById("apm-name").value.trim();
-  if (!name) { alert("Enter a profile name."); return; }
+  if (!name) { alert(i18n("anonymizer.mgr_err_no_name")); return; }
   const tags = [..._apmCurrentChecked];
   const statusEl = document.getElementById("apm-status");
   try {
@@ -6410,7 +6554,7 @@ async function anonProfileSave() {
       body: JSON.stringify({ name, tags }),
     });
     const data = await res.json();
-    if (!data.ok) { alert("Error saving: " + data.error); return; }
+    if (!data.ok) { alert(i18n("anonymizer.mgr_err_save", {error: data.error})); return; }
     if (_apmEditingKey && _apmEditingKey !== name) {
       await fetch(`/api/dicom/anon_profiles/${encodeURIComponent(_apmEditingKey)}`,
                   { method: "DELETE" });
@@ -6418,14 +6562,14 @@ async function anonProfileSave() {
     await _loadAnonProfilesFromServer();
     _apmEditingKey = name;
     renderApmProfileList();
-    statusEl.textContent = `Saved "${name}".`;
+    statusEl.textContent = i18n("anonymizer.mgr_saved", {name});
     setTimeout(() => { statusEl.textContent = ""; }, 2500);
   } catch (e) { alert("Error: " + e); }
 }
 
 async function anonProfileDelete() {
   if (!_apmEditingKey) return;
-  if (!confirm(`Delete profile "${_apmEditingKey}"?`)) return;
+  if (!confirm(i18n("anonymizer.mgr_confirm_delete", {name: _apmEditingKey}))) return;
   try {
     await fetch(`/api/dicom/anon_profiles/${encodeURIComponent(_apmEditingKey)}`,
                 { method: "DELETE" });
