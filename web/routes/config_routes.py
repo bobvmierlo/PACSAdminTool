@@ -16,14 +16,15 @@ bp = Blueprint("config", __name__)
 # Config schema
 # ---------------------------------------------------------------------------
 _CONFIG_SCHEMA = {
-    "local_ae":       dict,
-    "remote_aes":     list,
-    "hl7":            dict,
-    "query_defaults": dict,
-    "web":            dict,
-    "log_level":      str,
-    "language":       str,
-    "telemetry":      dict,
+    "local_ae":          dict,
+    "remote_aes":        list,
+    "dicomweb_presets":  list,
+    "hl7":               dict,
+    "query_defaults":    dict,
+    "web":               dict,
+    "log_level":         str,
+    "language":          str,
+    "telemetry":         dict,
 }
 
 _LOG_LEVELS   = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
@@ -68,6 +69,20 @@ def _validate_config_payload(data: dict) -> str | None:
                 return f"remote_aes[{i}].port must be an integer."
             if "port" in ae and not (1 <= ae["port"] <= 65535):
                 return f"remote_aes[{i}].port must be between 1 and 65535."
+    if "dicomweb_presets" in data:
+        _MAX_URL_LEN = 2048
+        for i, p in enumerate(data["dicomweb_presets"]):
+            if not isinstance(p, dict):
+                return f"dicomweb_presets[{i}] must be an object."
+            for field in ("name", "base_url", "auth_type", "username",
+                          "password", "token"):
+                if field in p and not isinstance(p[field], str):
+                    return f"dicomweb_presets[{i}].{field} must be a string."
+            if "base_url" in p and len(p["base_url"]) > _MAX_URL_LEN:
+                return f"dicomweb_presets[{i}].base_url exceeds {_MAX_URL_LEN} characters."
+            if "auth_type" in p and p["auth_type"] not in ("none", "basic", "bearer"):
+                return (f"dicomweb_presets[{i}].auth_type must be "
+                        "'none', 'basic', or 'bearer'.")
     if "hl7" in data:
         hl7 = data["hl7"]
         for port_key in ("listen_port", "default_port"):

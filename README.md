@@ -23,11 +23,13 @@ Can also be run locally with Python and pip, or deployed as a Docker container.
 | **Storage Commit** | Send N-ACTION storage commitment requests; receive async N-EVENT-REPORT responses with committed/failed breakdown |
 | **IOCM** | Send Instance Availability Notifications (delete/change notifications) |
 | **DICOM Inspector** | Upload any `.dcm` file and browse all DICOM tags in a searchable, collapsible tree |
+| **DICOM Validator** | Upload any `.dcm` file for conformance checking; validates file meta (group 0002), core UIDs, mandatory patient/study tags, pixel data consistency, UID collisions, and retired SOP classes; findings categorised as Error / Warning / Info |
 | **SR Viewer** | Parse any DICOM Structured Report as an interactive collapsible tree; colour-coded type/relationship badges; DCM-coded concepts link to the NEMA PS3.16 standard; filter bar |
 | **KOS Creator** | Build a DICOM Key Object Selection document (XDS-I manifest) from existing DICOM files |
 | **DICOMize** | Convert non-DICOM files to DICOM: PDF → Encapsulated PDF, images (JPEG/PNG/BMP/TIFF/WebP) → Secondary Capture, video (MP4/MOV) → Encapsulated Video; download or send directly to a PACS via C-STORE |
 | **Anonymizer** | Strip PHI from one or more DICOM files using a Basic or Full profile; download result as a ZIP |
 | **DICOMDIR** | Read a DICOMDIR file and browse the Patient → Study → Series → Instance hierarchy; or generate a standards-compliant DICOMDIR from uploaded files/folder and download as ZIP |
+| **DICOMweb** | QIDO-RS study/series/instance queries, STOW-RS multi-file upload, WADO-RS retrieve (packaged as ZIP); preset-based server configuration with Basic Auth and Bearer Token support |
 | **HL7** | Send/receive HL7 v2 messages over MLLP; built-in templates for ORM, ORU, ADT, SIU, OML, QBP |
 | **Settings** | Manage local AE title/port, remote AE presets, HL7 defaults, language, log level |
 | **Logs** | Live view of application logs from `~/.pacs_admin_tool/logs/` |
@@ -298,6 +300,29 @@ The UI supports English and Dutch. Switch languages in the **Settings** tab.
 - Upload any `.dcm` file and browse all tags in a searchable, collapsible tree
 - Sequence (SQ) elements expand inline; binary data shown as byte-length summary
 
+### DICOM Validator
+Performs a **DICOM conformance check** on any `.dcm` file without sending it to a PACS.
+
+**Check categories:**
+
+| Category | What is verified |
+|----------|-----------------|
+| File Meta | Group 0002 present, `MediaStorageSOPClassUID` matches `SOPClassUID`, transfer syntax present |
+| Core UIDs | `SOPClassUID`, `SOPInstanceUID`, `StudyInstanceUID`, `SeriesInstanceUID` — all present, valid UID format |
+| Patient module | Type 2 tags `PatientName`, `PatientID`, `PatientBirthDate`, `PatientSex` present (blank is allowed) |
+| Study module | `StudyDate`, `StudyTime`, `AccessionNumber`, `ReferringPhysicianName` — presence and format |
+| Pixel data | `PixelData` present for image SOP classes; consistency of `Rows`, `Columns`, `BitsAllocated`, `SamplesPerPixel` |
+| UID collisions | Detects Study/Series/Instance UIDs that are identical (copy-paste errors) |
+| SOP class | Flags retired SOP classes |
+| Private tags | Reports the number of private (odd-group) tags present |
+
+**Severity levels:**
+- **Error** — non-conformant; likely to cause import/routing failures in a PACS
+- **Warning** — technically valid but unusual; may cause interoperability issues
+- **Info** — informational only; no action required
+
+**Requirements:** Only `pydicom` (already bundled) — no extra packages.
+
 ### Anonymizer
 - Upload one or more DICOM files
 - **Basic profile**: removes patient identifiers and institution details
@@ -308,6 +333,28 @@ The UI supports English and Dutch. Switch languages in the **Settings** tab.
 ### DICOMDIR
 - **Reader**: upload a DICOMDIR file to browse the Patient → Study → Series → Instance hierarchy
 - **Generator**: upload individual DICOM files or an entire folder; a standards-compliant DICOM File Set (DICOMDIR + organised instance files) is generated using `pydicom.FileSet` and returned as a downloadable ZIP
+
+### DICOMweb (QIDO-RS / STOW-RS / WADO-RS)
+Implements all three DICOMweb services defined in **DICOM PS3.18** as an HTTP-based alternative to the traditional C-FIND / C-STORE / C-MOVE workflow.
+
+**Server configuration:**
+- Base URL, authentication type (None / Basic / Bearer Token), and credentials are entered once per session or loaded from a named preset
+- Presets are saved in `config.json` under `dicomweb_presets` and are available in the dropdown on every session start
+
+**Sub-tabs:**
+
+| Sub-tab | Service | What it does |
+|---------|---------|-------------|
+| **QIDO-RS** | Query based on ID for DICOM Objects | Queries studies, series, or instances using standard DICOM attributes as URL parameters; results rendered in a sortable table |
+| **STOW-RS** | Store Over the Web | Uploads one or more local `.dcm` files to the server using a `multipart/related; type=application/dicom` POST |
+| **WADO-RS** | Web Access to DICOM Objects | Retrieves one or more DICOM instances from the server; the server packages the `multipart/related` response into a `.zip` file for convenient download |
+
+**Authentication:**
+- **None** — plain HTTP/HTTPS, no credentials
+- **Basic** — HTTP Basic Auth (username + password encoded as Base64)
+- **Bearer Token** — `Authorization: Bearer <token>` header (OAuth 2.0 / API keys)
+
+**Requirements:** `requests` library (`pip install requests`); already included in `requirements.txt` and `requirements-web.txt`.
 
 ### SR Viewer
 Parses any DICOM Structured Report and renders it as an **interactive collapsible tree**.
@@ -407,6 +454,7 @@ All templates are editable before sending. Raw HL7 text can also be pasted direc
 - flask
 - flask-socketio
 - simple-websocket
+- requests (DICOMweb tab)
 
 The compiled `.exe` has **no runtime requirements**.
 
