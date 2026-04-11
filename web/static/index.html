@@ -4784,6 +4784,13 @@ async function loadSCPFiles() {
       inspBtn.textContent = "Inspect";
       inspBtn.onclick = () => scpFileInspect(f.name);
 
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn";
+      editBtn.style.cssText = "font-size:11px; padding:2px 8px; margin-right:4px";
+      editBtn.setAttribute("data-i18n", "scp.edit_file");
+      editBtn.textContent = "Edit Tags…";
+      editBtn.onclick = () => scpFileEdit(f.name);
+
       const delBtn = document.createElement("button");
       delBtn.className = "btn";
       delBtn.style.cssText = "font-size:11px; padding:2px 8px; color:#dc2626; border-color:#fca5a5";
@@ -4792,6 +4799,7 @@ async function loadSCPFiles() {
 
       actCel.appendChild(prevBtn);
       actCel.appendChild(inspBtn);
+      actCel.appendChild(editBtn);
       actCel.appendChild(delBtn);
       tr.appendChild(nameCel);
       tr.appendChild(sizeCel);
@@ -4812,6 +4820,73 @@ async function scpFileInspect(name) {
     const data = await res.json();
     if (!data.ok) { toast("Error: " + data.error, "err"); return; }
     showTagModal(name, data.tags);
+  } catch (e) {
+    toast("Error: " + e, "err");
+  }
+}
+
+async function scpFileEdit(path) {
+  toast(i18n("scp.edit_loading"), "info");
+  try {
+    // Fetch raw DICOM bytes and tag list in parallel
+    const [rawRes, inspRes] = await Promise.all([
+      fetch(`/api/scp/files/raw?path=${encodeURIComponent(path)}`),
+      fetch(`/api/scp/files/inspect?name=${encodeURIComponent(path)}`),
+    ]);
+    if (!rawRes.ok)  { toast("Error fetching file.", "err"); return; }
+    const inspData = await inspRes.json();
+    if (!inspData.ok) { toast("Error: " + inspData.error, "err"); return; }
+
+    const blob     = await rawRes.blob();
+    const filename = path.split("/").pop();
+    _inspectorFile = new File([blob], filename, { type: "application/dicom" });
+    _inspectorTags = inspData.tags || [];
+    _tagEdits      = {};
+
+    // Populate the metadata grid the same way doInspect() does
+    const grid = document.getElementById("inspector-meta-grid");
+    grid.innerHTML = "";
+    const m = inspData.meta || {};
+    [
+      ["Filename",         filename],
+      ["Patient Name",     m.PatientName],
+      ["Patient ID",       m.PatientID],
+      ["Modality",         m.Modality],
+      ["Study Date",       m.StudyDate],
+      ["SOP Class UID",    m.SOPClassUID],
+    ].forEach(([label, val]) => {
+      if (!val) return;
+      const div = document.createElement("div");
+      div.className = "field";
+      div.innerHTML = `<label style="color:#888;font-size:11px">${label}</label>
+                       <span style="font-size:13px">${escapeHtml(String(val))}</span>`;
+      grid.appendChild(div);
+    });
+    document.getElementById("inspector-filename").textContent = filename;
+    document.getElementById("inspector-meta-card").style.display = "";
+    document.getElementById("tag-editor-card").style.display    = "none";
+
+    // Switch to Inspector & Editor → Inspect & Edit sub-tab → open editor
+    showTab("inspector");
+    showInspectorSubTab("edit");
+    openTagEditor();
+  } catch (e) {
+    toast("Error: " + e, "err");
+  }
+}
+
+async function scpSeriesEdit(studyUid, seriesUid) {
+  try {
+    const res  = await fetch(`/api/scp/series/list?study=${encodeURIComponent(studyUid)}&series=${encodeURIComponent(seriesUid)}`);
+    const data = await res.json();
+    if (!data.ok || !data.urls?.length) {
+      toast(i18n("scp.edit_no_files"), "warn"); return;
+    }
+    // Extract the server-side path from the first file URL
+    const url  = new URL(data.urls[0], location.href);
+    const path = url.searchParams.get("path");
+    if (!path) { toast("Could not determine file path.", "err"); return; }
+    await scpFileEdit(path);
   } catch (e) {
     toast("Error: " + e, "err");
   }
@@ -5081,6 +5156,13 @@ async function loadSCPStudies() {
       const viewLabel = (sm.Modality || "Series") + " — " + (sm.SeriesDescription || ser.uid.slice(0, 16));
       viewBtn.onclick = () => viewSCPSeries(study.uid, ser.uid, viewLabel);
 
+      const editSer = document.createElement("button");
+      editSer.className = "btn";
+      editSer.style.cssText = "font-size:11px; padding:2px 8px; flex-shrink:0";
+      editSer.setAttribute("data-i18n", "scp.edit_file");
+      editSer.textContent = "Edit Tags…";
+      editSer.onclick = () => scpSeriesEdit(study.uid, ser.uid);
+
       const delSer = document.createElement("button");
       delSer.className = "btn";
       delSer.style.cssText = "font-size:11px; padding:2px 8px; color:#dc2626; border-color:#fca5a5; flex-shrink:0";
@@ -5090,6 +5172,7 @@ async function loadSCPStudies() {
       row.appendChild(mod);
       row.appendChild(sdesc);
       row.appendChild(viewBtn);
+      row.appendChild(editSer);
       row.appendChild(delSer);
       body.appendChild(row);
     });

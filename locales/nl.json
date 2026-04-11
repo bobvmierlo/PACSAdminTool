@@ -253,7 +253,10 @@
     "file_size": "Grootte",
     "file_mtime": "Gewijzigd",
     "stats": "Statistieken ontvangen bestanden",
-    "stats_refresh": "Analyseren"
+    "stats_refresh": "Analyseren",
+    "edit_file": "Tags bewerken…",
+    "edit_loading": "Bestand laden in editor…",
+    "edit_no_files": "Geen bestanden in deze serie."
   },
   "settings": {
     "local_ae": "Lokale AE-configuratie",

@@ -253,7 +253,10 @@
     "file_size": "Size",
     "file_mtime": "Modified",
     "stats": "Received File Statistics",
-    "stats_refresh": "Analyse"
+    "stats_refresh": "Analyse",
+    "edit_file": "Edit Tags…",
+    "edit_loading": "Loading file into editor…",
+    "edit_no_files": "No files in this series."
   },
   "settings": {
     "local_ae": "Local AE Configuration",
