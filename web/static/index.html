@@ -870,12 +870,13 @@
   <button class="tab-btn" onclick="showTab('dmwl')" data-i18n="tabs.dmwl">Worklist (DMWL)</button>
   <button class="tab-btn" onclick="showTab('commit')" data-i18n="tabs.commit">Storage Commit</button>
   <button class="tab-btn" onclick="showTab('iocm')" data-i18n="tabs.iocm">IOCM</button>
-  <button class="tab-btn" onclick="showTab('inspector')" data-i18n="tabs.inspector">DICOM Inspector</button>
+  <button class="tab-btn" onclick="showTab('inspector')" data-i18n="tabs.inspector">Inspector &amp; Editor</button>
   <button class="tab-btn" onclick="showTab('validator')" data-i18n="tabs.validator">DICOM Validator</button>
   <button class="tab-btn" onclick="showTab('sr_viewer')" data-i18n="tabs.sr_viewer">SR Viewer</button>
   <button class="tab-btn" onclick="showTab('kos_creator')" data-i18n="tabs.kos_creator">KOS Creator</button>
   <button class="tab-btn" onclick="showTab('dicomize')" data-i18n="tabs.dicomize">DICOMize</button>
   <button class="tab-btn" onclick="showTab('anonymizer')" data-i18n="tabs.anonymizer">Anonymizer</button>
+  <button class="tab-btn" onclick="showTab('uid_remap')" data-i18n="tabs.uid_remap">UID Remapper</button>
   <button class="tab-btn" onclick="showTab('dicomdir')" data-i18n="tabs.dicomdir">DICOMDIR</button>
   <button class="tab-btn" onclick="showTab('dicomweb')" data-i18n="tabs.dicomweb">DICOMweb</button>
   <button class="tab-btn" onclick="showTab('hl7')" data-i18n="tabs.hl7">HL7</button>
@@ -1337,75 +1338,148 @@
     <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-scp"></div></div>
   </div>
 
-  <!-- ── DICOM Inspector ──────────────────────────────────────────── -->
+  <!-- ── DICOM Inspector & Editor ────────────────────────────────── -->
   <div id="tab-inspector" class="tab-panel">
-    <div class="card">
-      <h3 data-i18n="inspector.title">DICOM File Inspector</h3>
-      <div class="btn-row">
-        <input type="file" id="inspector-file-input" accept=".dcm,*" style="display:none"
-               onchange="inspectorFileSelected()">
-        <button class="btn" onclick="document.getElementById('inspector-file-input').click()"
-                data-i18n="common.browse">Browse…</button>
-        <span id="inspector-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
-              text-overflow:ellipsis; white-space:nowrap"></span>
-        <button class="btn primary" onclick="doInspect()" data-i18n="inspector.parse">Parse &amp; Inspect</button>
-      </div>
-    </div>
-    <div class="card" id="inspector-meta-card" style="display:none">
-      <h3 data-i18n="inspector.metadata">File Metadata</h3>
-      <div id="inspector-meta-grid" class="field-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px,1fr))"></div>
-      <div class="btn-row" style="margin-top:12px">
-        <button class="btn primary" onclick="inspectorShowTags()" data-i18n="inspector.all_tags">View All DICOM Tags</button>
-        <button class="btn" onclick="openTagEditor()" data-i18n="inspector.edit_tags">Edit Tags…</button>
-      </div>
+    <!-- Sub-tab navigation -->
+    <div class="subtab-bar">
+      <button class="subtab-btn active" id="inspector-subtab-btn-edit"
+              onclick="showInspectorSubTab('edit')"
+              data-i18n="inspector.subtab_edit">Inspect &amp; Edit</button>
+      <button class="subtab-btn" id="inspector-subtab-btn-diff"
+              onclick="showInspectorSubTab('diff')"
+              data-i18n="inspector.subtab_diff">Diff</button>
     </div>
 
-    <!-- Tag editor (shown when Edit Tags is clicked) -->
-    <div class="card" id="tag-editor-card" style="display:none">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:8px">
-        <h3 style="margin:0" data-i18n="tag_editor.title">Tag Editor
-          <span id="tag-editor-change-count" style="font-size:12px; color:#2b6cb0; margin-left:8px"></span>
-        </h3>
-        <div style="display:flex; gap:6px; flex-wrap:wrap">
-          <input id="tag-editor-filter" type="text" data-i18n-placeholder="tag_editor.filter_placeholder" placeholder="Filter tags…"
-                 style="width:180px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px"
-                 oninput="renderEditTagTable()">
-          <button class="btn" onclick="resetTagEdits()" data-i18n="tag_editor.reset">Reset changes</button>
+    <!-- ── Inspect & Edit ──────────────────────────────────────────── -->
+    <div id="inspector-subtab-edit" class="subtab-panel active">
+      <div class="card">
+        <h3 data-i18n="inspector.title">DICOM File Inspector</h3>
+        <div class="btn-row">
+          <input type="file" id="inspector-file-input" accept=".dcm,*" style="display:none"
+                 onchange="inspectorFileSelected()">
+          <button class="btn" onclick="document.getElementById('inspector-file-input').click()"
+                  data-i18n="common.browse">Browse…</button>
+          <span id="inspector-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
+                text-overflow:ellipsis; white-space:nowrap"></span>
+          <button class="btn primary" onclick="doInspect()" data-i18n="inspector.parse">Parse &amp; Inspect</button>
         </div>
       </div>
-      <div class="result-table-wrap" style="max-height:380px; overflow-y:auto">
-        <table id="tag-editor-table">
-          <thead><tr>
-            <th data-i18n="dicom_detail.col_tag">Tag</th><th data-i18n="dicom_detail.col_keyword">Keyword</th><th data-i18n="dicom_detail.col_vr">VR</th><th data-i18n="dicom_detail.col_value">Value</th><th style="width:60px"></th>
-          </tr></thead>
-          <tbody id="tag-editor-tbody"></tbody>
-        </table>
+      <div class="card" id="inspector-meta-card" style="display:none">
+        <h3 data-i18n="inspector.metadata">File Metadata</h3>
+        <div id="inspector-meta-grid" class="field-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px,1fr))"></div>
+        <div class="btn-row" style="margin-top:12px">
+          <button class="btn primary" onclick="inspectorShowTags()" data-i18n="inspector.all_tags">View All DICOM Tags</button>
+          <button class="btn" onclick="openTagEditor()" data-i18n="inspector.edit_tags">Edit Tags…</button>
+        </div>
       </div>
-      <div style="margin-top:14px; border-top:1px solid #e5e7eb; padding-top:12px">
-        <div style="font-size:13px; font-weight:600; margin-bottom:8px; color:#374151" data-i18n="common.actions">Actions</div>
-        <div class="btn-row" style="flex-wrap:wrap; gap:8px; align-items:flex-end">
-          <button class="btn primary" onclick="downloadEdited()" data-i18n="tag_editor.download">Download Modified File</button>
-          <span style="color:#bbb; font-size:13px">or</span>
-          <div style="display:flex; align-items:flex-end; gap:6px; flex-wrap:wrap">
-            <div class="field" style="min-width:200px">
-              <label style="font-size:11px; color:#888" data-i18n="tag_editor.send_label">Send to Remote AE</label>
-              <select id="tag-editor-ae-select" style="font-size:12px"
-                      onchange="tagEditorAEChanged()">
-                <option value="" data-i18n="tag_editor.select_preset">Select a preset…</option>
-              </select>
-            </div>
-            <input id="tag-editor-ae-title" data-i18n-placeholder="common.ae_title" placeholder="AE Title"
-                   style="width:110px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
-            <input id="tag-editor-ae-host" data-i18n-placeholder="common.host" placeholder="Host"
-                   style="width:130px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
-            <input id="tag-editor-ae-port" data-i18n-placeholder="common.port" placeholder="Port" type="number" min="1" max="65535"
-                   style="width:70px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
-            <button class="btn success" onclick="sendEditedToPACS()" data-i18n="tag_editor.send_pacs">Send to PACS</button>
+
+      <!-- Tag editor (shown when Edit Tags is clicked) -->
+      <div class="card" id="tag-editor-card" style="display:none">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:8px">
+          <h3 style="margin:0" data-i18n="tag_editor.title">Tag Editor
+            <span id="tag-editor-change-count" style="font-size:12px; color:#2b6cb0; margin-left:8px"></span>
+          </h3>
+          <div style="display:flex; gap:6px; flex-wrap:wrap">
+            <input id="tag-editor-filter" type="text" data-i18n-placeholder="tag_editor.filter_placeholder" placeholder="Filter tags…"
+                   style="width:180px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px"
+                   oninput="renderEditTagTable()">
+            <button class="btn" onclick="resetTagEdits()" data-i18n="tag_editor.reset">Reset changes</button>
           </div>
-          <span id="tag-editor-status" style="font-size:12px; color:#888"></span>
+        </div>
+        <div class="result-table-wrap" style="max-height:380px; overflow-y:auto">
+          <table id="tag-editor-table">
+            <thead><tr>
+              <th data-i18n="dicom_detail.col_tag">Tag</th><th data-i18n="dicom_detail.col_keyword">Keyword</th><th data-i18n="dicom_detail.col_vr">VR</th><th data-i18n="dicom_detail.col_value">Value</th><th style="width:60px"></th>
+            </tr></thead>
+            <tbody id="tag-editor-tbody"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:14px; border-top:1px solid #e5e7eb; padding-top:12px">
+          <div style="font-size:13px; font-weight:600; margin-bottom:8px; color:#374151" data-i18n="common.actions">Actions</div>
+          <div class="btn-row" style="flex-wrap:wrap; gap:8px; align-items:flex-end">
+            <button class="btn primary" onclick="downloadEdited()" data-i18n="tag_editor.download">Download Modified File</button>
+            <span style="color:#bbb; font-size:13px">or</span>
+            <div style="display:flex; align-items:flex-end; gap:6px; flex-wrap:wrap">
+              <div class="field" style="min-width:200px">
+                <label style="font-size:11px; color:#888" data-i18n="tag_editor.send_label">Send to Remote AE</label>
+                <select id="tag-editor-ae-select" style="font-size:12px"
+                        onchange="tagEditorAEChanged()">
+                  <option value="" data-i18n="tag_editor.select_preset">Select a preset…</option>
+                </select>
+              </div>
+              <input id="tag-editor-ae-title" data-i18n-placeholder="common.ae_title" placeholder="AE Title"
+                     style="width:110px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
+              <input id="tag-editor-ae-host" data-i18n-placeholder="common.host" placeholder="Host"
+                     style="width:130px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
+              <input id="tag-editor-ae-port" data-i18n-placeholder="common.port" placeholder="Port" type="number" min="1" max="65535"
+                     style="width:70px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
+              <button class="btn success" onclick="sendEditedToPACS()" data-i18n="tag_editor.send_pacs">Send to PACS</button>
+            </div>
+            <span id="tag-editor-status" style="font-size:12px; color:#888"></span>
+          </div>
         </div>
       </div>
-    </div>
+    </div><!-- /inspector-subtab-edit -->
+
+    <!-- ── Diff ────────────────────────────────────────────────────── -->
+    <div id="inspector-subtab-diff" class="subtab-panel">
+      <div class="card">
+        <h3 data-i18n="diff.title">DICOM File Diff</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:14px">
+          <div class="field">
+            <label style="font-weight:600" data-i18n="diff.file_a">File A</label>
+            <div class="btn-row" style="margin-top:4px">
+              <input type="file" id="diff-file-a" accept=".dcm,*" style="display:none"
+                     onchange="diffFileChanged('a')">
+              <button class="btn" onclick="document.getElementById('diff-file-a').click()"
+                      data-i18n="common.browse">Browse…</button>
+              <span id="diff-filename-a" style="font-size:13px; color:#888; flex:1; overflow:hidden;
+                    text-overflow:ellipsis; white-space:nowrap"
+                    data-i18n="diff.no_file">No file selected</span>
+            </div>
+          </div>
+          <div class="field">
+            <label style="font-weight:600" data-i18n="diff.file_b">File B</label>
+            <div class="btn-row" style="margin-top:4px">
+              <input type="file" id="diff-file-b" accept=".dcm,*" style="display:none"
+                     onchange="diffFileChanged('b')">
+              <button class="btn" onclick="document.getElementById('diff-file-b').click()"
+                      data-i18n="common.browse">Browse…</button>
+              <span id="diff-filename-b" style="font-size:13px; color:#888; flex:1; overflow:hidden;
+                    text-overflow:ellipsis; white-space:nowrap"
+                    data-i18n="diff.no_file">No file selected</span>
+            </div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer">
+            <input type="checkbox" id="diff-only-changes" checked onchange="_renderDiffResults()">
+            <span data-i18n="diff.diff_only">Show differences only</span>
+          </label>
+          <button class="btn primary" onclick="doDiff()" data-i18n="diff.compare">Compare</button>
+        </div>
+      </div>
+
+      <div class="card" id="diff-results-card" style="display:none">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px">
+          <h3 style="margin:0" data-i18n="diff.results_title">Comparison Results</h3>
+          <span id="diff-summary" style="font-size:12px; color:#555"></span>
+        </div>
+        <div class="result-table-wrap" style="max-height:500px; overflow-y:auto">
+          <table id="diff-table">
+            <thead><tr>
+              <th data-i18n="dicom_detail.col_tag">Tag</th>
+              <th data-i18n="dicom_detail.col_keyword">Keyword</th>
+              <th data-i18n="dicom_detail.col_vr">VR</th>
+              <th data-i18n="diff.col_value_a">Value A</th>
+              <th data-i18n="diff.col_value_b">Value B</th>
+              <th data-i18n="diff.col_status">Status</th>
+            </tr></thead>
+            <tbody id="diff-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /inspector-subtab-diff -->
   </div>
 
   <!-- ── DICOM Validator ───────────────────────────────────────────── -->
@@ -1817,6 +1891,63 @@
           <div style="font-size:32px">📋</div>
           <div data-i18n="anonymizer.mgr_placeholder">Select a profile on the left, or create a new one.</div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── UID Remapper ──────────────────────────────────────────────── -->
+  <div id="tab-uid_remap" class="tab-panel">
+    <div class="card">
+      <h3 data-i18n="uid_remap.title">UID Remapper</h3>
+      <p style="font-size:13px; color:#555; margin-bottom:14px" data-i18n="uid_remap.description">
+        Generate fresh Study / Series / Instance UIDs for a batch of DICOM files.
+      </p>
+      <div class="field-grid">
+        <div class="field" style="grid-column:1/-1">
+          <label data-i18n="uid_remap.files_label">DICOM Files</label>
+          <div class="btn-row" style="margin-top:4px">
+            <input type="file" id="uid-remap-file-input" accept=".dcm,*" multiple style="display:none"
+                   onchange="uidRemapFilesSelected()">
+            <button class="btn" onclick="document.getElementById('uid-remap-file-input').click()"
+                    data-i18n="uid_remap.browse">Browse…</button>
+            <span id="uid-remap-file-count" style="font-size:13px; color:#555; flex:1"></span>
+          </div>
+        </div>
+        <div class="field">
+          <label data-i18n="uid_remap.level_label">Remap level</label>
+          <select id="uid-remap-level">
+            <option value="study"    data-i18n="uid_remap.level_study">Study only (StudyInstanceUID)</option>
+            <option value="series"   data-i18n="uid_remap.level_series">Study + Series</option>
+            <option value="instance" selected data-i18n="uid_remap.level_instance">Study + Series + Instance (all UIDs)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label data-i18n="uid_remap.prefix_label">UID prefix</label>
+          <input id="uid-remap-prefix" type="text" value="2.25."
+                 data-i18n-placeholder="uid_remap.prefix_hint" placeholder="e.g. 2.25. (UUID-based)"
+                 style="font-size:13px">
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:14px; flex-wrap:wrap; gap:8px">
+        <button class="btn" onclick="doUIDRemapPreview()" data-i18n="uid_remap.preview">Preview</button>
+        <button class="btn primary" onclick="doUIDRemapDownload()" data-i18n="uid_remap.download">Download Remapped ZIP</button>
+        <span id="uid-remap-status" style="font-size:12px; color:#888"></span>
+      </div>
+    </div>
+
+    <!-- Preview table -->
+    <div class="card" id="uid-remap-preview-card" style="display:none">
+      <h3 data-i18n="uid_remap.preview_title">UID Mapping Preview</h3>
+      <div class="result-table-wrap" style="max-height:480px; overflow-y:auto">
+        <table id="uid-remap-preview-table">
+          <thead><tr>
+            <th data-i18n="uid_remap.col_file">File</th>
+            <th data-i18n="uid_remap.col_tag">Tag</th>
+            <th data-i18n="uid_remap.col_old_uid">Old UID</th>
+            <th data-i18n="uid_remap.col_new_uid">New UID</th>
+          </tr></thead>
+          <tbody id="uid-remap-preview-tbody"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -5250,6 +5381,8 @@ const HELP_SECTIONS = [
 
   ["help.section_inspector", "help.body_inspector", []],
 
+  ["help.section_uid_remap", "help.body_uid_remap", []],
+
   ["help.section_validator", "help.body_validator",
   [
     {label: "DICOM PS3.5 §7 – Data Element Structure (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part05.html#chapter_7"},
@@ -7327,6 +7460,177 @@ async function sendEditedToPACS() {
     const res  = await fetch("/api/dicom/edit-and-store", { method: "POST", body: fd });
     const data = await res.json();
     status.textContent = data.ok ? `Sent: ${data.message}` : `Error: ${data.error || data.message}`;
+  } catch (e) {
+    status.textContent = "Error: " + e;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Inspector sub-tab switcher
+// ─────────────────────────────────────────────────────────────────
+
+function showInspectorSubTab(name) {
+  ["edit", "diff"].forEach(n => {
+    document.getElementById("inspector-subtab-" + n).classList.toggle("active", n === name);
+    document.getElementById("inspector-subtab-btn-" + n).classList.toggle("active", n === name);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────
+// DICOM Diff
+// ─────────────────────────────────────────────────────────────────
+
+function diffFileChanged(side) {
+  const input = document.getElementById("diff-file-" + side);
+  const span  = document.getElementById("diff-filename-" + side);
+  span.textContent = (input.files && input.files[0]) ? input.files[0].name
+                                                      : i18n("diff.no_file");
+}
+
+let _diffLastRows = null, _diffLastSummary = null;
+
+async function doDiff() {
+  const fa = document.getElementById("diff-file-a").files[0];
+  const fb = document.getElementById("diff-file-b").files[0];
+  if (!fa || !fb) { toast(i18n("diff.select_both"), "warn"); return; }
+
+  const fd = new FormData();
+  fd.append("file_a", fa);
+  fd.append("file_b", fb);
+
+  try {
+    const res  = await fetch("/api/dicom/diff", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!data.ok) { toast("Error: " + data.error, "err"); return; }
+    _diffLastRows    = data.rows;
+    _diffLastSummary = data.summary;
+    _renderDiffResults();
+  } catch (e) {
+    toast("Error: " + e, "err");
+  }
+}
+
+function _renderDiffResults() {
+  if (!_diffLastRows) return;
+  const rows     = _diffLastRows;
+  const summary  = _diffLastSummary;
+  const onlyDiff = document.getElementById("diff-only-changes").checked;
+  const visible  = onlyDiff ? rows.filter(r => r.status !== "same") : rows;
+
+  const s = summary;
+  document.getElementById("diff-summary").textContent =
+    i18n("diff.summary", s) ||
+    `${s.different} changed · ${s.only_a} only in A · ${s.only_b} only in B · ${s.same} identical`;
+
+  const tbody = document.getElementById("diff-tbody");
+  tbody.innerHTML = "";
+  if (!visible.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#888;padding:16px">${i18n("diff.no_results")}</td></tr>`;
+  } else {
+    const colours = { different: "#fffbeb", only_a: "#fff0f0", only_b: "#f0fff4", same: "" };
+    const labels  = {
+      different: () => i18n("diff.status_different"),
+      only_a:    () => i18n("diff.status_only_a"),
+      only_b:    () => i18n("diff.status_only_b"),
+      same:      () => i18n("diff.status_same"),
+    };
+    visible.forEach(r => {
+      const tr = document.createElement("tr");
+      tr.style.background = colours[r.status] || "";
+      tr.innerHTML =
+        `<td style="font-family:Consolas;font-size:11px">${r.tag}</td>` +
+        `<td style="font-size:12px">${escapeHtml(r.keyword)}</td>` +
+        `<td style="font-size:11px;color:#6b7280">${r.vr}</td>` +
+        `<td style="font-size:12px;max-width:260px;word-break:break-all">${escapeHtml(r.value_a)}</td>` +
+        `<td style="font-size:12px;max-width:260px;word-break:break-all">${escapeHtml(r.value_b)}</td>` +
+        `<td style="font-size:11px;white-space:nowrap">${labels[r.status]?.() || r.status}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+  document.getElementById("diff-results-card").style.display = "";
+}
+
+// ─────────────────────────────────────────────────────────────────
+// UID Remapper
+// ─────────────────────────────────────────────────────────────────
+
+let _uidRemapFiles = [];
+
+function uidRemapFilesSelected() {
+  const input = document.getElementById("uid-remap-file-input");
+  _uidRemapFiles = Array.from(input.files || []);
+  document.getElementById("uid-remap-file-count").textContent =
+    _uidRemapFiles.length
+      ? i18n("uid_remap.files_selected", { n: _uidRemapFiles.length })
+      : "";
+  document.getElementById("uid-remap-preview-card").style.display = "none";
+}
+
+function _uidRemapBuildForm() {
+  const fd = new FormData();
+  _uidRemapFiles.forEach(f => fd.append("files", f));
+  fd.append("level",  document.getElementById("uid-remap-level").value);
+  fd.append("prefix", document.getElementById("uid-remap-prefix").value.trim() || "2.25.");
+  return fd;
+}
+
+async function doUIDRemapPreview() {
+  if (!_uidRemapFiles.length) { toast(i18n("uid_remap.no_files"), "warn"); return; }
+  const status = document.getElementById("uid-remap-status");
+  status.textContent = i18n("uid_remap.preparing");
+  try {
+    const res  = await fetch("/api/dicom/uid-remap/preview",
+                             { method: "POST", body: _uidRemapBuildForm() });
+    const data = await res.json();
+    if (!data.ok) { status.textContent = "Error: " + data.error; return; }
+    _renderUIDRemapPreview(data.mapping);
+    status.textContent = "";
+  } catch (e) {
+    status.textContent = "Error: " + e;
+  }
+}
+
+function _renderUIDRemapPreview(mapping) {
+  const tbody = document.getElementById("uid-remap-preview-tbody");
+  tbody.innerHTML = "";
+  let hasRows = false;
+  mapping.forEach(entry => {
+    entry.changes.forEach((ch, i) => {
+      hasRows = true;
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        `<td style="font-size:12px">${i === 0 ? escapeHtml(entry.file) : ""}</td>` +
+        `<td style="font-size:11px;font-family:Consolas">${ch.tag} ${escapeHtml(ch.name)}</td>` +
+        `<td style="font-size:11px;font-family:Consolas;word-break:break-all;max-width:220px;color:#dc2626">${escapeHtml(ch.old)}</td>` +
+        `<td style="font-size:11px;font-family:Consolas;word-break:break-all;max-width:220px;color:#16a34a">${escapeHtml(ch.new)}</td>`;
+      tbody.appendChild(tr);
+    });
+  });
+  if (!hasRows) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#888;padding:16px">${i18n("uid_remap.preview_none")}</td></tr>`;
+  }
+  document.getElementById("uid-remap-preview-card").style.display = "";
+  document.getElementById("uid-remap-preview-card").scrollIntoView({ behavior: "smooth" });
+}
+
+async function doUIDRemapDownload() {
+  if (!_uidRemapFiles.length) { toast(i18n("uid_remap.no_files"), "warn"); return; }
+  const status = document.getElementById("uid-remap-status");
+  status.textContent = i18n("uid_remap.preparing");
+  try {
+    const res = await fetch("/api/dicom/uid-remap", { method: "POST", body: _uidRemapBuildForm() });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      status.textContent = "Error: " + (err.error || res.statusText);
+      return;
+    }
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "uid_remapped.zip";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    status.textContent = i18n("uid_remap.done");
   } catch (e) {
     status.textContent = "Error: " + e;
   }

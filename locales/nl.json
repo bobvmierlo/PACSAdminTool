@@ -22,7 +22,7 @@
     "sr_viewer": "SR Viewer",
     "kos_creator": "KOS Maker",
     "dicomize": "DICOMiseer",
-    "inspector": "DICOM Inspector",
+    "inspector": "Inspector & Editor",
     "anonymizer": "Anonimiseerder",
     "dicomdir": "DICOMDIR",
     "settings": "Instellingen",
@@ -30,7 +30,8 @@
     "about": "Over",
     "logs": "Logboeken",
     "dicomweb": "DICOMweb",
-    "validator": "DICOM Validator"
+    "validator": "DICOM Validator",
+    "uid_remap": "UID Remapper"
   },
   "common": {
     "preset": "Voorinstelling:",
@@ -324,8 +325,8 @@
     "body_dicomize": "Converteer niet-DICOM-bestanden (PDF, afbeeldingen, video) naar geldige DICOM-objecten.\n\n─── Gedeelde patiënt- en studiegegevens ──────────────────\nAlle drie de subtabs delen een invouwbare kaart bovenaan.\nVul de velden eenmalig in; ze gelden voor elke conversie in de huidige sessie.\n• Studie Instance UID — vul een bestaande UID in of klik Genereren.\n\n─── Invullen vanuit Worklist ────────────────────────────\nKlik op \"Invullen uit Worklist…\" om een DICOM Modality Worklist te bevragen\nen patiënt/studiegegevens automatisch in te vullen vanuit een geselecteerd item.\nDit simuleert hoe een echte modaliteit werkt: de PACS koppelt ontvangen\nbeelden automatisch aan de juiste studie.\n\n─── PDF naar DICOM ───────────────────────────────────────\nSlaat de PDF ongewijzigd op als Encapsulated PDF Storage.\nSOP-klasse  1.2.840.10008.5.1.4.1.1.104.1\nModaliteit  DOC\n• Originele PDF-bytes worden verbatim opgeslagen.\n\n─── Afbeeldingen naar DICOM ─────────────────────────────\nConverteert rasterafbeeldingen naar Secondary Capture DICOM-bestanden.\nSOP-klasse  1.2.840.10008.5.1.4.1.1.7\nModaliteit  OT\n• Meerdere bestanden → aparte .dcm per afbeelding, geleverd als ZIP.\n\n─── Video naar DICOM ────────────────────────────────────\nTwee uitvoerformaten beschikbaar:\n\n  Ingekapselde video (standaard)\n    SOP-klasse  1.2.840.10008.5.1.4.1.1.77.1.2.1  (Video Photographic Image Storage)\n    Transfer    1.2.840.10008.1.2.4.102  (MPEG-4 AVC/H.264)\n    Modaliteit  XC\n    Video wordt niet getranscodeerd.\n    Let op: sommige viewers openen dit in een externe videospeler.\n\n  Multi-frame JPEG\n    SOP-klasse  1.2.840.10008.5.1.4.1.1.7.4  (Multi-frame True Color Secondary Capture)\n    Transfer    1.2.840.10008.1.2.4.50  (JPEG Baseline)\n    Modaliteit  OT\n    Frames worden geëxtraheerd met ffmpeg (max. 10 fps) als JPEG-frames.\n    Speelt als native cine-loop in alle standaard DICOM-viewers.\n    Vereist: ffmpeg geïnstalleerd op de server.\n\n─── Downloaden vs Verzenden naar PACS ───────────────────\nDICOM downloaden      Converteert en triggert een browserdownload (.dcm of .zip).\nVerzenden naar PACS   Converteert en stuurt via C-STORE. Selecteer een preset\n                      of voer handmatig host/poort/AE-titel in.",
     "section_cget": "C-MOVE vs C-GET",
     "body_cget": "Zie de Engelstalige help voor een volledige vergelijking van C-MOVE en C-GET.\n\nKort samengevat:\n• C-MOVE instrueert een PACS om bestanden naar een derde AE te sturen.\n• C-GET haalt bestanden rechtstreeks op naar deze applicatie, zonder dat een apart inkomend poort nodig is.",
-    "section_inspector": "DICOM Bestandsinspector",
-    "body_inspector": "Inspecteer DICOM-tags van elk .dcm-bestand zonder PACS-verbinding.\n\nWorkflow: bestand kiezen → Parse & Inspect → alle tags bekijken.",
+    "section_inspector": "DICOM Inspector & Editor",
+    "body_inspector": "Inspecteer, bewerk en vergelijk DICOM-tags zonder PACS-verbinding.\n\n─── Subtab Inspecteren & Bewerken ──────────────────────────────\n1. Klik op Bladeren en selecteer een DICOM-bestand.\n2. Klik op Parse & Inspecteren.\n3. Een metadata-overzicht verschijnt (Patiënt, Modaliteit, SOPClass, etc.).\n4. Klik op Alle DICOM-tags bekijken voor de volledige filterbare tagboom.\n5. Klik op Tags bewerken… voor de inline Tag-editor:\n   • Bewerk elke tagwaarde direct en volg openstaande wijzigingen.\n   • Gewijzigd bestand downloaden — slaat het bewerkte DICOM op.\n   • Verzenden naar PACS — C-STOREt het bewerkte bestand naar een AE.\n\n─── Subtab Vergelijken ──────────────────────────────────────────\nVergelijk twee DICOM-bestanden tag voor tag:\n1. Selecteer Bestand A en Bestand B.\n2. Klik op Vergelijken.\n3. De tabel toont Gewijzigd / Alleen in A / Alleen in B / Identiek.\n   Schakel 'Toon alleen verschillen' in om identieke tags te verbergen.\n\n─── Toepassingen ────────────────────────────────────────────────\n• Foute tags corrigeren (patiëntnaam, accession number) voor herimport.\n• Anonimisering of correctie verifiëren.\n• Dezelfde studie uit twee systemen vergelijken.",
     "section_anonymizer": "DICOM Anonimiseerder",
     "body_anonymizer": "Verwijder of vervang beschermde patiëntgegevens (PHI) uit DICOM-bestanden.\n\n─── Profielen ────────────────────────────────────────────\n  Basis     Vervangt PatientName en PatientID, verwijdert geboortedatum,\n            geslacht, instelling, verwijzende artsen en accession number.\n\n  Volledig  Alles uit Basis plus studie/seriebeschrijvingen en protocolnaam.\n\n─── Workflow ─────────────────────────────────────────────\n1. Klik Bestanden toevoegen en selecteer .dcm-bestanden.\n2. Kies een profiel en stel vervangwaarden in.\n3. Kies een uitvoeroptie:\n\n   Anonimiseren & ZIP downloaden\n     Converteert en triggert een browserdownload. Originelen ongewijzigd.\n\n   Anonimiseren & Verzenden (C-STORE)\n     Anonimiseert de bestanden en stuurt ze direct naar een PACS via C-STORE.\n     Selecteer een preset of voer handmatig host/poort/AE-titel in.\n\n─── Belangrijke opmerkingen ──────────────────────────────\n• UIDs worden standaard NIET gewijzigd.\n• Ingebrand PHI in pixeldata wordt NIET verwijderd.\n• Valideer het resultaat altijd bij klinische workflows.",
     "section_dicomdir": "DICOMDIR",
@@ -339,7 +340,9 @@
     "section_dicomweb": "DICOMweb",
     "section_validator": "DICOM Validator",
     "body_dicomweb": "Zoek, sla op en haal DICOM-objecten op via de DICOMweb REST API.\n\n─── Wat is DICOMweb? ────────────────────────────────────────\nDICOMweb is een set RESTful-services gedefinieerd in DICOM PS3.18 en biedt\nHTTP-alternatieven voor traditionele DICOM-netwerkdiensten:\n\n  QIDO-RS   Zoeken op basis van ID — vervangt C-FIND\n  STOW-RS   Opslaan via het web — vervangt C-STORE\n  WADO-RS   Ophalen via het web — vervangt C-MOVE / C-GET\n\nModerne PACS-, VNA- en cloudplatformen (Orthanc, DCM4CHEE, Google Healthcare\nAPI, Azure DICOM Service) bieden naast traditioneel DICOM ook DICOMweb aan.\n\n─── Serverconfiguratie ──────────────────────────────────────\nVoer de basis-URL van het DICOMweb-eindpunt in, bijv.:\n  http://orthanc.local:8042/wado\n  https://healthcare.googleapis.com/v1/.../dicomWeb\n\nAuthenticatieopties:\n  Geen      Geen inloggegevens vereist\n  Basis     Gebruikersnaam / wachtwoord (HTTP Basic Authentication)\n  Bearer    OAuth 2.0 Bearer-token\n\nKlik op Verbinding testen om een minimaal QIDO-RS-verzoek te sturen\nen te bevestigen dat de server reageert met HTTP 200.\n\nGebruik Opslaan als voorinstelling om URL en inloggegevens snel opnieuw te gebruiken.\n\n─── QIDO-RS (Zoeken) ────────────────────────────────────────\nZoekniveau bepaalt de granulariteit van de resultaten:\n  Studies    Één rij per studie (meest gebruikelijk)\n  Series     Één rij per serie — voer Study UID in om te beperken\n  Instanzen  Één rij per SOP-instantie — voer Study + Series UID in\n\nLaat filtervelden leeg om alle records te zoeken.\nGebruik Max. resultaten om grote antwoorden te beperken.\n\nPatiëntnaam ondersteunt wildcards: JANSEN* of *JANSEN*\n\n─── STOW-RS (Opslaan) ───────────────────────────────────────\nStuur een of meer DICOM-bestanden naar de server via:\n  POST <basis-url>/studies\n\n─── WADO-RS (Ophalen) ───────────────────────────────────────\nHaal een complete studie, serie of instantie op.\nHet antwoord wordt geretourneerd als een ZIP-archief met één .dcm-bestand\nper opgehaalde instantie.",
-    "body_validator": "Valideer een DICOM-bestand tegen de DICOM-standaard en identificeer afwijkingen.\n\n─── Wat wordt gecontroleerd ─────────────────────────────────\nBestandsmeta-informatie (Groep 0002)\n  • Transfer Syntax UID aanwezig en geldig formaat\n  • MediaStorageSOPClassUID en MediaStorageSOPInstanceUID aanwezig\n  • Cross-check tussen bestandsmeta en dataset-UIDs\n\nKernidentificatoren\n  • SOPClassUID (0008,0016) — Type 1 verplicht\n  • SOPInstanceUID (0008,0018) — Type 1 verplicht\n  • StudyInstanceUID (0020,000D) — Type 1 verplicht\n  • SeriesInstanceUID (0020,000E) — Type 1 verplicht\n  • Modality (0008,0060) — Type 1 verplicht\n  • Alle UIDs gevalideerd op DICOM UID-formaatregels\n  • UID-uniciteitscontrole (botsingsdetectie Study/Series/SOP)\n  • Detectie van verouderde SOP-klassen\n\nPatiëntmodule\n  • PatientName (0010,0010) — Type 2\n  • PatientID (0010,0020) — Type 2\n  • PatientBirthDate, PatientSex — Type 2\n\nAlgemene Studiemodule\n  • StudyDate (0008,0020) — Type 2\n  • AccessionNumber (0008,0050) — Type 2\n  • ReferringPhysicianName (0008,0090) — Type 2\n\nPixeldata (alleen afbeelding-SOP-klassen)\n  • Pixeldata aanwezig conform BitsAllocated\n  • BitsStored mag BitsAllocated niet overschrijden\n  • HighBit = BitsStored - 1 controle\n  • Rows en Columns aanwezig\n  • PixelSpacing aanwezig voor CT/MR/PET/NM\n\n─── Ernstniveaus ────────────────────────────────────────────\n  Fout         Bestand schendt een MUST-vereiste. De meeste PACS-systemen\n               zullen het bestand weigeren of verkeerd verwerken.\n  Waarschuwing Bestand schendt een SHOULD-vereiste of bevat een\n               ongebruikelijke waarde. Werkt mogelijk op de meeste systemen.\n  Info         Informatieve bevinding — bestand is geldig maar er is\n               iets te melden (privétags, ontbrekende Type 2-tags, etc.).\n\n─── Tips ────────────────────────────────────────────────────\n• Een schone validatie garandeert niet dat elk PACS het bestand accepteert.\n• Gebruik het tabblad Anonimiseerder voor beelden met ingebrande patiëntgegevens.\n• Gebruik het tabblad DICOM Inspector voor gedetailleerd tagonderzoek."
+    "body_validator": "Valideer een DICOM-bestand tegen de DICOM-standaard en identificeer afwijkingen.\n\n─── Wat wordt gecontroleerd ─────────────────────────────────\nBestandsmeta-informatie (Groep 0002)\n  • Transfer Syntax UID aanwezig en geldig formaat\n  • MediaStorageSOPClassUID en MediaStorageSOPInstanceUID aanwezig\n  • Cross-check tussen bestandsmeta en dataset-UIDs\n\nKernidentificatoren\n  • SOPClassUID (0008,0016) — Type 1 verplicht\n  • SOPInstanceUID (0008,0018) — Type 1 verplicht\n  • StudyInstanceUID (0020,000D) — Type 1 verplicht\n  • SeriesInstanceUID (0020,000E) — Type 1 verplicht\n  • Modality (0008,0060) — Type 1 verplicht\n  • Alle UIDs gevalideerd op DICOM UID-formaatregels\n  • UID-uniciteitscontrole (botsingsdetectie Study/Series/SOP)\n  • Detectie van verouderde SOP-klassen\n\nPatiëntmodule\n  • PatientName (0010,0010) — Type 2\n  • PatientID (0010,0020) — Type 2\n  • PatientBirthDate, PatientSex — Type 2\n\nAlgemene Studiemodule\n  • StudyDate (0008,0020) — Type 2\n  • AccessionNumber (0008,0050) — Type 2\n  • ReferringPhysicianName (0008,0090) — Type 2\n\nPixeldata (alleen afbeelding-SOP-klassen)\n  • Pixeldata aanwezig conform BitsAllocated\n  • BitsStored mag BitsAllocated niet overschrijden\n  • HighBit = BitsStored - 1 controle\n  • Rows en Columns aanwezig\n  • PixelSpacing aanwezig voor CT/MR/PET/NM\n\n─── Ernstniveaus ────────────────────────────────────────────\n  Fout         Bestand schendt een MUST-vereiste. De meeste PACS-systemen\n               zullen het bestand weigeren of verkeerd verwerken.\n  Waarschuwing Bestand schendt een SHOULD-vereiste of bevat een\n               ongebruikelijke waarde. Werkt mogelijk op de meeste systemen.\n  Info         Informatieve bevinding — bestand is geldig maar er is\n               iets te melden (privétags, ontbrekende Type 2-tags, etc.).\n\n─── Tips ────────────────────────────────────────────────────\n• Een schone validatie garandeert niet dat elk PACS het bestand accepteert.\n• Gebruik het tabblad Anonimiseerder voor beelden met ingebrande patiëntgegevens.\n• Gebruik het tabblad DICOM Inspector voor gedetailleerd tagonderzoek.",
+    "section_uid_remap": "UID Remapper",
+    "body_uid_remap": "Genereer nieuwe Study / Series / Instance-UIDs voor een batch DICOM-bestanden.\n\n─── Waarom dit nodig is ─────────────────────────────────────────\nDe meeste PACS-systemen weigeren een C-STORE als de StudyInstanceUID al\nbestaat in hun database. De UID Remapper lost dit op door volledig nieuwe\nUIDs aan te maken, terwijl alle andere tags en interne verwijzingen intact\nblijven (alle bestanden van dezelfde studie krijgen dezelfde nieuwe\nStudyInstanceUID, enzovoort).\n\n─── Werkwijze ───────────────────────────────────────────────────\n1. Selecteer één of meer DICOM-bestanden.\n2. Kies het remap-niveau:\n   • Alleen studie — alleen StudyInstanceUID wordt vervangen.\n   • Studie + Series — Study + SeriesInstanceUID.\n   • Studie + Series + Instance — alle drie de UIDs (veiligste optie).\n3. Stel optioneel een aangepast UID-voorvoegsel in (standaard: 2.25.).\n4. Klik op Voorbeeld om de oud→nieuw-mapping te bekijken.\n5. Klik op Remapped ZIP downloaden.\n6. Verstuur de bestanden via C-STORE of DICOMweb STOW-RS.\n\n─── Opmerkingen ─────────────────────────────────────────────────\n• Het voorvoegsel '2.25.' gevolgd door een UUID-integer is een DICOM-\n  conforme methode voor globally unique UIDs zonder geregistreerde root.\n• MediaStorageSOPInstanceUID in de file meta-groep wordt ook bijgewerkt\n  bij remap op instance-niveau."
   },
   "dashboard": {
     "services": "Services",
@@ -356,7 +359,9 @@
     "parse": "Parse & Inspecteren",
     "metadata": "Bestandsmetadata",
     "all_tags": "Alle DICOM-tags bekijken",
-    "edit_tags": "Tags bewerken…"
+    "edit_tags": "Tags bewerken…",
+    "subtab_edit": "Inspecteren & Bewerken",
+    "subtab_diff": "Vergelijken"
   },
   "anonymizer": {
     "title": "DICOM Anonimiseerder",
@@ -777,5 +782,48 @@
     "severity_error": "Fout",
     "severity_warning": "Waarschuwing",
     "severity_info": "Info"
+  },
+  "diff": {
+    "title": "DICOM-bestandsvergelijking",
+    "file_a": "Bestand A",
+    "file_b": "Bestand B",
+    "no_file": "Geen bestand geselecteerd",
+    "diff_only": "Toon alleen verschillen",
+    "compare": "Vergelijken",
+    "results_title": "Vergelijkingsresultaten",
+    "col_value_a": "Waarde A",
+    "col_value_b": "Waarde B",
+    "col_status": "Status",
+    "status_different": "Gewijzigd",
+    "status_only_a": "Alleen in A",
+    "status_only_b": "Alleen in B",
+    "status_same": "Identiek",
+    "summary": "{different} gewijzigd · {only_a} alleen in A · {only_b} alleen in B · {same} identiek",
+    "no_results": "Geen verschillen gevonden.",
+    "select_both": "Selecteer beide bestanden vóór het vergelijken."
+  },
+  "uid_remap": {
+    "title": "UID Remapper",
+    "description": "Genereer nieuwe Study / Series / Instance-UIDs voor een batch DICOM-bestanden. Handig bij het opnieuw importeren van een studie die al bestaat in het PACS (afwijzing bij dubbele UID).",
+    "files_label": "DICOM-bestanden",
+    "browse": "Bladeren…",
+    "files_selected": "{n} bestand(en) geselecteerd",
+    "level_label": "Remap-niveau",
+    "level_study": "Alleen studie (StudyInstanceUID)",
+    "level_series": "Studie + Series",
+    "level_instance": "Studie + Series + Instance (alle UIDs)",
+    "prefix_label": "UID-voorvoegsel",
+    "prefix_hint": "bijv. 2.25. (UUID-gebaseerd)",
+    "preview": "Voorbeeld",
+    "preview_title": "UID-mapping voorbeeld",
+    "col_file": "Bestand",
+    "col_tag": "Tag",
+    "col_old_uid": "Oude UID",
+    "col_new_uid": "Nieuwe UID",
+    "download": "Remapped ZIP downloaden",
+    "no_files": "Selecteer eerst een of meer DICOM-bestanden.",
+    "preparing": "Nieuwe UIDs genereren…",
+    "done": "Klaar — ZIP gedownload.",
+    "preview_none": "Geen UID-wijzigingen gedetecteerd."
   }
 }

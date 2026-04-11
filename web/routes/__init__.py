@@ -10,6 +10,7 @@ from web.routes.locale_routes import bp as locale_bp
 from web.routes.logs_routes import bp as logs_bp
 from web.routes.scp_routes import bp as scp_bp
 from web.routes.system import bp as system_bp
+from web.routes.uid_remap_routes import bp as uid_remap_bp
 from web.routes.validator_routes import bp as validator_bp
 
 
@@ -24,5 +25,6 @@ def register_all(app):
     app.register_blueprint(dicomize_bp)
     app.register_blueprint(dicomweb_bp)
     app.register_blueprint(validator_bp)
+    app.register_blueprint(uid_remap_bp)
     app.register_blueprint(scp_bp)
     app.register_blueprint(hl7_bp)

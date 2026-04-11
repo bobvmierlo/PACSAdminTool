@@ -927,6 +927,82 @@ def dicom_edit_and_store():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+# ── DICOM Diff ────────────────────────────────────────────────────────────────
+
+@bp.route("/api/dicom/diff", methods=["POST"])
+@require_login
+def dicom_diff():
+    """Compare two DICOM files tag-by-tag and return a structured diff."""
+    import pydicom
+
+    fa = request.files.get("file_a")
+    fb = request.files.get("file_b")
+    if not fa or not fb:
+        return jsonify({"ok": False, "error": "Two files required (file_a, file_b)."}), 400
+
+    def _to_dict(ds):
+        result = {}
+        for elem in ds:
+            tag_str = f"({elem.tag.group:04X},{elem.tag.element:04X})"
+            try:
+                if elem.VR == "SQ":
+                    val = f"[Sequence: {len(elem.value)} item(s)]"
+                elif elem.VR in ("OB", "OD", "OF", "OL", "OW", "UN"):
+                    val = f"[Binary: {len(elem.value)} bytes]"
+                else:
+                    val = str(elem.value)
+            except Exception:
+                val = "[unreadable]"
+            result[tag_str] = {
+                "keyword": elem.keyword or "",
+                "vr":      str(elem.VR),
+                "value":   val,
+            }
+        return result
+
+    try:
+        ds_a = pydicom.dcmread(io.BytesIO(fa.read()), force=True)
+        ds_b = pydicom.dcmread(io.BytesIO(fb.read()), force=True)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+    tags_a = _to_dict(ds_a)
+    tags_b = _to_dict(ds_b)
+    all_tags = sorted(set(tags_a) | set(tags_b))
+
+    rows = []
+    for tag in all_tags:
+        a = tags_a.get(tag)
+        b = tags_b.get(tag)
+        if a and not b:
+            status = "only_a"
+        elif b and not a:
+            status = "only_b"
+        elif a["value"] != b["value"]:
+            status = "different"
+        else:
+            status = "same"
+        rows.append({
+            "tag":     tag,
+            "keyword": (a or b)["keyword"],
+            "vr":      (a or b)["vr"],
+            "value_a": a["value"] if a else "",
+            "value_b": b["value"] if b else "",
+            "status":  status,
+        })
+
+    summary = {
+        "total":     len(rows),
+        "different": sum(1 for r in rows if r["status"] == "different"),
+        "only_a":    sum(1 for r in rows if r["status"] == "only_a"),
+        "only_b":    sum(1 for r in rows if r["status"] == "only_b"),
+        "same":      sum(1 for r in rows if r["status"] == "same"),
+    }
+    _audit("dicom.diff", ip=_req_ip(), user=_req_user(),
+           detail={"file_a": fa.filename, "file_b": fb.filename})
+    return jsonify({"ok": True, "rows": rows, "summary": summary})
+
+
 # ── Custom Anonymisation Profiles ─────────────────────────────────────────────
 
 @bp.route("/api/dicom/anon_profiles", methods=["GET"])

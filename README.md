@@ -22,12 +22,13 @@ Can also be run locally with Python and pip, or deployed as a Docker container.
 | **DMWL** | Full Modality Worklist query with export to CSV |
 | **Storage Commit** | Send N-ACTION storage commitment requests; receive async N-EVENT-REPORT responses with committed/failed breakdown |
 | **IOCM** | Send Instance Availability Notifications (delete/change notifications) |
-| **DICOM Inspector** | Upload any `.dcm` file and browse all DICOM tags in a searchable, collapsible tree |
+| **Inspector & Editor** | Upload any `.dcm` file; browse all tags in a searchable tree; inline tag editor lets you change any value, then download the modified file or send it directly via C-STORE; Diff sub-tab compares two DICOM files tag-by-tag |
 | **DICOM Validator** | Upload any `.dcm` file for conformance checking; validates file meta (group 0002), core UIDs, mandatory patient/study tags, pixel data consistency, UID collisions, and retired SOP classes; findings categorised as Error / Warning / Info |
 | **SR Viewer** | Parse any DICOM Structured Report as an interactive collapsible tree; colour-coded type/relationship badges; DCM-coded concepts link to the NEMA PS3.16 standard; filter bar |
 | **KOS Creator** | Build a DICOM Key Object Selection document (XDS-I manifest) from existing DICOM files |
 | **DICOMize** | Convert non-DICOM files to DICOM: PDF → Encapsulated PDF, images (JPEG/PNG/BMP/TIFF/WebP) → Secondary Capture, video (MP4/MOV) → Encapsulated Video; download or send directly to a PACS via C-STORE |
 | **Anonymizer** | Strip PHI from one or more DICOM files using a Basic or Full profile; download result as a ZIP |
+| **UID Remapper** | Generate fresh Study / Series / Instance UIDs for a batch of DICOM files while preserving internal referential integrity; preview the old→new UID mapping before downloading as ZIP |
 | **DICOMDIR** | Read a DICOMDIR file and browse the Patient → Study → Series → Instance hierarchy; or generate a standards-compliant DICOMDIR from uploaded files/folder and download as ZIP |
 | **DICOMweb** | QIDO-RS study/series/instance queries, STOW-RS multi-file upload, WADO-RS retrieve (packaged as ZIP); preset-based server configuration with Basic Auth and Bearer Token support |
 | **HL7** | Send/receive HL7 v2 messages over MLLP; built-in templates for ORM, ORU, ADT, SIU, OML, QBP |
@@ -296,9 +297,19 @@ The UI supports English and Dutch. Switch languages in the **Settings** tab.
 - Per-file Inspect (full tag browser) and Delete actions in the Files on Disk table
 - **Auto-purge**: files older than 24 hours are deleted on startup and nightly at 01:00 to prevent patient data from lingering
 
-### DICOM Inspector
+### Inspector & Editor
+Two sub-tabs in one panel — no PACS connection required.
+
+**Inspect & Edit sub-tab:**
 - Upload any `.dcm` file and browse all tags in a searchable, collapsible tree
 - Sequence (SQ) elements expand inline; binary data shown as byte-length summary
+- Click **Edit Tags…** to open the inline Tag Editor: change any tag value in-place, track pending changes, then **Download Modified File** or **Send to PACS** via C-STORE
+
+**Diff sub-tab:**
+- Select two `.dcm` files (File A and File B) and click **Compare**
+- Results table shows every tag with its status: **Changed** / **Only in A** / **Only in B** / **Identical**
+- Toggle "Show differences only" to filter out identical tags
+- Colour-coded rows: yellow = changed, red-tint = only in A, green-tint = only in B
 
 ### DICOM Validator
 Performs a **DICOM conformance check** on any `.dcm` file without sending it to a PACS.
@@ -322,6 +333,29 @@ Performs a **DICOM conformance check** on any `.dcm` file without sending it to 
 - **Info** — informational only; no action required
 
 **Requirements:** Only `pydicom` (already bundled) — no extra packages.
+
+### UID Remapper
+Generates fresh Study / Series / Instance UIDs for a batch of DICOM files while preserving internal referential integrity.
+
+**Why you need this:** Most PACS systems reject a C-STORE when the StudyInstanceUID already exists in their database. The UID Remapper creates brand-new UIDs so the study can be re-imported as a fresh study.
+
+**Remap levels:**
+
+| Level | Tags replaced |
+|-------|--------------|
+| Study only | `StudyInstanceUID` (0020,000D) |
+| Study + Series | `StudyInstanceUID` + `SeriesInstanceUID` (0020,000E) |
+| Study + Series + Instance | All three + `SOPInstanceUID` (0008,0018) + file meta `MediaStorageSOPInstanceUID` |
+
+**Workflow:**
+1. Select one or more DICOM files
+2. Choose a remap level (default: all UIDs)
+3. Optionally set a custom UID prefix (default `2.25.` — UUID-based, globally unique without a registered root)
+4. Click **Preview** to inspect the old→new UID mapping before committing
+5. Click **Download Remapped ZIP** to get the modified files
+6. C-STORE via the C-STORE tab or upload via DICOMweb STOW-RS
+
+All files from the same original study receive the same new `StudyInstanceUID`, maintaining referential integrity across a multi-file set.
 
 ### Anonymizer
 - Upload one or more DICOM files
