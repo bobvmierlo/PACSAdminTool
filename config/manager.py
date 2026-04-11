@@ -25,6 +25,7 @@ DEFAULT_CONFIG = {
         "port": 11112
     },
     "remote_aes": [],
+    "dicomweb_presets": [],
     "hl7": {
         "listen_port": 2575,
         "default_host": "127.0.0.1",

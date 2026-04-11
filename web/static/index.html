@@ -870,12 +870,15 @@
   <button class="tab-btn" onclick="showTab('dmwl')" data-i18n="tabs.dmwl">Worklist (DMWL)</button>
   <button class="tab-btn" onclick="showTab('commit')" data-i18n="tabs.commit">Storage Commit</button>
   <button class="tab-btn" onclick="showTab('iocm')" data-i18n="tabs.iocm">IOCM</button>
-  <button class="tab-btn" onclick="showTab('inspector')" data-i18n="tabs.inspector">DICOM Inspector</button>
+  <button class="tab-btn" onclick="showTab('inspector')" data-i18n="tabs.inspector">Inspector &amp; Editor</button>
+  <button class="tab-btn" onclick="showTab('validator')" data-i18n="tabs.validator">DICOM Validator</button>
   <button class="tab-btn" onclick="showTab('sr_viewer')" data-i18n="tabs.sr_viewer">SR Viewer</button>
   <button class="tab-btn" onclick="showTab('kos_creator')" data-i18n="tabs.kos_creator">KOS Creator</button>
   <button class="tab-btn" onclick="showTab('dicomize')" data-i18n="tabs.dicomize">DICOMize</button>
   <button class="tab-btn" onclick="showTab('anonymizer')" data-i18n="tabs.anonymizer">Anonymizer</button>
+  <button class="tab-btn" onclick="showTab('uid_remap')" data-i18n="tabs.uid_remap">UID Remapper</button>
   <button class="tab-btn" onclick="showTab('dicomdir')" data-i18n="tabs.dicomdir">DICOMDIR</button>
+  <button class="tab-btn" onclick="showTab('dicomweb')" data-i18n="tabs.dicomweb">DICOMweb</button>
   <button class="tab-btn" onclick="showTab('hl7')" data-i18n="tabs.hl7">HL7</button>
   <button class="tab-btn" onclick="showTab('settings')" data-i18n="tabs.settings">Settings</button>
   <button class="tab-btn" onclick="showTab('logs')" data-i18n="tabs.logs">Logs</button>
@@ -1335,73 +1338,381 @@
     <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-scp"></div></div>
   </div>
 
-  <!-- ── DICOM Inspector ──────────────────────────────────────────── -->
+  <!-- ── DICOM Inspector & Editor ────────────────────────────────── -->
   <div id="tab-inspector" class="tab-panel">
-    <div class="card">
-      <h3 data-i18n="inspector.title">DICOM File Inspector</h3>
-      <div class="btn-row">
-        <input type="file" id="inspector-file-input" accept=".dcm,*" style="display:none"
-               onchange="inspectorFileSelected()">
-        <button class="btn" onclick="document.getElementById('inspector-file-input').click()"
-                data-i18n="common.browse">Browse…</button>
-        <span id="inspector-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
-              text-overflow:ellipsis; white-space:nowrap"></span>
-        <button class="btn primary" onclick="doInspect()" data-i18n="inspector.parse">Parse &amp; Inspect</button>
-      </div>
+    <!-- Sub-tab navigation -->
+    <div class="subtab-bar">
+      <button class="subtab-btn active" id="inspector-subtab-btn-edit"
+              onclick="showInspectorSubTab('edit')"
+              data-i18n="inspector.subtab_edit">Inspect &amp; Edit</button>
+      <button class="subtab-btn" id="inspector-subtab-btn-diff"
+              onclick="showInspectorSubTab('diff')"
+              data-i18n="inspector.subtab_diff">Diff</button>
     </div>
-    <div class="card" id="inspector-meta-card" style="display:none">
-      <h3 data-i18n="inspector.metadata">File Metadata</h3>
-      <div id="inspector-meta-grid" class="field-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px,1fr))"></div>
-      <div class="btn-row" style="margin-top:12px">
-        <button class="btn primary" onclick="inspectorShowTags()" data-i18n="inspector.all_tags">View All DICOM Tags</button>
-        <button class="btn" onclick="openTagEditor()" data-i18n="inspector.edit_tags">Edit Tags…</button>
+
+    <!-- ── Inspect & Edit ──────────────────────────────────────────── -->
+    <div id="inspector-subtab-edit" class="subtab-panel active">
+      <div class="card">
+        <h3 data-i18n="inspector.title">DICOM File Inspector</h3>
+        <div class="btn-row">
+          <input type="file" id="inspector-file-input" accept=".dcm,*" style="display:none"
+                 onchange="inspectorFileSelected()">
+          <button class="btn" onclick="document.getElementById('inspector-file-input').click()"
+                  data-i18n="common.browse">Browse…</button>
+          <span id="inspector-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
+                text-overflow:ellipsis; white-space:nowrap"></span>
+          <button class="btn primary" onclick="doInspect()" data-i18n="inspector.parse">Parse &amp; Inspect</button>
+        </div>
+      </div>
+      <div class="card" id="inspector-meta-card" style="display:none">
+        <h3 data-i18n="inspector.metadata">File Metadata</h3>
+        <div id="inspector-meta-grid" class="field-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px,1fr))"></div>
+        <div class="btn-row" style="margin-top:12px">
+          <button class="btn primary" onclick="inspectorShowTags()" data-i18n="inspector.all_tags">View All DICOM Tags</button>
+          <button class="btn" onclick="openTagEditor()" data-i18n="inspector.edit_tags">Edit Tags…</button>
+        </div>
+      </div>
+
+      <!-- Tag editor (shown when Edit Tags is clicked) -->
+      <div class="card" id="tag-editor-card" style="display:none">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:8px">
+          <h3 style="margin:0" data-i18n="tag_editor.title">Tag Editor
+            <span id="tag-editor-change-count" style="font-size:12px; color:#2b6cb0; margin-left:8px"></span>
+          </h3>
+          <div style="display:flex; gap:6px; flex-wrap:wrap">
+            <input id="tag-editor-filter" type="text" data-i18n-placeholder="tag_editor.filter_placeholder" placeholder="Filter tags…"
+                   style="width:180px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px"
+                   oninput="renderEditTagTable()">
+            <button class="btn" onclick="resetTagEdits()" data-i18n="tag_editor.reset">Reset changes</button>
+          </div>
+        </div>
+        <div class="result-table-wrap" style="max-height:380px; overflow-y:auto">
+          <table id="tag-editor-table">
+            <thead><tr>
+              <th data-i18n="dicom_detail.col_tag">Tag</th><th data-i18n="dicom_detail.col_keyword">Keyword</th><th data-i18n="dicom_detail.col_vr">VR</th><th data-i18n="dicom_detail.col_value">Value</th><th style="width:60px"></th>
+            </tr></thead>
+            <tbody id="tag-editor-tbody"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:14px; border-top:1px solid #e5e7eb; padding-top:12px">
+          <div style="font-size:13px; font-weight:600; margin-bottom:8px; color:#374151" data-i18n="common.actions">Actions</div>
+          <div class="btn-row" style="flex-wrap:wrap; gap:8px; align-items:flex-end">
+            <button class="btn primary" onclick="downloadEdited()" data-i18n="tag_editor.download">Download Modified File</button>
+            <span style="color:#bbb; font-size:13px">or</span>
+            <div style="display:flex; align-items:flex-end; gap:6px; flex-wrap:wrap">
+              <div class="field" style="min-width:200px">
+                <label style="font-size:11px; color:#888" data-i18n="tag_editor.send_label">Send to Remote AE</label>
+                <select id="tag-editor-ae-select" style="font-size:12px"
+                        onchange="tagEditorAEChanged()">
+                  <option value="" data-i18n="tag_editor.select_preset">Select a preset…</option>
+                </select>
+              </div>
+              <input id="tag-editor-ae-title" data-i18n-placeholder="common.ae_title" placeholder="AE Title"
+                     style="width:110px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
+              <input id="tag-editor-ae-host" data-i18n-placeholder="common.host" placeholder="Host"
+                     style="width:130px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
+              <input id="tag-editor-ae-port" data-i18n-placeholder="common.port" placeholder="Port" type="number" min="1" max="65535"
+                     style="width:70px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
+              <button class="btn success" onclick="sendEditedToPACS()" data-i18n="tag_editor.send_pacs">Send to PACS</button>
+            </div>
+            <span id="tag-editor-status" style="font-size:12px; color:#888"></span>
+          </div>
+        </div>
+      </div>
+    </div><!-- /inspector-subtab-edit -->
+
+    <!-- ── Diff ────────────────────────────────────────────────────── -->
+    <div id="inspector-subtab-diff" class="subtab-panel">
+      <div class="card">
+        <h3 data-i18n="diff.title">DICOM File Diff</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:14px">
+          <div class="field">
+            <label style="font-weight:600" data-i18n="diff.file_a">File A</label>
+            <div class="btn-row" style="margin-top:4px">
+              <input type="file" id="diff-file-a" accept=".dcm,*" style="display:none"
+                     onchange="diffFileChanged('a')">
+              <button class="btn" onclick="document.getElementById('diff-file-a').click()"
+                      data-i18n="common.browse">Browse…</button>
+              <span id="diff-filename-a" style="font-size:13px; color:#888; flex:1; overflow:hidden;
+                    text-overflow:ellipsis; white-space:nowrap"
+                    data-i18n="diff.no_file">No file selected</span>
+            </div>
+          </div>
+          <div class="field">
+            <label style="font-weight:600" data-i18n="diff.file_b">File B</label>
+            <div class="btn-row" style="margin-top:4px">
+              <input type="file" id="diff-file-b" accept=".dcm,*" style="display:none"
+                     onchange="diffFileChanged('b')">
+              <button class="btn" onclick="document.getElementById('diff-file-b').click()"
+                      data-i18n="common.browse">Browse…</button>
+              <span id="diff-filename-b" style="font-size:13px; color:#888; flex:1; overflow:hidden;
+                    text-overflow:ellipsis; white-space:nowrap"
+                    data-i18n="diff.no_file">No file selected</span>
+            </div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer">
+            <input type="checkbox" id="diff-only-changes" checked onchange="_renderDiffResults()">
+            <span data-i18n="diff.diff_only">Show differences only</span>
+          </label>
+          <button class="btn primary" onclick="doDiff()" data-i18n="diff.compare">Compare</button>
+        </div>
+      </div>
+
+      <div class="card" id="diff-results-card" style="display:none">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px">
+          <h3 style="margin:0" data-i18n="diff.results_title">Comparison Results</h3>
+          <span id="diff-summary" style="font-size:12px; color:#555"></span>
+        </div>
+        <div class="result-table-wrap" style="max-height:500px; overflow-y:auto">
+          <table id="diff-table">
+            <thead><tr>
+              <th data-i18n="dicom_detail.col_tag">Tag</th>
+              <th data-i18n="dicom_detail.col_keyword">Keyword</th>
+              <th data-i18n="dicom_detail.col_vr">VR</th>
+              <th data-i18n="diff.col_value_a">Value A</th>
+              <th data-i18n="diff.col_value_b">Value B</th>
+              <th data-i18n="diff.col_status">Status</th>
+            </tr></thead>
+            <tbody id="diff-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /inspector-subtab-diff -->
+  </div>
+
+  <!-- ── DICOM Validator ───────────────────────────────────────────── -->
+  <div id="tab-validator" class="tab-panel">
+    <!-- File selection -->
+    <div class="card">
+      <h3 data-i18n="validator.title">DICOM File Validator</h3>
+      <div class="btn-row">
+        <input type="file" id="validator-file-input" accept=".dcm,*" style="display:none"
+               onchange="validatorFileSelected()">
+        <button class="btn" onclick="document.getElementById('validator-file-input').click()"
+                data-i18n="common.browse">Browse…</button>
+        <span id="validator-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
+              text-overflow:ellipsis; white-space:nowrap"></span>
+        <button class="btn primary" onclick="doValidate()" data-i18n="validator.validate">Validate</button>
       </div>
     </div>
 
-    <!-- Tag editor (shown when Edit Tags is clicked) -->
-    <div class="card" id="tag-editor-card" style="display:none">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:8px">
-        <h3 style="margin:0" data-i18n="tag_editor.title">Tag Editor
-          <span id="tag-editor-change-count" style="font-size:12px; color:#2b6cb0; margin-left:8px"></span>
-        </h3>
-        <div style="display:flex; gap:6px; flex-wrap:wrap">
-          <input id="tag-editor-filter" type="text" data-i18n-placeholder="tag_editor.filter_placeholder" placeholder="Filter tags…"
-                 style="width:180px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px"
-                 oninput="renderEditTagTable()">
-          <button class="btn" onclick="resetTagEdits()" data-i18n="tag_editor.reset">Reset changes</button>
-        </div>
-      </div>
-      <div class="result-table-wrap" style="max-height:380px; overflow-y:auto">
-        <table id="tag-editor-table">
-          <thead><tr>
-            <th data-i18n="dicom_detail.col_tag">Tag</th><th data-i18n="dicom_detail.col_keyword">Keyword</th><th data-i18n="dicom_detail.col_vr">VR</th><th data-i18n="dicom_detail.col_value">Value</th><th style="width:60px"></th>
-          </tr></thead>
-          <tbody id="tag-editor-tbody"></tbody>
+    <!-- Summary card (shown after validation) -->
+    <div class="card" id="validator-summary-card" style="display:none">
+      <h3 data-i18n="validator.summary_title">Validation Summary</h3>
+      <div class="field-grid" id="validator-summary-grid"></div>
+      <div id="validator-verdict" style="margin-top:12px; padding:10px 14px; border-radius:4px;
+           font-size:13px; font-weight:600; border:1px solid transparent"></div>
+    </div>
+
+    <!-- Findings table (shown after validation) -->
+    <div class="card" id="validator-findings-card" style="display:none">
+      <h3 data-i18n="validator.findings_title">Findings</h3>
+      <div class="result-table-wrap">
+        <table id="validator-findings-table">
+          <thead>
+            <tr>
+              <th style="width:90px"  data-i18n="validator.col_severity">Severity</th>
+              <th style="width:210px" data-i18n="validator.col_code">Code</th>
+              <th style="width:140px" data-i18n="validator.col_tag">Tag</th>
+              <th data-i18n="validator.col_message">Message</th>
+            </tr>
+          </thead>
+          <tbody id="validator-findings-tbody"></tbody>
         </table>
       </div>
-      <div style="margin-top:14px; border-top:1px solid #e5e7eb; padding-top:12px">
-        <div style="font-size:13px; font-weight:600; margin-bottom:8px; color:#374151" data-i18n="common.actions">Actions</div>
-        <div class="btn-row" style="flex-wrap:wrap; gap:8px; align-items:flex-end">
-          <button class="btn primary" onclick="downloadEdited()" data-i18n="tag_editor.download">Download Modified File</button>
-          <span style="color:#bbb; font-size:13px">or</span>
-          <div style="display:flex; align-items:flex-end; gap:6px; flex-wrap:wrap">
-            <div class="field" style="min-width:200px">
-              <label style="font-size:11px; color:#888" data-i18n="tag_editor.send_label">Send to Remote AE</label>
-              <select id="tag-editor-ae-select" style="font-size:12px"
-                      onchange="tagEditorAEChanged()">
-                <option value="" data-i18n="tag_editor.select_preset">Select a preset…</option>
-              </select>
-            </div>
-            <input id="tag-editor-ae-title" data-i18n-placeholder="common.ae_title" placeholder="AE Title"
-                   style="width:110px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
-            <input id="tag-editor-ae-host" data-i18n-placeholder="common.host" placeholder="Host"
-                   style="width:130px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
-            <input id="tag-editor-ae-port" data-i18n-placeholder="common.port" placeholder="Port" type="number" min="1" max="65535"
-                   style="width:70px; font-size:12px; padding:4px 8px; border:1px solid #d1d5db; border-radius:4px">
-            <button class="btn success" onclick="sendEditedToPACS()" data-i18n="tag_editor.send_pacs">Send to PACS</button>
-          </div>
-          <span id="tag-editor-status" style="font-size:12px; color:#888"></span>
+    </div>
+  </div>
+
+  <!-- ── DICOMweb ────────────────────────────────────────────────────── -->
+  <div id="tab-dicomweb" class="tab-panel">
+
+    <!-- Server configuration card -->
+    <div class="card">
+      <h3 data-i18n="dicomweb.server_title">DICOMweb Server</h3>
+      <div class="field-grid">
+        <div class="field" style="grid-column:span 3">
+          <label data-i18n="dicomweb.base_url">Base URL</label>
+          <input id="dw-base-url" type="url"
+                 data-i18n-placeholder="dicomweb.base_url_placeholder"
+                 placeholder="https://server/wado/rs">
         </div>
+        <div class="field">
+          <label data-i18n="dicomweb.auth_type">Authentication</label>
+          <select id="dw-auth-type" onchange="dwAuthTypeChanged()">
+            <option value="none"   data-i18n="dicomweb.auth_none">None</option>
+            <option value="basic"  data-i18n="dicomweb.auth_basic">Basic (Username / Password)</option>
+            <option value="bearer" data-i18n="dicomweb.auth_bearer">Bearer Token</option>
+          </select>
+        </div>
+      </div>
+      <!-- Basic auth fields -->
+      <div id="dw-basic-fields" class="field-grid" style="display:none; margin-top:8px">
+        <div class="field">
+          <label data-i18n="dicomweb.username">Username</label>
+          <input id="dw-username" autocomplete="username">
+        </div>
+        <div class="field">
+          <label data-i18n="dicomweb.password">Password</label>
+          <input id="dw-password" type="password" autocomplete="current-password">
+        </div>
+      </div>
+      <!-- Bearer token field -->
+      <div id="dw-bearer-fields" style="display:none; margin-top:8px">
+        <div class="field">
+          <label data-i18n="dicomweb.token">Bearer Token</label>
+          <input id="dw-token" style="width:100%">
+        </div>
+      </div>
+      <!-- Preset management row -->
+      <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; align-items:center">
+        <select id="dw-preset-select" onchange="dwLoadPreset()"
+                style="font-size:13px; padding:5px 8px; border:1px solid #d0d0d0; border-radius:3px; background:#fff">
+          <option value=""></option>
+        </select>
+        <button class="btn" onclick="dwSavePreset()"
+                data-i18n="dicomweb.save_preset">Save as Preset</button>
+        <button class="btn" onclick="dwDeletePreset()"
+                data-i18n="dicomweb.delete_preset">Delete Preset</button>
+        <button class="btn primary" onclick="dwTestConnection()"
+                data-i18n="dicomweb.test_connection">Test Connection</button>
+        <span id="dw-test-status" style="font-size:12px"></span>
+      </div>
+    </div>
+
+    <!-- Sub-tabs: QIDO / STOW / WADO -->
+    <div class="card" style="flex:1">
+      <div class="subtab-bar">
+        <button class="subtab-btn active" id="dw-tab-qido-btn"
+                onclick="showDWTab('qido')"
+                data-i18n="dicomweb.subtab_qido">QIDO-RS (Query)</button>
+        <button class="subtab-btn" id="dw-tab-stow-btn"
+                onclick="showDWTab('stow')"
+                data-i18n="dicomweb.subtab_stow">STOW-RS (Store)</button>
+        <button class="subtab-btn" id="dw-tab-wado-btn"
+                onclick="showDWTab('wado')"
+                data-i18n="dicomweb.subtab_wado">WADO-RS (Retrieve)</button>
+      </div>
+
+      <!-- ── QIDO-RS ──────────────────────────────────────────────── -->
+      <div id="dw-subtab-qido" class="subtab-panel active">
+        <h3 style="margin-bottom:10px" data-i18n="dicomweb.qido_title">Query Studies / Series / Instances</h3>
+        <div class="field-grid">
+          <div class="field">
+            <label data-i18n="dicomweb.qido_level">Query Level:</label>
+            <select id="dw-qido-level" onchange="dwQIDOLevelChanged()">
+              <option value="studies"   data-i18n="dicomweb.qido_level_studies">Studies</option>
+              <option value="series"    data-i18n="dicomweb.qido_level_series">Series</option>
+              <option value="instances" data-i18n="dicomweb.qido_level_instances">Instances</option>
+            </select>
+          </div>
+          <div class="field">
+            <label data-i18n="dicomweb.qido_patient_id">Patient ID:</label>
+            <input id="dw-qido-patient-id">
+          </div>
+          <div class="field">
+            <label data-i18n="dicomweb.qido_patient_name">Patient Name:</label>
+            <input id="dw-qido-patient-name" placeholder="SMITH*">
+          </div>
+          <div class="field">
+            <label data-i18n="dicomweb.qido_study_date">Study Date:</label>
+            <input id="dw-qido-study-date"
+                   data-i18n-placeholder="dicomweb.qido_study_date_hint"
+                   placeholder="YYYYMMDD or YYYYMMDD-YYYYMMDD">
+          </div>
+          <div class="field">
+            <label data-i18n="dicomweb.qido_modality">Modality:</label>
+            <input id="dw-qido-modality" placeholder="CT">
+          </div>
+          <div class="field">
+            <label data-i18n="dicomweb.qido_accession">Accession #:</label>
+            <input id="dw-qido-accession">
+          </div>
+          <div class="field" id="dw-qido-study-uid-field" style="display:none">
+            <label data-i18n="dicomweb.qido_study_uid">Study Instance UID:</label>
+            <input id="dw-qido-study-uid">
+          </div>
+          <div class="field" id="dw-qido-series-uid-field" style="display:none">
+            <label data-i18n="dicomweb.qido_series_uid">Series Instance UID:</label>
+            <input id="dw-qido-series-uid">
+          </div>
+          <div class="field" style="max-width:110px">
+            <label data-i18n="dicomweb.qido_limit">Max results:</label>
+            <input id="dw-qido-limit" type="number" value="100" min="1" max="10000">
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn primary" onclick="doQIDO()"
+                  data-i18n="dicomweb.qido_run">Run QIDO-RS</button>
+          <button class="btn" onclick="dwClearResults()"
+                  data-i18n="dicomweb.qido_clear">Clear</button>
+          <span id="dw-qido-count" style="font-size:12px; color:#888"></span>
+        </div>
+        <div class="result-table-wrap" id="dw-qido-results-wrap" style="display:none; margin-top:10px">
+          <p style="font-size:11px; color:#888; margin-bottom:6px"
+             data-i18n="dicomweb.row_click_hint">Click a row to copy the Study UID to the WADO-RS tab.</p>
+          <table id="dw-qido-table">
+            <thead><tr>
+              <th data-i18n="dicomweb.col_patient_id">PatientID</th>
+              <th data-i18n="dicomweb.col_patient_name">PatientName</th>
+              <th data-i18n="dicomweb.col_study_date">StudyDate</th>
+              <th data-i18n="dicomweb.col_modality">Modality</th>
+              <th data-i18n="dicomweb.col_accession">Accession</th>
+              <th data-i18n="dicomweb.col_description">Description</th>
+              <th data-i18n="dicomweb.col_series">#Series</th>
+              <th data-i18n="dicomweb.col_study_uid">StudyUID</th>
+            </tr></thead>
+            <tbody id="dw-qido-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── STOW-RS ──────────────────────────────────────────────── -->
+      <div id="dw-subtab-stow" class="subtab-panel" style="display:none">
+        <h3 style="margin-bottom:10px" data-i18n="dicomweb.stow_title">Store DICOM Instances</h3>
+        <div class="btn-row">
+          <input type="file" id="dw-stow-file-input" accept=".dcm,*" multiple
+                 style="display:none" onchange="dwSTOWFilesSelected()">
+          <button class="btn"
+                  onclick="document.getElementById('dw-stow-file-input').click()"
+                  data-i18n="dicomweb.stow_add_files">Add Files…</button>
+          <button class="btn" onclick="dwSTOWClearFiles()"
+                  data-i18n="dicomweb.stow_clear">Clear</button>
+          <span id="dw-stow-file-count" style="font-size:12px; color:#555"></span>
+        </div>
+        <div id="dw-stow-file-list"
+             style="margin-top:8px; font-size:12px; color:#555; max-height:120px;
+                    overflow-y:auto"></div>
+        <div class="btn-row" style="margin-top:12px">
+          <button class="btn primary" onclick="doSTOW()"
+                  data-i18n="dicomweb.stow_send">Send via STOW-RS</button>
+        </div>
+        <div id="dw-stow-status" style="margin-top:8px; font-size:13px"></div>
+      </div>
+
+      <!-- ── WADO-RS ──────────────────────────────────────────────── -->
+      <div id="dw-subtab-wado" class="subtab-panel" style="display:none">
+        <h3 style="margin-bottom:10px" data-i18n="dicomweb.wado_title">Retrieve DICOM Instances</h3>
+        <div class="field-grid">
+          <div class="field" style="grid-column:span 2">
+            <label data-i18n="dicomweb.wado_study_uid">Study Instance UID (required):</label>
+            <input id="dw-wado-study-uid">
+          </div>
+          <div class="field" style="grid-column:span 2">
+            <label data-i18n="dicomweb.wado_series_uid">Series Instance UID (optional):</label>
+            <input id="dw-wado-series-uid">
+          </div>
+          <div class="field" style="grid-column:span 2">
+            <label data-i18n="dicomweb.wado_instance_uid">SOP Instance UID (optional):</label>
+            <input id="dw-wado-instance-uid">
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:12px">
+          <button class="btn primary" onclick="doWADO()"
+                  data-i18n="dicomweb.wado_retrieve">Retrieve (Download ZIP)</button>
+        </div>
+        <div id="dw-wado-status" style="margin-top:8px; font-size:13px"></div>
       </div>
     </div>
   </div>
@@ -1580,6 +1891,63 @@
           <div style="font-size:32px">📋</div>
           <div data-i18n="anonymizer.mgr_placeholder">Select a profile on the left, or create a new one.</div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── UID Remapper ──────────────────────────────────────────────── -->
+  <div id="tab-uid_remap" class="tab-panel">
+    <div class="card">
+      <h3 data-i18n="uid_remap.title">UID Remapper</h3>
+      <p style="font-size:13px; color:#555; margin-bottom:14px" data-i18n="uid_remap.description">
+        Generate fresh Study / Series / Instance UIDs for a batch of DICOM files.
+      </p>
+      <div class="field-grid">
+        <div class="field" style="grid-column:1/-1">
+          <label data-i18n="uid_remap.files_label">DICOM Files</label>
+          <div class="btn-row" style="margin-top:4px">
+            <input type="file" id="uid-remap-file-input" accept=".dcm,*" multiple style="display:none"
+                   onchange="uidRemapFilesSelected()">
+            <button class="btn" onclick="document.getElementById('uid-remap-file-input').click()"
+                    data-i18n="uid_remap.browse">Browse…</button>
+            <span id="uid-remap-file-count" style="font-size:13px; color:#555; flex:1"></span>
+          </div>
+        </div>
+        <div class="field">
+          <label data-i18n="uid_remap.level_label">Remap level</label>
+          <select id="uid-remap-level">
+            <option value="study"    data-i18n="uid_remap.level_study">Study only (StudyInstanceUID)</option>
+            <option value="series"   data-i18n="uid_remap.level_series">Study + Series</option>
+            <option value="instance" selected data-i18n="uid_remap.level_instance">Study + Series + Instance (all UIDs)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label data-i18n="uid_remap.prefix_label">UID prefix</label>
+          <input id="uid-remap-prefix" type="text" value="2.25."
+                 data-i18n-placeholder="uid_remap.prefix_hint" placeholder="e.g. 2.25. (UUID-based)"
+                 style="font-size:13px">
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:14px; flex-wrap:wrap; gap:8px">
+        <button class="btn" onclick="doUIDRemapPreview()" data-i18n="uid_remap.preview">Preview</button>
+        <button class="btn primary" onclick="doUIDRemapDownload()" data-i18n="uid_remap.download">Download Remapped ZIP</button>
+        <span id="uid-remap-status" style="font-size:12px; color:#888"></span>
+      </div>
+    </div>
+
+    <!-- Preview table -->
+    <div class="card" id="uid-remap-preview-card" style="display:none">
+      <h3 data-i18n="uid_remap.preview_title">UID Mapping Preview</h3>
+      <div class="result-table-wrap" style="max-height:480px; overflow-y:auto">
+        <table id="uid-remap-preview-table">
+          <thead><tr>
+            <th data-i18n="uid_remap.col_file">File</th>
+            <th data-i18n="uid_remap.col_tag">Tag</th>
+            <th data-i18n="uid_remap.col_old_uid">Old UID</th>
+            <th data-i18n="uid_remap.col_new_uid">New UID</th>
+          </tr></thead>
+          <tbody id="uid-remap-preview-tbody"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -3120,6 +3488,7 @@ async function loadConfig() {
 
   renderPresetTable();
   refreshAllPresetDropdowns();
+  dwRefreshPresets();
 }
 
 function renderPresetTable() {
@@ -3235,6 +3604,7 @@ async function saveSettings() {
     [["ae-cfind","cfind"],["ae-cstore","cstore"],["ae-dmwl","dmwl"],["ae-commit","commit"],["ae-iocm","iocm"]]
       .forEach(([c, p]) => buildAESelector(c, p));
     refreshAllPresetDropdowns();
+    dwRefreshPresets();
   }
 }
 
@@ -4414,6 +4784,13 @@ async function loadSCPFiles() {
       inspBtn.textContent = "Inspect";
       inspBtn.onclick = () => scpFileInspect(f.name);
 
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn";
+      editBtn.style.cssText = "font-size:11px; padding:2px 8px; margin-right:4px";
+      editBtn.setAttribute("data-i18n", "scp.edit_file");
+      editBtn.textContent = "Edit Tags…";
+      editBtn.onclick = () => scpFileEdit(f.name);
+
       const delBtn = document.createElement("button");
       delBtn.className = "btn";
       delBtn.style.cssText = "font-size:11px; padding:2px 8px; color:#dc2626; border-color:#fca5a5";
@@ -4422,6 +4799,7 @@ async function loadSCPFiles() {
 
       actCel.appendChild(prevBtn);
       actCel.appendChild(inspBtn);
+      actCel.appendChild(editBtn);
       actCel.appendChild(delBtn);
       tr.appendChild(nameCel);
       tr.appendChild(sizeCel);
@@ -4442,6 +4820,73 @@ async function scpFileInspect(name) {
     const data = await res.json();
     if (!data.ok) { toast("Error: " + data.error, "err"); return; }
     showTagModal(name, data.tags);
+  } catch (e) {
+    toast("Error: " + e, "err");
+  }
+}
+
+async function scpFileEdit(path) {
+  toast(i18n("scp.edit_loading"), "info");
+  try {
+    // Fetch raw DICOM bytes and tag list in parallel
+    const [rawRes, inspRes] = await Promise.all([
+      fetch(`/api/scp/files/raw?path=${encodeURIComponent(path)}`),
+      fetch(`/api/scp/files/inspect?name=${encodeURIComponent(path)}`),
+    ]);
+    if (!rawRes.ok)  { toast("Error fetching file.", "err"); return; }
+    const inspData = await inspRes.json();
+    if (!inspData.ok) { toast("Error: " + inspData.error, "err"); return; }
+
+    const blob     = await rawRes.blob();
+    const filename = path.split("/").pop();
+    _inspectorFile = new File([blob], filename, { type: "application/dicom" });
+    _inspectorTags = inspData.tags || [];
+    _tagEdits      = {};
+
+    // Populate the metadata grid the same way doInspect() does
+    const grid = document.getElementById("inspector-meta-grid");
+    grid.innerHTML = "";
+    const m = inspData.meta || {};
+    [
+      ["Filename",         filename],
+      ["Patient Name",     m.PatientName],
+      ["Patient ID",       m.PatientID],
+      ["Modality",         m.Modality],
+      ["Study Date",       m.StudyDate],
+      ["SOP Class UID",    m.SOPClassUID],
+    ].forEach(([label, val]) => {
+      if (!val) return;
+      const div = document.createElement("div");
+      div.className = "field";
+      div.innerHTML = `<label style="color:#888;font-size:11px">${label}</label>
+                       <span style="font-size:13px">${escapeHtml(String(val))}</span>`;
+      grid.appendChild(div);
+    });
+    document.getElementById("inspector-filename").textContent = filename;
+    document.getElementById("inspector-meta-card").style.display = "";
+    document.getElementById("tag-editor-card").style.display    = "none";
+
+    // Switch to Inspector & Editor → Inspect & Edit sub-tab → open editor
+    showTab("inspector");
+    showInspectorSubTab("edit");
+    openTagEditor();
+  } catch (e) {
+    toast("Error: " + e, "err");
+  }
+}
+
+async function scpSeriesEdit(studyUid, seriesUid) {
+  try {
+    const res  = await fetch(`/api/scp/series/list?study=${encodeURIComponent(studyUid)}&series=${encodeURIComponent(seriesUid)}`);
+    const data = await res.json();
+    if (!data.ok || !data.urls?.length) {
+      toast(i18n("scp.edit_no_files"), "warn"); return;
+    }
+    // Extract the server-side path from the first file URL
+    const url  = new URL(data.urls[0], location.href);
+    const path = url.searchParams.get("path");
+    if (!path) { toast("Could not determine file path.", "err"); return; }
+    await scpFileEdit(path);
   } catch (e) {
     toast("Error: " + e, "err");
   }
@@ -4711,6 +5156,13 @@ async function loadSCPStudies() {
       const viewLabel = (sm.Modality || "Series") + " — " + (sm.SeriesDescription || ser.uid.slice(0, 16));
       viewBtn.onclick = () => viewSCPSeries(study.uid, ser.uid, viewLabel);
 
+      const editSer = document.createElement("button");
+      editSer.className = "btn";
+      editSer.style.cssText = "font-size:11px; padding:2px 8px; flex-shrink:0";
+      editSer.setAttribute("data-i18n", "scp.edit_file");
+      editSer.textContent = "Edit Tags…";
+      editSer.onclick = () => scpSeriesEdit(study.uid, ser.uid);
+
       const delSer = document.createElement("button");
       delSer.className = "btn";
       delSer.style.cssText = "font-size:11px; padding:2px 8px; color:#dc2626; border-color:#fca5a5; flex-shrink:0";
@@ -4720,6 +5172,7 @@ async function loadSCPStudies() {
       row.appendChild(mod);
       row.appendChild(sdesc);
       row.appendChild(viewBtn);
+      row.appendChild(editSer);
       row.appendChild(delSer);
       body.appendChild(row);
     });
@@ -4966,8 +5419,8 @@ function renderTagTable(rows) {
 
 const HELP_SECTIONS = [
   // Order matches the tab bar: Dashboard → C-FIND → C-STORE → Receiver →
-  // DMWL → Commit → IOCM → Inspector → SR Viewer → KOS → DICOMize →
-  // Anonymizer → DICOMDIR → HL7 → Settings → Logs → About
+  // DMWL → Commit → IOCM → Inspector → Validator → SR Viewer → KOS → DICOMize →
+  // Anonymizer → DICOMDIR → DICOMweb → HL7 → Settings → Logs → About
   ["help.section_dashboard", "help.body_dashboard",
   []],
 
@@ -5011,6 +5464,14 @@ const HELP_SECTIONS = [
 
   ["help.section_inspector", "help.body_inspector", []],
 
+  ["help.section_uid_remap", "help.body_uid_remap", []],
+
+  ["help.section_validator", "help.body_validator",
+  [
+    {label: "DICOM PS3.5 §7 – Data Element Structure (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part05.html#chapter_7"},
+    {label: "DICOM PS3.3 – Information Object Definitions (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html"},
+  ]],
+
   ["help.section_sr_viewer", "help.body_sr_viewer",
   [
     {label: "DICOM PS3.3 §C.17 – Structured Reporting IODs (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part03.html#chapter_C"},
@@ -5037,6 +5498,14 @@ const HELP_SECTIONS = [
   ["help.section_dicomdir", "help.body_dicomdir",
   [
     {label: "DICOM PS3.10 §8 – DICOMDIR File (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part10.html#sect_8"},
+  ]],
+
+  ["help.section_dicomweb", "help.body_dicomweb",
+  [
+    {label: "DICOM PS3.18 – Web Services (NEMA)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part18.html"},
+    {label: "PS3.18 §6.7 – QIDO-RS (Query)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part18.html#sect_6.7"},
+    {label: "PS3.18 §6.6 – STOW-RS (Store)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part18.html#sect_6.6"},
+    {label: "PS3.18 §6.5 – WADO-RS (Retrieve)", url: "https://dicom.nema.org/medical/dicom/current/output/html/part18.html#sect_6.5"},
   ]],
 
   ["help.section_hl7_send", "help.body_hl7_send",
@@ -5108,7 +5577,443 @@ function showHelp(idx) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// 16. General utilities
+// ─────────────────────────────────────────────────────────────────
+// 16. DICOM File Validator
+// ─────────────────────────────────────────────────────────────────
+
+function validatorFileSelected() {
+  const f = document.getElementById("validator-file-input").files[0];
+  document.getElementById("validator-filename").textContent = f ? f.name : "";
+  document.getElementById("validator-summary-card").style.display  = "none";
+  document.getElementById("validator-findings-card").style.display = "none";
+}
+
+async function doValidate() {
+  const input = document.getElementById("validator-file-input");
+  if (!input.files.length) {
+    toast(i18n("validator.no_file"), "warn");
+    return;
+  }
+  const fd = new FormData();
+  fd.append("file", input.files[0]);
+  try {
+    const res  = await fetch("/api/dicom/validate", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!data.ok) { toast(data.error || "Validation failed", "err"); return; }
+    _renderValidatorResults(data);
+  } catch (e) {
+    toast("" + e, "err");
+  }
+}
+
+function _renderValidatorResults(data) {
+  const summary  = data.summary  || {};
+  const findings = data.findings || [];
+
+  // ── summary card ───────────────────────────────────────────────
+  const grid = document.getElementById("validator-summary-grid");
+  grid.innerHTML = [
+    ["validator.sum_patient",         summary.patient_name        || "—"],
+    ["validator.sum_patient_id",      summary.patient_id          || "—"],
+    ["validator.sum_study_date",      summary.study_date          || "—"],
+    ["validator.sum_modality",        summary.modality            || "—"],
+    ["validator.sum_sop_class",       summary.sop_class_name      || summary.sop_class_uid || "—"],
+    ["validator.sum_transfer_syntax", summary.transfer_syntax_name || summary.transfer_syntax_uid || "—"],
+  ].map(([key, val]) =>
+    `<div class="field"><label>${i18n(key)}</label>` +
+    `<span style="font-size:13px;color:#1a1a1a">${escapeHtml(String(val))}</span></div>`
+  ).join("");
+
+  const verdict = document.getElementById("validator-verdict");
+  const errs = summary.errors   || 0;
+  const warn = summary.warnings || 0;
+  if (errs > 0) {
+    verdict.style.cssText = "margin-top:12px;padding:10px 14px;border-radius:4px;font-size:13px;font-weight:600;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5";
+    verdict.textContent   = i18n("validator.verdict_errors", { n: errs, w: warn });
+  } else if (warn > 0) {
+    verdict.style.cssText = "margin-top:12px;padding:10px 14px;border-radius:4px;font-size:13px;font-weight:600;background:#fffbeb;color:#d97706;border:1px solid #fcd34d";
+    verdict.textContent   = i18n("validator.verdict_warnings", { n: warn });
+  } else {
+    verdict.style.cssText = "margin-top:12px;padding:10px 14px;border-radius:4px;font-size:13px;font-weight:600;background:#f0fdf4;color:#15803d;border:1px solid #86efac";
+    verdict.textContent   = i18n("validator.verdict_ok");
+  }
+  document.getElementById("validator-summary-card").style.display = "block";
+
+  // ── findings table ──────────────────────────────────────────────
+  const tbody = document.getElementById("validator-findings-tbody");
+  tbody.innerHTML = "";
+  if (findings.length > 0) {
+    findings.forEach(f => {
+      const sev = f.severity || "info";
+      const [colour, prefix] =
+        sev === "error"   ? ["#dc2626", "✗ " + i18n("validator.severity_error")]   :
+        sev === "warning" ? ["#d97706", "⚠ " + i18n("validator.severity_warning")] :
+                            ["#2b6cb0", "ℹ " + i18n("validator.severity_info")];
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        `<td style="color:${colour};font-weight:600;font-size:12px">${escapeHtml(prefix)}</td>` +
+        `<td style="font-size:12px;font-family:Consolas,monospace">${escapeHtml(f.code    || "")}</td>` +
+        `<td style="font-size:12px;font-family:Consolas,monospace">${escapeHtml(f.tag     || "")}</td>` +
+        `<td style="font-size:12px">${escapeHtml(f.message || "")}</td>`;
+      tbody.appendChild(tr);
+    });
+    document.getElementById("validator-findings-card").style.display = "block";
+  } else {
+    document.getElementById("validator-findings-card").style.display = "none";
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 17. DICOMweb (QIDO-RS / STOW-RS / WADO-RS)
+// ─────────────────────────────────────────────────────────────────
+
+function showDWTab(name) {
+  document.querySelectorAll("[id^='dw-subtab-']").forEach(el => el.style.display = "none");
+  document.querySelectorAll("[id^='dw-tab-'][id$='-btn']").forEach(el => el.classList.remove("active"));
+  document.getElementById("dw-subtab-" + name).style.display = "block";
+  document.getElementById("dw-tab-" + name + "-btn").classList.add("active");
+}
+
+function dwAuthTypeChanged() {
+  const type = document.getElementById("dw-auth-type").value;
+  document.getElementById("dw-basic-fields").style.display  = type === "basic"  ? "" : "none";
+  document.getElementById("dw-bearer-fields").style.display = type === "bearer" ? "" : "none";
+}
+
+function _dwCfg() {
+  return {
+    base_url:  document.getElementById("dw-base-url").value.trim(),
+    auth_type: document.getElementById("dw-auth-type").value,
+    username:  document.getElementById("dw-username").value.trim(),
+    password:  document.getElementById("dw-password").value,
+    token:     document.getElementById("dw-token").value.trim(),
+  };
+}
+
+// ── Preset management ─────────────────────────────────────────────
+
+function dwRefreshPresets() {
+  const presets = appConfig.dicomweb_presets || [];
+  const sel  = document.getElementById("dw-preset-select");
+  const prev = sel.value;
+  sel.innerHTML = `<option value="">${i18n("dicomweb.load_preset")}</option>`;
+  presets.forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p.name;
+    opt.textContent = p.name;
+    sel.appendChild(opt);
+  });
+  sel.value = prev;
+}
+
+function dwLoadPreset() {
+  const name = document.getElementById("dw-preset-select").value;
+  const p    = (appConfig.dicomweb_presets || []).find(x => x.name === name);
+  if (!p) return;
+  document.getElementById("dw-base-url").value  = p.base_url  || "";
+  document.getElementById("dw-auth-type").value = p.auth_type || "none";
+  document.getElementById("dw-username").value  = p.username  || "";
+  document.getElementById("dw-password").value  = p.password  || "";
+  document.getElementById("dw-token").value     = p.token     || "";
+  dwAuthTypeChanged();
+}
+
+async function dwSavePreset() {
+  const name = prompt(i18n("dicomweb.preset_name_prompt"), "");
+  if (!name || !name.trim()) return;
+  const trimmed = name.trim();
+  if (!appConfig.dicomweb_presets) appConfig.dicomweb_presets = [];
+  appConfig.dicomweb_presets = appConfig.dicomweb_presets.filter(p => p.name !== trimmed);
+  appConfig.dicomweb_presets.push({ name: trimmed, ..._dwCfg() });
+  await saveConfig();
+  dwRefreshPresets();
+  document.getElementById("dw-preset-select").value = trimmed;
+  toast(i18n("dicomweb.preset_saved"), "ok");
+}
+
+async function dwDeletePreset() {
+  const name = document.getElementById("dw-preset-select").value;
+  if (!name) return;
+  if (!confirm(i18n("dicomweb.preset_delete_confirm").replace("{name}", name))) return;
+  appConfig.dicomweb_presets = (appConfig.dicomweb_presets || []).filter(p => p.name !== name);
+  await saveConfig();
+  dwRefreshPresets();
+  toast(i18n("dicomweb.preset_deleted"), "ok");
+}
+
+// ── Connection test ───────────────────────────────────────────────
+
+async function dwTestConnection() {
+  const cfg = _dwCfg();
+  if (!cfg.base_url) { toast(i18n("dicomweb.no_url"), "warn"); return; }
+  const statusEl = document.getElementById("dw-test-status");
+  statusEl.textContent = "…";
+  statusEl.style.color = "#888";
+  try {
+    const res  = await fetch("/api/dicomweb/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cfg),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      statusEl.textContent = "✓ " + i18n("dicomweb.test_ok");
+      statusEl.style.color = "#15803d";
+    } else {
+      statusEl.textContent = "✗ " + (data.error || "failed");
+      statusEl.style.color = "#dc2626";
+    }
+  } catch (e) {
+    statusEl.textContent = "✗ " + e;
+    statusEl.style.color = "#dc2626";
+  }
+}
+
+// ── QIDO-RS ───────────────────────────────────────────────────────
+
+function dwQIDOLevelChanged() {
+  const level = document.getElementById("dw-qido-level").value;
+  document.getElementById("dw-qido-study-uid-field").style.display  =
+    ["series","instances"].includes(level) ? "" : "none";
+  document.getElementById("dw-qido-series-uid-field").style.display =
+    level === "instances" ? "" : "none";
+}
+
+async function doQIDO() {
+  const cfg = _dwCfg();
+  if (!cfg.base_url) { toast(i18n("dicomweb.no_url"), "warn"); return; }
+
+  const level     = document.getElementById("dw-qido-level").value;
+  const studyUid  = document.getElementById("dw-qido-study-uid").value.trim();
+  const seriesUid = document.getElementById("dw-qido-series-uid").value.trim();
+  const limit     = document.getElementById("dw-qido-limit").value.trim();
+
+  const params = {};
+  const patId  = document.getElementById("dw-qido-patient-id").value.trim();
+  const patNm  = document.getElementById("dw-qido-patient-name").value.trim();
+  const stDate = document.getElementById("dw-qido-study-date").value.trim();
+  const modal  = document.getElementById("dw-qido-modality").value.trim();
+  const acc    = document.getElementById("dw-qido-accession").value.trim();
+  if (patId)  params["00100020"] = patId;
+  if (patNm)  params["00100010"] = patNm;
+  if (stDate) params["00080020"] = stDate;
+  if (modal) {
+    // Studies level uses ModalitiesInStudy; series/instances use Modality
+    params[level === "studies" ? "00080061" : "00080060"] = modal;
+  }
+  if (acc)   params["00080050"] = acc;
+  if (limit) params["limit"]    = limit;
+
+  // Request useful fields to be returned
+  params["includefield"] =
+    "00100020,00100010,00080020,00080050,00080061,00080060,0020000D," +
+    "00201206,00201208,00081030,0008103E,0020000E";
+
+  const countEl = document.getElementById("dw-qido-count");
+  countEl.textContent = "…";
+
+  try {
+    const res  = await fetch("/api/dicomweb/qido", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...cfg, level, study_uid: studyUid,
+                             series_uid: seriesUid, params }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      toast(data.error || "QIDO-RS failed", "err");
+      countEl.textContent = "";
+      return;
+    }
+    _dwRenderQIDO(data.results, level);
+    countEl.textContent = i18n("dicomweb.results_count", { n: data.count });
+  } catch (e) {
+    toast("" + e, "err");
+    countEl.textContent = "";
+  }
+}
+
+function _dwTag(obj, tag) {
+  if (!obj || !obj[tag]) return "";
+  const t = obj[tag];
+  if (!t.Value || t.Value.length === 0) return "";
+  const v = t.Value[0];
+  if (typeof v === "object" && v !== null) {
+    return v.Alphabetic || v.Ideographic || v.Phonetic || JSON.stringify(v);
+  }
+  if (Array.isArray(t.Value)) return t.Value.join("\\");
+  return String(v);
+}
+
+function _dwRenderQIDO(results, level) {
+  const tbody = document.getElementById("dw-qido-tbody");
+  const wrap  = document.getElementById("dw-qido-results-wrap");
+  tbody.innerHTML = "";
+  wrap.style.display = "block";
+
+  if (!results || results.length === 0) {
+    tbody.innerHTML =
+      `<tr><td colspan="8" style="text-align:center;color:#888;padding:16px">` +
+      escapeHtml(i18n("dicomweb.no_results")) + `</td></tr>`;
+    return;
+  }
+
+  results.forEach(r => {
+    const patId   = _dwTag(r, "00100020");
+    const patName = _dwTag(r, "00100010");
+    const date    = _dwTag(r, "00080020");
+    const modal   = _dwTag(r, "00080061") || _dwTag(r, "00080060");
+    const acc     = _dwTag(r, "00080050");
+    const desc    = _dwTag(r, "00081030") || _dwTag(r, "0008103E");
+    const nSeries = _dwTag(r, "00201206") || _dwTag(r, "00201208") || "";
+    const uid     = _dwTag(r, "0020000D") || _dwTag(r, "0020000E");
+
+    const dateFmt = date.length === 8
+      ? `${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}`
+      : date;
+
+    const tr = document.createElement("tr");
+    tr.style.cursor = "pointer";
+    tr.title = i18n("dicomweb.row_click_hint");
+    tr.innerHTML =
+      `<td>${escapeHtml(patId)}</td>` +
+      `<td>${escapeHtml(patName)}</td>` +
+      `<td>${escapeHtml(dateFmt)}</td>` +
+      `<td>${escapeHtml(modal)}</td>` +
+      `<td>${escapeHtml(acc)}</td>` +
+      `<td>${escapeHtml(desc)}</td>` +
+      `<td>${escapeHtml(nSeries)}</td>` +
+      `<td style="font-size:11px;color:#888;word-break:break-all;max-width:180px;` +
+      `overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(uid)}">` +
+      `${escapeHtml(uid)}</td>`;
+
+    tr.addEventListener("click", () => {
+      // Copy study UID to WADO-RS and the QIDO study-uid field
+      const studyUid = _dwTag(r, "0020000D");
+      if (studyUid) {
+        document.getElementById("dw-wado-study-uid").value  = studyUid;
+        document.getElementById("dw-qido-study-uid").value  = studyUid;
+      }
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+function dwClearResults() {
+  document.getElementById("dw-qido-tbody").innerHTML = "";
+  document.getElementById("dw-qido-results-wrap").style.display = "none";
+  document.getElementById("dw-qido-count").textContent = "";
+}
+
+// ── STOW-RS ───────────────────────────────────────────────────────
+
+let _dwSTOWFiles = [];
+
+function dwSTOWFilesSelected() {
+  _dwSTOWFiles = Array.from(document.getElementById("dw-stow-file-input").files);
+  document.getElementById("dw-stow-file-count").textContent =
+    i18n("dicomweb.files_selected", { n: _dwSTOWFiles.length });
+  document.getElementById("dw-stow-file-list").innerHTML =
+    _dwSTOWFiles.map(f =>
+      `<div>${escapeHtml(f.name)} ` +
+      `<span style="color:#aaa">(${(f.size/1024).toFixed(1)} KB)</span></div>`
+    ).join("");
+}
+
+function dwSTOWClearFiles() {
+  _dwSTOWFiles = [];
+  document.getElementById("dw-stow-file-input").value = "";
+  document.getElementById("dw-stow-file-count").textContent = "";
+  document.getElementById("dw-stow-file-list").innerHTML    = "";
+  document.getElementById("dw-stow-status").textContent     = "";
+}
+
+async function doSTOW() {
+  const cfg = _dwCfg();
+  if (!cfg.base_url)          { toast(i18n("dicomweb.no_url"),   "warn"); return; }
+  if (!_dwSTOWFiles.length)   { toast(i18n("dicomweb.no_files"), "warn"); return; }
+
+  const statusEl = document.getElementById("dw-stow-status");
+  statusEl.textContent = i18n("dicomweb.sending");
+  statusEl.style.color = "#888";
+
+  const fd = new FormData();
+  fd.append("base_url",  cfg.base_url);
+  fd.append("auth_type", cfg.auth_type);
+  fd.append("username",  cfg.username);
+  fd.append("password",  cfg.password);
+  fd.append("token",     cfg.token);
+  _dwSTOWFiles.forEach(f => fd.append("files[]", f));
+
+  try {
+    const res  = await fetch("/api/dicomweb/stow", { method: "POST", body: fd });
+    const data = await res.json();
+    if (data.ok) {
+      statusEl.textContent = "✓ " + i18n("dicomweb.stow_ok", { n: data.files_sent });
+      statusEl.style.color = "#15803d";
+    } else {
+      statusEl.textContent = "✗ " + (data.error || "failed");
+      statusEl.style.color = "#dc2626";
+    }
+  } catch (e) {
+    statusEl.textContent = "✗ " + e;
+    statusEl.style.color = "#dc2626";
+  }
+}
+
+// ── WADO-RS ───────────────────────────────────────────────────────
+
+async function doWADO() {
+  const cfg = _dwCfg();
+  if (!cfg.base_url) { toast(i18n("dicomweb.no_url"), "warn"); return; }
+
+  const studyUid    = document.getElementById("dw-wado-study-uid").value.trim();
+  const seriesUid   = document.getElementById("dw-wado-series-uid").value.trim();
+  const instanceUid = document.getElementById("dw-wado-instance-uid").value.trim();
+
+  if (!studyUid) { toast(i18n("dicomweb.wado_no_study"), "warn"); return; }
+
+  const statusEl = document.getElementById("dw-wado-status");
+  statusEl.textContent = i18n("dicomweb.retrieving");
+  statusEl.style.color = "#888";
+
+  try {
+    const res = await fetch("/api/dicomweb/wado", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...cfg, study_uid: studyUid,
+                             series_uid: seriesUid, instance_uid: instanceUid }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      statusEl.textContent = "✗ " + (err.error || res.statusText);
+      statusEl.style.color = "#dc2626";
+      return;
+    }
+
+    const blob = await res.blob();
+    const cd   = res.headers.get("Content-Disposition") || "";
+    const m    = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+    const name = m ? m[1].replace(/['"]/g, "") : "wado_retrieve.zip";
+
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement("a");
+    a.href    = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    statusEl.textContent = "✓ " + i18n("dicomweb.wado_ok");
+    statusEl.style.color = "#15803d";
+  } catch (e) {
+    statusEl.textContent = "✗ " + e;
+    statusEl.style.color = "#dc2626";
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 18. General utilities
 // ─────────────────────────────────────────────────────────────────
 
 // Append a line to a log box div
@@ -6638,6 +7543,177 @@ async function sendEditedToPACS() {
     const res  = await fetch("/api/dicom/edit-and-store", { method: "POST", body: fd });
     const data = await res.json();
     status.textContent = data.ok ? `Sent: ${data.message}` : `Error: ${data.error || data.message}`;
+  } catch (e) {
+    status.textContent = "Error: " + e;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Inspector sub-tab switcher
+// ─────────────────────────────────────────────────────────────────
+
+function showInspectorSubTab(name) {
+  ["edit", "diff"].forEach(n => {
+    document.getElementById("inspector-subtab-" + n).classList.toggle("active", n === name);
+    document.getElementById("inspector-subtab-btn-" + n).classList.toggle("active", n === name);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────
+// DICOM Diff
+// ─────────────────────────────────────────────────────────────────
+
+function diffFileChanged(side) {
+  const input = document.getElementById("diff-file-" + side);
+  const span  = document.getElementById("diff-filename-" + side);
+  span.textContent = (input.files && input.files[0]) ? input.files[0].name
+                                                      : i18n("diff.no_file");
+}
+
+let _diffLastRows = null, _diffLastSummary = null;
+
+async function doDiff() {
+  const fa = document.getElementById("diff-file-a").files[0];
+  const fb = document.getElementById("diff-file-b").files[0];
+  if (!fa || !fb) { toast(i18n("diff.select_both"), "warn"); return; }
+
+  const fd = new FormData();
+  fd.append("file_a", fa);
+  fd.append("file_b", fb);
+
+  try {
+    const res  = await fetch("/api/dicom/diff", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!data.ok) { toast("Error: " + data.error, "err"); return; }
+    _diffLastRows    = data.rows;
+    _diffLastSummary = data.summary;
+    _renderDiffResults();
+  } catch (e) {
+    toast("Error: " + e, "err");
+  }
+}
+
+function _renderDiffResults() {
+  if (!_diffLastRows) return;
+  const rows     = _diffLastRows;
+  const summary  = _diffLastSummary;
+  const onlyDiff = document.getElementById("diff-only-changes").checked;
+  const visible  = onlyDiff ? rows.filter(r => r.status !== "same") : rows;
+
+  const s = summary;
+  document.getElementById("diff-summary").textContent =
+    i18n("diff.summary", s) ||
+    `${s.different} changed · ${s.only_a} only in A · ${s.only_b} only in B · ${s.same} identical`;
+
+  const tbody = document.getElementById("diff-tbody");
+  tbody.innerHTML = "";
+  if (!visible.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#888;padding:16px">${i18n("diff.no_results")}</td></tr>`;
+  } else {
+    const colours = { different: "#fffbeb", only_a: "#fff0f0", only_b: "#f0fff4", same: "" };
+    const labels  = {
+      different: () => i18n("diff.status_different"),
+      only_a:    () => i18n("diff.status_only_a"),
+      only_b:    () => i18n("diff.status_only_b"),
+      same:      () => i18n("diff.status_same"),
+    };
+    visible.forEach(r => {
+      const tr = document.createElement("tr");
+      tr.style.background = colours[r.status] || "";
+      tr.innerHTML =
+        `<td style="font-family:Consolas;font-size:11px">${r.tag}</td>` +
+        `<td style="font-size:12px">${escapeHtml(r.keyword)}</td>` +
+        `<td style="font-size:11px;color:#6b7280">${r.vr}</td>` +
+        `<td style="font-size:12px;max-width:260px;word-break:break-all">${escapeHtml(r.value_a)}</td>` +
+        `<td style="font-size:12px;max-width:260px;word-break:break-all">${escapeHtml(r.value_b)}</td>` +
+        `<td style="font-size:11px;white-space:nowrap">${labels[r.status]?.() || r.status}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+  document.getElementById("diff-results-card").style.display = "";
+}
+
+// ─────────────────────────────────────────────────────────────────
+// UID Remapper
+// ─────────────────────────────────────────────────────────────────
+
+let _uidRemapFiles = [];
+
+function uidRemapFilesSelected() {
+  const input = document.getElementById("uid-remap-file-input");
+  _uidRemapFiles = Array.from(input.files || []);
+  document.getElementById("uid-remap-file-count").textContent =
+    _uidRemapFiles.length
+      ? i18n("uid_remap.files_selected", { n: _uidRemapFiles.length })
+      : "";
+  document.getElementById("uid-remap-preview-card").style.display = "none";
+}
+
+function _uidRemapBuildForm() {
+  const fd = new FormData();
+  _uidRemapFiles.forEach(f => fd.append("files", f));
+  fd.append("level",  document.getElementById("uid-remap-level").value);
+  fd.append("prefix", document.getElementById("uid-remap-prefix").value.trim() || "2.25.");
+  return fd;
+}
+
+async function doUIDRemapPreview() {
+  if (!_uidRemapFiles.length) { toast(i18n("uid_remap.no_files"), "warn"); return; }
+  const status = document.getElementById("uid-remap-status");
+  status.textContent = i18n("uid_remap.preparing");
+  try {
+    const res  = await fetch("/api/dicom/uid-remap/preview",
+                             { method: "POST", body: _uidRemapBuildForm() });
+    const data = await res.json();
+    if (!data.ok) { status.textContent = "Error: " + data.error; return; }
+    _renderUIDRemapPreview(data.mapping);
+    status.textContent = "";
+  } catch (e) {
+    status.textContent = "Error: " + e;
+  }
+}
+
+function _renderUIDRemapPreview(mapping) {
+  const tbody = document.getElementById("uid-remap-preview-tbody");
+  tbody.innerHTML = "";
+  let hasRows = false;
+  mapping.forEach(entry => {
+    entry.changes.forEach((ch, i) => {
+      hasRows = true;
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        `<td style="font-size:12px">${i === 0 ? escapeHtml(entry.file) : ""}</td>` +
+        `<td style="font-size:11px;font-family:Consolas">${ch.tag} ${escapeHtml(ch.name)}</td>` +
+        `<td style="font-size:11px;font-family:Consolas;word-break:break-all;max-width:220px;color:#dc2626">${escapeHtml(ch.old)}</td>` +
+        `<td style="font-size:11px;font-family:Consolas;word-break:break-all;max-width:220px;color:#16a34a">${escapeHtml(ch.new)}</td>`;
+      tbody.appendChild(tr);
+    });
+  });
+  if (!hasRows) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#888;padding:16px">${i18n("uid_remap.preview_none")}</td></tr>`;
+  }
+  document.getElementById("uid-remap-preview-card").style.display = "";
+  document.getElementById("uid-remap-preview-card").scrollIntoView({ behavior: "smooth" });
+}
+
+async function doUIDRemapDownload() {
+  if (!_uidRemapFiles.length) { toast(i18n("uid_remap.no_files"), "warn"); return; }
+  const status = document.getElementById("uid-remap-status");
+  status.textContent = i18n("uid_remap.preparing");
+  try {
+    const res = await fetch("/api/dicom/uid-remap", { method: "POST", body: _uidRemapBuildForm() });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      status.textContent = "Error: " + (err.error || res.statusText);
+      return;
+    }
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "uid_remapped.zip";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    status.textContent = i18n("uid_remap.done");
   } catch (e) {
     status.textContent = "Error: " + e;
   }
