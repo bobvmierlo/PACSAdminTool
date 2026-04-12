@@ -225,7 +225,9 @@
     "received_messages": "Ontvangen berichten",
     "messages_received": "{n} bericht(en) ontvangen",
     "messages_count": "{n} berichten",
-    "invalid_port": "Ongeldig poortnummer."
+    "invalid_port": "Ongeldig poortnummer.",
+    "inspect_btn": "Inspecteren",
+    "inspector_title": "HL7 Inspector"
   },
   "scp": {
     "listener_config": "Listener-configuratie",
@@ -300,6 +302,7 @@
     "my_preferences": "Mijn voorkeuren",
     "show_advanced_tabs": "Geavanceerde tabbladen tonen",
     "advanced_tabs_hint": "Schakelt in: Opslagbevestiging · IOCM · KOS Creator · UID Remapper · DICOMweb",
+    "dicomweb_presets": "Opgeslagen DICOMweb-presets (Systeem)",
     "my_dicom_presets": "Mijn DICOM-presets",
     "my_dicomweb_presets": "Mijn DICOMweb-presets",
     "save_to_my_presets": "Mijn presets",
@@ -361,6 +364,8 @@
     "services": "Services",
     "ae_health": "AE Connectiviteit",
     "test_all": "Alle AEs testen",
+    "dw_health": "DICOMweb Connectiviteit",
+    "test_all_dw": "Alle DICOMweb testen",
     "recent_activity": "Recente activiteit",
     "no_presets": "Geen externe AE-presets geconfigureerd. Voeg ze toe in Instellingen.",
     "ae_reachable": "✓ bereikbaar",
@@ -791,7 +796,10 @@
     "col_severity": "Ernst",
     "col_code": "Code",
     "col_tag": "Tag",
+    "col_name": "Naam",
+    "col_group": "Groep",
     "col_message": "Bericht",
+    "all_checks_title": "Volledig validatieoverzicht",
     "severity_error": "Fout",
     "severity_warning": "Waarschuwing",
     "severity_info": "Info"

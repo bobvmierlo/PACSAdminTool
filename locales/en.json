@@ -225,7 +225,9 @@
     "received_messages": "Received Messages",
     "messages_received": "{n} message(s) received",
     "messages_count": "{n} messages",
-    "invalid_port": "Invalid port number."
+    "invalid_port": "Invalid port number.",
+    "inspect_btn": "Inspect",
+    "inspector_title": "HL7 Inspector"
   },
   "scp": {
     "listener_config": "Listener Configuration",
@@ -300,6 +302,7 @@
     "my_preferences": "My Preferences",
     "show_advanced_tabs": "Show advanced tabs",
     "advanced_tabs_hint": "Enables: Storage Commit · IOCM · KOS Creator · UID Remapper · DICOMweb",
+    "dicomweb_presets": "Saved DICOMweb Presets (System)",
     "my_dicom_presets": "My DICOM Presets",
     "my_dicomweb_presets": "My DICOMweb Presets",
     "save_to_my_presets": "My Presets",
@@ -361,6 +364,8 @@
     "services": "Services",
     "ae_health": "AE Connectivity",
     "test_all": "Test All AEs",
+    "dw_health": "DICOMweb Connectivity",
+    "test_all_dw": "Test All DICOMweb",
     "recent_activity": "Recent Activity",
     "no_presets": "No remote AE presets configured. Add them in Settings.",
     "ae_reachable": "✓ reachable",
@@ -791,7 +796,10 @@
     "col_severity": "Severity",
     "col_code": "Code",
     "col_tag": "Tag",
+    "col_name": "Name",
+    "col_group": "Group",
     "col_message": "Message",
+    "all_checks_title": "Full Validation Checklist",
     "severity_error": "Error",
     "severity_warning": "Warning",
     "severity_info": "Info"
