@@ -3563,7 +3563,21 @@ socket.on("hl7_message", data => {
   block.style.cssText = "border:1px solid #e0e0e0; border-radius:3px; background:#fff; padding:10px; font-size:12px";
   block.innerHTML =
     `<div style="color:#888; margin-bottom:4px; font-size:11px">[${data.ts}] From ${data.from}</div>` +
-    `<pre style="font-family:Consolas; white-space:pre-wrap; color:#1a1a1a">${escapeHtml(data.message)}</pre>`;
+    `<pre style="font-family:Consolas; white-space:pre-wrap; color:#1a1a1a; margin:0">${escapeHtml(data.message)}</pre>`;
+
+  // Add Inspect button — triggers the inline HL7 inspector for this message
+  const msgText = data.message;
+  const inspBtn = document.createElement("button");
+  inspBtn.className = "btn";
+  inspBtn.style.cssText = "margin-top:6px; font-size:11px; padding:2px 8px";
+  inspBtn.textContent = "Inspect";
+  inspBtn.setAttribute("data-i18n", "hl7.inspect_btn");
+  inspBtn.onclick = () => {
+    hl7ParseAndInspect(null, msgText);
+    document.getElementById("hl7-recv-inspector").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
+  block.appendChild(inspBtn);
+
   container.appendChild(block);
   container.scrollTop = container.scrollHeight;
 
@@ -5151,10 +5165,15 @@ function _hl7Parse(raw) {
   });
 }
 
-/** Show HL7 inspector for a given textarea element ID. */
-function hl7ParseAndInspect(textareaId) {
-  const isPrimary = textareaId === "hl7-message";
-  const raw = document.getElementById(textareaId)?.value || "";
+/**
+ * Show HL7 inspector for a given textarea element ID, or for a raw text string.
+ *
+ * @param {string|null} textareaId  - ID of the source textarea, or null when rawText is provided.
+ * @param {string}      [rawText]   - Raw HL7 message text (used by received-message blocks).
+ */
+function hl7ParseAndInspect(textareaId, rawText) {
+  const isPrimary = textareaId === "hl7-message" && rawText == null;
+  const raw = rawText != null ? rawText : (document.getElementById(textareaId)?.value || "");
   if (!raw.trim()) { toast(i18n("hl7.no_message"), "warn"); return; }
 
   const tbodyId   = isPrimary ? "hl7-parsed-tbody"      : "hl7-recv-parsed-tbody";
