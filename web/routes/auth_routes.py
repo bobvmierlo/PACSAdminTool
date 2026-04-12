@@ -7,10 +7,12 @@ from web.auth import (
     create_user,
     current_user as _current_user,
     delete_user,
+    get_user_settings,
     has_users,
     list_users,
     require_admin,
     require_login,
+    save_user_settings,
     verify_password,
 )
 from web.audit import log as _audit
@@ -157,4 +159,39 @@ def users_change_password(username):
         return jsonify({"ok": False, "error": f"User '{username}' not found."}), 404
     _audit("user.change_password", ip=_req_ip(), user=_req_user(),
            detail={"username": username})
+    return jsonify({"ok": True})
+
+
+# ── Per-user settings ─────────────────────────────────────────────────────────
+
+@bp.route("/api/user/settings", methods=["GET"])
+@require_login
+def user_settings_get():
+    """Return the current user's personal settings."""
+    username = session.get("username")
+    return jsonify({"ok": True, "settings": get_user_settings(username)})
+
+
+@bp.route("/api/user/settings", methods=["POST"])
+@require_login
+def user_settings_save():
+    """Merge a partial settings patch into the current user's settings."""
+    from web.auth import DEFAULT_USER_SETTINGS
+
+    username = session.get("username")
+    patch    = request.get_json(silent=True) or {}
+
+    # Validate: only known keys, correct types
+    unknown = set(patch.keys()) - set(DEFAULT_USER_SETTINGS.keys())
+    if unknown:
+        return jsonify({"ok": False, "error": f"Unknown setting(s): {sorted(unknown)}"}), 400
+    if "show_advanced_tabs" in patch and not isinstance(patch["show_advanced_tabs"], bool):
+        return jsonify({"ok": False, "error": "'show_advanced_tabs' must be a boolean."}), 400
+    for list_key in ("remote_aes", "dicomweb_presets"):
+        if list_key in patch and not isinstance(patch[list_key], list):
+            return jsonify({"ok": False, "error": f"'{list_key}' must be a list."}), 400
+
+    save_user_settings(username, patch)
+    _audit("user.settings.save", ip=_req_ip(), user=_req_user(),
+           detail={"keys": sorted(patch.keys())})
     return jsonify({"ok": True})

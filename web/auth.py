@@ -162,6 +162,45 @@ def is_admin() -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Per-user settings
+# ---------------------------------------------------------------------------
+
+DEFAULT_USER_SETTINGS: dict = {
+    "show_advanced_tabs": False,
+    "remote_aes":         [],
+    "dicomweb_presets":   [],
+}
+
+
+def get_user_settings(username: str) -> dict:
+    """Return a user's settings dict, merged with defaults for missing keys."""
+    user = find_user(username)
+    stored = (user or {}).get("settings", {})
+    return {**DEFAULT_USER_SETTINGS, **stored}
+
+
+def save_user_settings(username: str, patch: dict) -> bool:
+    """Merge *patch* into the user's existing settings and persist.
+
+    Only keys present in DEFAULT_USER_SETTINGS are accepted; unknown keys
+    are silently ignored so old clients cannot inject arbitrary data.
+    Returns False if the user is not found.
+    """
+    users = _load()
+    for u in users:
+        if u["username"] == username:
+            existing = {**DEFAULT_USER_SETTINGS, **u.get("settings", {})}
+            for key in DEFAULT_USER_SETTINGS:
+                if key in patch:
+                    existing[key] = patch[key]
+            u["settings"] = existing
+            _save(users)
+            logger.debug("User settings updated for %s: %s", username, list(patch.keys()))
+            return True
+    return False
+
+
+# ---------------------------------------------------------------------------
 # Decorators
 # ---------------------------------------------------------------------------
 

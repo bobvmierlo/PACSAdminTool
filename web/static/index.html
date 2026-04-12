@@ -868,22 +868,23 @@
   <button class="tab-btn" onclick="showTab('cstore')" data-i18n="tabs.cstore">C-STORE</button>
   <button class="tab-btn" onclick="showTab('scp')" data-i18n="tabs.scp">DICOM Receiver</button>
   <button class="tab-btn" onclick="showTab('dmwl')" data-i18n="tabs.dmwl">Worklist (DMWL)</button>
-  <button class="tab-btn" onclick="showTab('commit')" data-i18n="tabs.commit">Storage Commit</button>
-  <button class="tab-btn" onclick="showTab('iocm')" data-i18n="tabs.iocm">IOCM</button>
+  <button class="tab-btn" onclick="showTab('commit')" data-i18n="tabs.commit" data-advanced="true">Storage Commit</button>
+  <button class="tab-btn" onclick="showTab('iocm')" data-i18n="tabs.iocm" data-advanced="true">IOCM</button>
   <button class="tab-btn" onclick="showTab('inspector')" data-i18n="tabs.inspector">Inspector &amp; Editor</button>
   <button class="tab-btn" onclick="showTab('validator')" data-i18n="tabs.validator">DICOM Validator</button>
   <button class="tab-btn" onclick="showTab('sr_viewer')" data-i18n="tabs.sr_viewer">SR Viewer</button>
-  <button class="tab-btn" onclick="showTab('kos_creator')" data-i18n="tabs.kos_creator">KOS Creator</button>
+  <button class="tab-btn" onclick="showTab('kos_creator')" data-i18n="tabs.kos_creator" data-advanced="true">KOS Creator</button>
   <button class="tab-btn" onclick="showTab('dicomize')" data-i18n="tabs.dicomize">DICOMize</button>
   <button class="tab-btn" onclick="showTab('anonymizer')" data-i18n="tabs.anonymizer">Anonymizer</button>
-  <button class="tab-btn" onclick="showTab('uid_remap')" data-i18n="tabs.uid_remap">UID Remapper</button>
+  <button class="tab-btn" onclick="showTab('uid_remap')" data-i18n="tabs.uid_remap" data-advanced="true">UID Remapper</button>
   <button class="tab-btn" onclick="showTab('dicomdir')" data-i18n="tabs.dicomdir">DICOMDIR</button>
-  <button class="tab-btn" onclick="showTab('dicomweb')" data-i18n="tabs.dicomweb">DICOMweb</button>
+  <button class="tab-btn" onclick="showTab('dicomweb')" data-i18n="tabs.dicomweb" data-advanced="true">DICOMweb</button>
   <button class="tab-btn" onclick="showTab('hl7')" data-i18n="tabs.hl7">HL7</button>
   <button class="tab-btn" onclick="showTab('settings')" data-i18n="tabs.settings">Settings</button>
   <button class="tab-btn" onclick="showTab('logs')" data-i18n="tabs.logs">Logs</button>
   <button class="tab-btn" onclick="showTab('help')" data-i18n="tabs.help">Help</button>
   <button class="tab-btn" onclick="showTab('about')" data-i18n="tabs.about">About</button>
+  <button id="advanced-tabs-toggle" class="tab-btn" style="margin-left:auto; color:#888; font-size:12px; white-space:nowrap" onclick="toggleAdvancedTabs()">&#9658; Advanced</button>
 </div>
 
 <!-- Mobile navigation bar — sits in flow on small screens, hidden on desktop -->
@@ -2096,6 +2097,66 @@
     <div class="btn-row" style="margin-top:4px; padding:0 0 20px 0">
       <button class="btn primary" onclick="saveSettings()" data-i18n="settings.save">Save Settings</button>
       <span id="save-status" style="color:#888; font-size:13px"></span>
+    </div>
+
+    <!-- My Preferences card (shown only when a user is logged in) -->
+    <div class="card" id="my-preferences-card" style="display:none">
+      <h3 data-i18n="settings.my_preferences">My Preferences</h3>
+
+      <!-- Advanced tabs toggle -->
+      <div class="field-grid" style="margin-bottom:12px">
+        <div class="field" style="flex-direction:row; align-items:center; gap:10px; flex-wrap:nowrap">
+          <input type="checkbox" id="pref-show-advanced-tabs" style="width:16px; height:16px; flex-shrink:0; cursor:pointer"
+                 onchange="setAdvancedTabsFromCheckbox(this)">
+          <label for="pref-show-advanced-tabs" style="margin:0; cursor:pointer" data-i18n="settings.show_advanced_tabs">Show advanced tabs</label>
+        </div>
+      </div>
+      <p style="font-size:12px; color:#888; margin:-4px 0 16px 0" data-i18n="settings.advanced_tabs_hint">
+        Enables Storage Commit, IOCM, KOS Creator, UID Remapper and DICOMweb tabs.
+      </p>
+
+      <!-- My DICOM AE Presets -->
+      <h4 style="margin:0 0 8px 0; font-size:14px" data-i18n="settings.my_dicom_presets">My DICOM AE Presets</h4>
+      <div class="result-table-wrap">
+        <table>
+          <thead><tr><th data-i18n="common.name">Name</th><th data-i18n="common.ae_title">AE Title</th><th data-i18n="common.host">Host</th><th data-i18n="common.port">Port</th><th data-i18n="common.actions">Actions</th></tr></thead>
+          <tbody id="my-ae-presets-tbody"></tbody>
+        </table>
+      </div>
+      <div class="field-grid" style="margin-top:10px">
+        <div class="field"><label data-i18n="common.name">Name</label><input id="my-ae-name" placeholder="My PACS"></div>
+        <div class="field"><label data-i18n="common.ae_title">AE Title</label><input id="my-ae-aet" placeholder="PACS_AE"></div>
+        <div class="field"><label data-i18n="common.host">Host</label><input id="my-ae-host" placeholder="192.168.1.10"></div>
+        <div class="field" style="max-width:100px"><label data-i18n="common.port">Port</label><input id="my-ae-port" type="number" min="1" max="65535" placeholder="104"></div>
+      </div>
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn primary" onclick="addMyAEPreset()" data-i18n="settings.add_preset">+ Add Preset</button>
+      </div>
+
+      <!-- My DICOMweb Presets -->
+      <h4 style="margin:20px 0 8px 0; font-size:14px" data-i18n="settings.my_dicomweb_presets">My DICOMweb Presets</h4>
+      <div class="result-table-wrap">
+        <table>
+          <thead><tr><th data-i18n="common.name">Name</th><th>Base URL</th><th data-i18n="common.actions">Actions</th></tr></thead>
+          <tbody id="my-dw-presets-tbody"></tbody>
+        </table>
+      </div>
+      <div class="field-grid" style="margin-top:10px">
+        <div class="field"><label data-i18n="common.name">Name</label><input id="my-dw-name" placeholder="My DICOMweb"></div>
+        <div class="field"><label>Base URL</label><input id="my-dw-url" placeholder="https://pacs.example.com/dicomweb"></div>
+        <div class="field"><label>Auth</label>
+          <select id="my-dw-auth">
+            <option value="none">None</option>
+            <option value="basic">Basic</option>
+            <option value="bearer">Bearer</option>
+          </select>
+        </div>
+        <div class="field"><label>Username / Token</label><input id="my-dw-user" placeholder="username or token"></div>
+        <div class="field"><label data-i18n="auth.password">Password</label><input id="my-dw-pass" type="password" placeholder="(for Basic)"></div>
+      </div>
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn primary" onclick="addMyDWPreset()" data-i18n="settings.add_preset">+ Add Preset</button>
+      </div>
     </div>
 
     <!-- User management card (shown only when auth is active and user is admin) -->
@@ -3396,6 +3457,11 @@ socket.on("hl7_status", data => updateHL7Button(data.running));
 // ─────────────────────────────────────────────────────────────────
 
 function showTab(name) {
+  // If an advanced tab is requested but advanced tabs are hidden, fall back to dashboard
+  if (ADVANCED_TABS.includes(name) && !userSettings.show_advanced_tabs) {
+    name = "dashboard";
+  }
+
   // Hide all panels and deactivate all buttons
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -3424,6 +3490,45 @@ function showTab(name) {
   if (name === "dicomize")  dzLoadPresets();
 }
 
+function applyAdvancedTabVisibility() {
+  const show = userSettings.show_advanced_tabs || false;
+  document.querySelectorAll(".tab-btn[data-advanced='true']").forEach(btn => {
+    btn.style.display = show ? "" : "none";
+  });
+  const toggle = document.getElementById("advanced-tabs-toggle");
+  if (toggle) {
+    toggle.textContent = show ? "\u25BE Advanced" : "\u25B8 Advanced";
+    toggle.title = i18n("settings.advanced_tabs_hint");
+  }
+  // Sync the My Preferences checkbox
+  _syncAdvancedTabsCheckbox();
+  // If the currently active tab is now hidden, switch to dashboard
+  const activeTab = localStorage.getItem("activeTab") || "dashboard";
+  if (ADVANCED_TABS.includes(activeTab) && !show) {
+    showTab("dashboard");
+  }
+}
+
+// Called by the "▸ Advanced" button in the tab bar (toggles)
+async function toggleAdvancedTabs() {
+  userSettings.show_advanced_tabs = !userSettings.show_advanced_tabs;
+  _syncAdvancedTabsCheckbox();
+  applyAdvancedTabVisibility();
+  await _patchUserSettings({ show_advanced_tabs: userSettings.show_advanced_tabs });
+}
+
+// Called by the checkbox in My Preferences (reads checkbox state directly)
+async function setAdvancedTabsFromCheckbox(cb) {
+  userSettings.show_advanced_tabs = cb.checked;
+  applyAdvancedTabVisibility();
+  await _patchUserSettings({ show_advanced_tabs: userSettings.show_advanced_tabs });
+}
+
+function _syncAdvancedTabsCheckbox() {
+  const cb = document.getElementById("pref-show-advanced-tabs");
+  if (cb) cb.checked = userSettings.show_advanced_tabs || false;
+}
+
 function toggleMobileNav() {
   document.getElementById("tab-bar").classList.toggle("mobile-open");
 }
@@ -3439,7 +3544,40 @@ function showHL7Tab(sub) {
 // 3. Config / Settings
 // ─────────────────────────────────────────────────────────────────
 
-let appConfig = {};  // holds the full config from the server
+let appConfig    = {};  // full system config from /api/config
+let userSettings = {};  // per-user settings from /api/user/settings
+let _currentUser = null; // {username, role} or null
+
+const ADVANCED_TABS = ["commit", "iocm", "kos_creator", "uid_remap", "dicomweb"];
+
+/** POST a partial patch to /api/config (only the keys provided). */
+async function _patchConfig(patch) {
+  try {
+    const res = await fetch("/api/config", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(patch),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      toast("Config save error: " + (err.error || res.statusText), "err");
+    }
+  } catch (e) {
+    toast("Config save error: " + e, "err");
+  }
+}
+
+/** POST a partial patch to /api/user/settings. No-op if not logged in. */
+async function _patchUserSettings(patch) {
+  if (!_currentUser) return;
+  try {
+    await fetch("/api/user/settings", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(patch),
+    });
+  } catch { /* ignore */ }
+}
 
 // Called once on page load to populate all forms with saved settings
 async function loadConfig() {
@@ -3538,26 +3676,136 @@ async function testPreset(i, btn) {
   }
 }
 
-function addPreset() {
+async function addPreset() {
   const name = document.getElementById("new-ae-name").value.trim();
   const aet  = document.getElementById("new-ae-aet").value.trim();
   const host = document.getElementById("new-ae-host").value.trim();
   const port = parsePort(document.getElementById("new-ae-port").value);
   if (!name) { toast(i18n("settings.name_required"), "warn"); return; }
   if (port === null) { toast(i18n("common.invalid_port", {port: document.getElementById("new-ae-port").value.trim()}), "err"); return; }
-  if (!appConfig.remote_aes) appConfig.remote_aes = [];
-  appConfig.remote_aes.push({ name, ae_title: aet, host, port });
+  const preset = { name, ae_title: aet, host, port };
+  const toSystem = _currentUser
+    ? confirm(`${i18n("settings.preset_save_choice")}\n\nOK = ${i18n("settings.save_to_system")}\nCancel = ${i18n("settings.save_to_my_presets")}`)
+    : true;
+  if (toSystem) {
+    if (!appConfig.remote_aes) appConfig.remote_aes = [];
+    appConfig.remote_aes = appConfig.remote_aes.filter(a => a.name !== name);
+    appConfig.remote_aes.push(preset);
+    await _patchConfig({ remote_aes: appConfig.remote_aes });
+  } else {
+    if (!userSettings.remote_aes) userSettings.remote_aes = [];
+    userSettings.remote_aes = userSettings.remote_aes.filter(a => a.name !== name);
+    userSettings.remote_aes.push(preset);
+    await _patchUserSettings({ remote_aes: userSettings.remote_aes });
+    renderMyPreferences();
+  }
   renderPresetTable();
   refreshAllPresetDropdowns();
   ["new-ae-name","new-ae-aet","new-ae-host","new-ae-port"].forEach(id =>
     document.getElementById(id).value = "");
 }
 
-function deletePreset(i) {
+async function deletePreset(i) {
   appConfig.remote_aes.splice(i, 1);
+  await _patchConfig({ remote_aes: appConfig.remote_aes });
   renderPresetTable();
   refreshAllPresetDropdowns();
 }
+
+// ── My Preferences ───────────────────────────────────────────────────────────
+
+function renderMyPreferences() {
+  const card = document.getElementById("my-preferences-card");
+  if (!card) return;
+  if (!_currentUser) { card.style.display = "none"; return; }
+  card.style.display = "";
+
+  // Sync advanced-tabs checkbox
+  const cb = document.getElementById("pref-show-advanced-tabs");
+  if (cb) cb.checked = userSettings.show_advanced_tabs || false;
+
+  // Render My DICOM AE Presets table
+  const aeBody = document.getElementById("my-ae-presets-tbody");
+  if (aeBody) {
+    aeBody.innerHTML = "";
+    (userSettings.remote_aes || []).forEach((ae, i) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        `<td>${ae.name}</td><td>${ae.ae_title}</td><td>${ae.host}</td><td>${ae.port}</td>` +
+        `<td><button class="btn danger" style="padding:2px 8px; font-size:11px"
+            onclick="deleteMyAEPreset(${i})">Delete</button></td>`;
+      aeBody.appendChild(tr);
+    });
+  }
+
+  // Render My DICOMweb Presets table
+  const dwBody = document.getElementById("my-dw-presets-tbody");
+  if (dwBody) {
+    dwBody.innerHTML = "";
+    (userSettings.dicomweb_presets || []).forEach((p, i) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        `<td>${p.name}</td><td style="word-break:break-all;font-size:12px">${p.base_url || ""}</td>` +
+        `<td><button class="btn danger" style="padding:2px 8px; font-size:11px"
+            onclick="deleteMyDWPreset(${i})">Delete</button></td>`;
+      dwBody.appendChild(tr);
+    });
+  }
+}
+
+async function addMyAEPreset() {
+  const name = document.getElementById("my-ae-name").value.trim();
+  const aet  = document.getElementById("my-ae-aet").value.trim();
+  const host = document.getElementById("my-ae-host").value.trim();
+  const port = parsePort(document.getElementById("my-ae-port").value);
+  if (!name) { toast(i18n("settings.name_required"), "warn"); return; }
+  if (port === null) { toast(i18n("common.invalid_port", {port: document.getElementById("my-ae-port").value.trim()}), "err"); return; }
+  if (!userSettings.remote_aes) userSettings.remote_aes = [];
+  userSettings.remote_aes = userSettings.remote_aes.filter(a => a.name !== name);
+  userSettings.remote_aes.push({ name, ae_title: aet, host, port });
+  await _patchUserSettings({ remote_aes: userSettings.remote_aes });
+  renderMyPreferences();
+  refreshAllPresetDropdowns();
+  ["my-ae-name","my-ae-aet","my-ae-host","my-ae-port"].forEach(id =>
+    document.getElementById(id).value = "");
+}
+
+async function deleteMyAEPreset(i) {
+  if (!userSettings.remote_aes) return;
+  userSettings.remote_aes.splice(i, 1);
+  await _patchUserSettings({ remote_aes: userSettings.remote_aes });
+  renderMyPreferences();
+  refreshAllPresetDropdowns();
+}
+
+async function addMyDWPreset() {
+  const name    = document.getElementById("my-dw-name").value.trim();
+  const baseUrl = document.getElementById("my-dw-url").value.trim();
+  const auth    = document.getElementById("my-dw-auth").value;
+  const user    = document.getElementById("my-dw-user").value.trim();
+  const pass    = document.getElementById("my-dw-pass").value;
+  if (!name) { toast(i18n("settings.name_required"), "warn"); return; }
+  if (!baseUrl) { toast("Base URL is required.", "warn"); return; }
+  const preset = { name, base_url: baseUrl, auth_type: auth, username: user, password: pass, token: auth === "bearer" ? user : "" };
+  if (!userSettings.dicomweb_presets) userSettings.dicomweb_presets = [];
+  userSettings.dicomweb_presets = userSettings.dicomweb_presets.filter(p => p.name !== name);
+  userSettings.dicomweb_presets.push(preset);
+  await _patchUserSettings({ dicomweb_presets: userSettings.dicomweb_presets });
+  renderMyPreferences();
+  dwRefreshPresets();
+  ["my-dw-name","my-dw-url","my-dw-user","my-dw-pass"].forEach(id =>
+    document.getElementById(id).value = "");
+}
+
+async function deleteMyDWPreset(i) {
+  if (!userSettings.dicomweb_presets) return;
+  userSettings.dicomweb_presets.splice(i, 1);
+  await _patchUserSettings({ dicomweb_presets: userSettings.dicomweb_presets });
+  renderMyPreferences();
+  dwRefreshPresets();
+}
+
+// ── System Settings ───────────────────────────────────────────────────────────
 
 async function saveSettings() {
   const localPort = parsePort(document.getElementById("set-ae-port").value);
@@ -3664,23 +3912,50 @@ function buildAESelector(containerId, prefix) {
 
 // Refresh all preset <select> elements with current config
 function refreshAllPresetDropdowns() {
-  const presets = appConfig.remote_aes || [];
+  const sysPresets  = appConfig.remote_aes   || [];
+  const userPresets = userSettings.remote_aes || [];
   document.querySelectorAll("[id$='-preset']").forEach(sel => {
+    // Skip DICOMweb preset selects (handled by dwRefreshPresets)
+    if (sel.id === "dw-preset-select") return;
     const current = sel.value;
     sel.innerHTML = `<option value="">${i18n("common.manual")}</option>`;
-    presets.forEach(ae => {
-      const opt = document.createElement("option");
-      opt.value = ae.name;
-      opt.textContent = ae.name;
-      sel.appendChild(opt);
-    });
+    if (sysPresets.length > 0) {
+      const grp = document.createElement("optgroup");
+      grp.label = i18n("settings.system_presets");
+      sysPresets.forEach(ae => {
+        const opt = document.createElement("option");
+        opt.value = "sys:" + ae.name;
+        opt.textContent = ae.name;
+        grp.appendChild(opt);
+      });
+      sel.appendChild(grp);
+    }
+    if (userPresets.length > 0) {
+      const grp = document.createElement("optgroup");
+      grp.label = i18n("settings.user_presets");
+      userPresets.forEach(ae => {
+        const opt = document.createElement("option");
+        opt.value = "usr:" + ae.name;
+        opt.textContent = ae.name;
+        grp.appendChild(opt);
+      });
+      sel.appendChild(grp);
+    }
     sel.value = current;  // restore previous selection if still valid
   });
 }
 
 function loadPreset(prefix) {
-  const name = document.getElementById(prefix + "-preset").value;
-  const ae   = (appConfig.remote_aes || []).find(a => a.name === name);
+  const val  = document.getElementById(prefix + "-preset").value;
+  if (!val) return;
+  let ae;
+  if (val.startsWith("usr:")) {
+    const name = val.slice(4);
+    ae = (userSettings.remote_aes || []).find(a => a.name === name);
+  } else {
+    const name = val.startsWith("sys:") ? val.slice(4) : val;
+    ae = (appConfig.remote_aes || []).find(a => a.name === name);
+  }
   if (!ae) return;
   document.getElementById(prefix + "-ae").value   = ae.ae_title;
   document.getElementById(prefix + "-host").value = ae.host;
@@ -4172,9 +4447,6 @@ function updateTemplateDesc() {
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("hl7-template")
     .addEventListener("change", updateTemplateDesc);
-
-  // Restore the last active tab, falling back to dashboard
-  showTab(localStorage.getItem("activeTab") || "dashboard");
 
   // Fetch app version and data paths from the server
   fetch("/api/version")
@@ -5693,22 +5965,47 @@ function _dwCfg() {
 // ── Preset management ─────────────────────────────────────────────
 
 function dwRefreshPresets() {
-  const presets = appConfig.dicomweb_presets || [];
+  const sysPresets  = appConfig.dicomweb_presets   || [];
+  const userPresets = userSettings.dicomweb_presets || [];
   const sel  = document.getElementById("dw-preset-select");
   const prev = sel.value;
   sel.innerHTML = `<option value="">${i18n("dicomweb.load_preset")}</option>`;
-  presets.forEach(p => {
-    const opt = document.createElement("option");
-    opt.value = p.name;
-    opt.textContent = p.name;
-    sel.appendChild(opt);
-  });
+  if (sysPresets.length > 0) {
+    const grp = document.createElement("optgroup");
+    grp.label = i18n("settings.system_presets");
+    sysPresets.forEach(p => {
+      const opt = document.createElement("option");
+      opt.value = "sys:" + p.name;
+      opt.textContent = p.name;
+      grp.appendChild(opt);
+    });
+    sel.appendChild(grp);
+  }
+  if (userPresets.length > 0) {
+    const grp = document.createElement("optgroup");
+    grp.label = i18n("settings.user_presets");
+    userPresets.forEach(p => {
+      const opt = document.createElement("option");
+      opt.value = "usr:" + p.name;
+      opt.textContent = p.name;
+      grp.appendChild(opt);
+    });
+    sel.appendChild(grp);
+  }
   sel.value = prev;
 }
 
 function dwLoadPreset() {
-  const name = document.getElementById("dw-preset-select").value;
-  const p    = (appConfig.dicomweb_presets || []).find(x => x.name === name);
+  const val = document.getElementById("dw-preset-select").value;
+  if (!val) return;
+  let p;
+  if (val.startsWith("usr:")) {
+    const name = val.slice(4);
+    p = (userSettings.dicomweb_presets || []).find(x => x.name === name);
+  } else {
+    const name = val.startsWith("sys:") ? val.slice(4) : val;
+    p = (appConfig.dicomweb_presets || []).find(x => x.name === name);
+  }
   if (!p) return;
   document.getElementById("dw-base-url").value  = p.base_url  || "";
   document.getElementById("dw-auth-type").value = p.auth_type || "none";
@@ -5722,21 +6019,47 @@ async function dwSavePreset() {
   const name = prompt(i18n("dicomweb.preset_name_prompt"), "");
   if (!name || !name.trim()) return;
   const trimmed = name.trim();
-  if (!appConfig.dicomweb_presets) appConfig.dicomweb_presets = [];
-  appConfig.dicomweb_presets = appConfig.dicomweb_presets.filter(p => p.name !== trimmed);
-  appConfig.dicomweb_presets.push({ name: trimmed, ..._dwCfg() });
-  await saveConfig();
+  const preset  = { name: trimmed, ..._dwCfg() };
+
+  // Ask where to save when a user is logged in
+  const toSystem = _currentUser
+    ? confirm(`${i18n("settings.preset_save_choice")}\n\n` +
+              `OK = ${i18n("settings.save_to_system")}\n` +
+              `Cancel = ${i18n("settings.save_to_my_presets")}`)
+    : true; // no auth → system only
+
+  if (toSystem) {
+    if (!appConfig.dicomweb_presets) appConfig.dicomweb_presets = [];
+    appConfig.dicomweb_presets = appConfig.dicomweb_presets.filter(p => p.name !== trimmed);
+    appConfig.dicomweb_presets.push(preset);
+    await _patchConfig({ dicomweb_presets: appConfig.dicomweb_presets });
+  } else {
+    if (!userSettings.dicomweb_presets) userSettings.dicomweb_presets = [];
+    userSettings.dicomweb_presets = userSettings.dicomweb_presets.filter(p => p.name !== trimmed);
+    userSettings.dicomweb_presets.push(preset);
+    await _patchUserSettings({ dicomweb_presets: userSettings.dicomweb_presets });
+  }
+
   dwRefreshPresets();
-  document.getElementById("dw-preset-select").value = trimmed;
+  document.getElementById("dw-preset-select").value = (toSystem ? "sys:" : "usr:") + trimmed;
   toast(i18n("dicomweb.preset_saved"), "ok");
 }
 
 async function dwDeletePreset() {
-  const name = document.getElementById("dw-preset-select").value;
-  if (!name) return;
+  const sel  = document.getElementById("dw-preset-select");
+  const val  = sel.value; // "sys:name" or "usr:name"
+  if (!val) return;
+  const isUser = val.startsWith("usr:");
+  const name   = val.replace(/^(sys:|usr:)/, "");
   if (!confirm(i18n("dicomweb.preset_delete_confirm").replace("{name}", name))) return;
-  appConfig.dicomweb_presets = (appConfig.dicomweb_presets || []).filter(p => p.name !== name);
-  await saveConfig();
+
+  if (isUser) {
+    userSettings.dicomweb_presets = (userSettings.dicomweb_presets || []).filter(p => p.name !== name);
+    await _patchUserSettings({ dicomweb_presets: userSettings.dicomweb_presets });
+  } else {
+    appConfig.dicomweb_presets = (appConfig.dicomweb_presets || []).filter(p => p.name !== name);
+    await _patchConfig({ dicomweb_presets: appConfig.dicomweb_presets });
+  }
   dwRefreshPresets();
   toast(i18n("dicomweb.preset_deleted"), "ok");
 }
@@ -6118,33 +6441,36 @@ async function deleteUser(username, btn) {
 // ─────────────────────────────────────────────────────────────────
 
 async function initAuthUI() {
-  // Check if auth is active by calling /api/users (returns 404 if no auth)
-  // We use /api/version which always works – but if the page loaded at all,
-  // auth succeeded. We just read the current username from a meta header if
-  // the server provides one, OR we call /api/users to check.
-  // Simpler approach: if we can hit /api/users we know auth is active.
   try {
-    const res = await fetch("/api/users");
-    if (res.ok) {
-      const data = await res.json();
-      // Find the currently logged-in user by hitting /api/config which always
-      // carries the session. We read the username from the session-based approach.
-      // Since Flask doesn't expose the session to JS, we add a lightweight endpoint:
-      // Instead, we use a simpler trick – check /api/users was accessible, meaning
-      // we are an admin. But we can't know the username this way.
-      // So we add a /api/me endpoint in server.py instead.
-      const meRes = await fetch("/api/me");
-      if (meRes.ok) {
-        const me = await meRes.json();
-        const el = document.getElementById("header-user");
-        el.textContent = me.username;
-        el.style.display = "";
-        document.getElementById("btn-logout").style.display = "";
-        // Load user management table for admins
-        if (me.role === "admin") loadUsers();
-      }
+    const meRes = await fetch("/api/me");
+    if (meRes.ok) {
+      const me = await meRes.json();
+      _currentUser = me;
+      const el = document.getElementById("header-user");
+      el.textContent = me.username;
+      el.style.display = "";
+      document.getElementById("btn-logout").style.display = "";
+      // Load user management table for admins
+      if (me.role === "admin") loadUsers();
+
+      // Fetch and apply per-user settings
+      try {
+        const settingsRes = await fetch("/api/user/settings");
+        if (settingsRes.ok) {
+          const sd = await settingsRes.json();
+          if (sd.ok) userSettings = sd.settings;
+        }
+      } catch { /* ignore – keep defaults */ }
+
+      // Refresh preset dropdowns now that userSettings is populated
+      refreshAllPresetDropdowns();
+      dwRefreshPresets();
     }
   } catch { /* auth not active or request failed – ignore */ }
+
+  // Apply advanced tab visibility (runs regardless of auth state)
+  applyAdvancedTabVisibility();
+  renderMyPreferences();
 }
 
 async function doLogout() {
@@ -6202,7 +6528,8 @@ async function doLogout() {
   renderHL7InHistory();
 
   // Show username + logout button (if auth is active)
-  initAuthUI();
+  // Must be awaited so userSettings is populated before showTab() is called
+  await initAuthUI();
 
   // ── C-FIND model/level validation ─────────────────────────────────
   // Study Root model (STUDY) does not support PATIENT query level.
@@ -6343,6 +6670,9 @@ async function doLogout() {
   // ── Restore theme ────────────────────────────────────────────────────
   const savedTheme = localStorage.getItem("pacsadmin_theme") || "light";
   _applyTheme(savedTheme);
+
+  // ── Restore active tab (after auth+settings loaded to respect advanced tabs) ─
+  showTab(localStorage.getItem("activeTab") || "dashboard");
 })();
 
 // ─────────────────────────────────────────────────────────────────
@@ -6779,29 +7109,52 @@ function _dzGetAE(prefix) {
 
 // Populate AE fields from config preset
 function dzFillAE(prefix) {
-  const sel  = document.getElementById(`dz-${prefix}-ae-preset`);
-  const name = sel?.value || "";
-  if (!name) return;
-  const ae = (appConfig.remote_aes || []).find(a => a.name === name);
+  const sel = document.getElementById(`dz-${prefix}-ae-preset`);
+  const val = sel?.value || "";
+  if (!val) return;
+  let ae;
+  if (val.startsWith("usr:")) {
+    ae = (userSettings.remote_aes || []).find(a => a.name === val.slice(4));
+  } else {
+    const name = val.startsWith("sys:") ? val.slice(4) : val;
+    ae = (appConfig.remote_aes || []).find(a => a.name === name);
+  }
   if (!ae) return;
   document.getElementById(`dz-${prefix}-ae-title`).value = ae.ae_title || "";
   document.getElementById(`dz-${prefix}-ae-host`).value  = ae.host     || "";
   document.getElementById(`dz-${prefix}-ae-port`).value  = ae.port     || "";
 }
 
-// Populate AE preset dropdowns from config
+// Populate AE preset dropdowns from config (with system + user optgroups)
 function dzLoadPresets() {
-  const presets = (appConfig.remote_aes || []);
+  const sysPresets  = appConfig.remote_aes   || [];
+  const userPresets = userSettings.remote_aes || [];
   ["pdf", "images", "video"].forEach(pfx => {
     const sel = document.getElementById(`dz-${pfx}-ae-preset`);
     if (!sel) return;
+    const prev = sel.value;
     sel.innerHTML = `<option value=""></option>`;
-    presets.forEach(ae => {
-      const opt = document.createElement("option");
-      opt.value       = ae.name;
-      opt.textContent = ae.name;
-      sel.appendChild(opt);
-    });
+    if (sysPresets.length > 0) {
+      const grp = document.createElement("optgroup");
+      grp.label = i18n("settings.system_presets");
+      sysPresets.forEach(ae => {
+        const opt = document.createElement("option");
+        opt.value = "sys:" + ae.name; opt.textContent = ae.name;
+        grp.appendChild(opt);
+      });
+      sel.appendChild(grp);
+    }
+    if (userPresets.length > 0) {
+      const grp = document.createElement("optgroup");
+      grp.label = i18n("settings.user_presets");
+      userPresets.forEach(ae => {
+        const opt = document.createElement("option");
+        opt.value = "usr:" + ae.name; opt.textContent = ae.name;
+        grp.appendChild(opt);
+      });
+      sel.appendChild(grp);
+    }
+    sel.value = prev;
   });
 }
 
@@ -7032,20 +7385,44 @@ function closeDzWorklistModal() {
 }
 
 function dzWlLoadPresets() {
-  const sel = document.getElementById("dz-wl-ae-preset");
+  const sel         = document.getElementById("dz-wl-ae-preset");
+  const sysPresets  = appConfig.remote_aes   || [];
+  const userPresets = userSettings.remote_aes || [];
+  const prev        = sel.value;
   sel.innerHTML = '<option value=""></option>';
-  (appConfig.remote_aes || []).forEach(ae => {
-    const opt = document.createElement("option");
-    opt.value       = ae.name;
-    opt.textContent = ae.name;
-    sel.appendChild(opt);
-  });
+  if (sysPresets.length > 0) {
+    const grp = document.createElement("optgroup");
+    grp.label = i18n("settings.system_presets");
+    sysPresets.forEach(ae => {
+      const opt = document.createElement("option");
+      opt.value = "sys:" + ae.name; opt.textContent = ae.name;
+      grp.appendChild(opt);
+    });
+    sel.appendChild(grp);
+  }
+  if (userPresets.length > 0) {
+    const grp = document.createElement("optgroup");
+    grp.label = i18n("settings.user_presets");
+    userPresets.forEach(ae => {
+      const opt = document.createElement("option");
+      opt.value = "usr:" + ae.name; opt.textContent = ae.name;
+      grp.appendChild(opt);
+    });
+    sel.appendChild(grp);
+  }
+  sel.value = prev;
 }
 
 function dzWlFillAE() {
-  const name = document.getElementById("dz-wl-ae-preset").value;
-  if (!name) return;
-  const ae = (appConfig.remote_aes || []).find(a => a.name === name);
+  const val = document.getElementById("dz-wl-ae-preset").value;
+  if (!val) return;
+  let ae;
+  if (val.startsWith("usr:")) {
+    ae = (userSettings.remote_aes || []).find(a => a.name === val.slice(4));
+  } else {
+    const name = val.startsWith("sys:") ? val.slice(4) : val;
+    ae = (appConfig.remote_aes || []).find(a => a.name === name);
+  }
   if (!ae) return;
   document.getElementById("dz-wl-host").value = ae.host      || "";
   document.getElementById("dz-wl-port").value = ae.port      || "";
