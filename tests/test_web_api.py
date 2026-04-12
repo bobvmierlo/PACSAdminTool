@@ -384,3 +384,304 @@ class TestSCPFiles:
         data = json.loads(resp.data)
         assert data["ok"]
         assert isinstance(data["files"], list)
+
+
+# ---------------------------------------------------------------------------
+# System DICOMweb Presets (via Config API)
+# ---------------------------------------------------------------------------
+
+class TestDICOMwebPresetsConfig:
+    def test_save_dicomweb_presets_valid(self, authed_client):
+        preset = {
+            "name": "Test WADO",
+            "base_url": "https://pacs.example.com/wado",
+            "auth_type": "none",
+            "username": "",
+            "password": "",
+        }
+        resp = authed_client.post(
+            "/api/config",
+            data=json.dumps({"dicomweb_presets": [preset]}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        assert json.loads(resp.data)["ok"]
+
+    def test_dicomweb_presets_persisted_after_save(self, authed_client):
+        preset = {
+            "name": "Persist Test",
+            "base_url": "https://example.com/dicomweb",
+            "auth_type": "basic",
+            "username": "user",
+            "password": "pass",
+        }
+        authed_client.post(
+            "/api/config",
+            data=json.dumps({"dicomweb_presets": [preset]}),
+            content_type="application/json",
+        )
+        resp = authed_client.get("/api/config")
+        cfg  = json.loads(resp.data)
+        presets = cfg.get("dicomweb_presets", [])
+        assert any(p["name"] == "Persist Test" for p in presets)
+
+    def test_invalid_auth_type_rejected(self, authed_client):
+        preset = {
+            "name": "Bad Auth",
+            "base_url": "https://example.com/dicomweb",
+            "auth_type": "digest",   # not allowed
+        }
+        resp = authed_client.post(
+            "/api/config",
+            data=json.dumps({"dicomweb_presets": [preset]}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+        data = json.loads(resp.data)
+        assert not data["ok"]
+
+    def test_non_list_dicomweb_presets_rejected(self, authed_client):
+        resp = authed_client.post(
+            "/api/config",
+            data=json.dumps({"dicomweb_presets": "not-a-list"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+
+    def test_non_dict_entry_in_dicomweb_presets_rejected(self, authed_client):
+        resp = authed_client.post(
+            "/api/config",
+            data=json.dumps({"dicomweb_presets": ["string-not-object"]}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+
+    def test_bearer_auth_type_accepted(self, authed_client):
+        preset = {
+            "name": "Bearer Test",
+            "base_url": "https://example.com/dicomweb",
+            "auth_type": "bearer",
+            "username": "mytoken",
+            "password": "",
+        }
+        resp = authed_client.post(
+            "/api/config",
+            data=json.dumps({"dicomweb_presets": [preset]}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Per-user Settings API  (/api/user/settings)
+# ---------------------------------------------------------------------------
+
+class TestUserSettings:
+    def test_get_returns_settings_dict(self, authed_client):
+        resp = authed_client.get("/api/user/settings")
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        assert data["ok"]
+        assert isinstance(data["settings"], dict)
+
+    def test_get_includes_expected_defaults(self, authed_client):
+        data = json.loads(authed_client.get("/api/user/settings").data)
+        settings = data["settings"]
+        assert "show_advanced_tabs" in settings
+        assert "remote_aes"         in settings
+        assert "dicomweb_presets"   in settings
+
+    def test_save_show_advanced_tabs(self, authed_client):
+        resp = authed_client.post(
+            "/api/user/settings",
+            data=json.dumps({"show_advanced_tabs": True}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        assert json.loads(resp.data)["ok"]
+
+        # Verify it persisted
+        data = json.loads(authed_client.get("/api/user/settings").data)
+        assert data["settings"]["show_advanced_tabs"] is True
+
+    def test_save_user_remote_aes(self, authed_client):
+        ae = {"name": "My PACS", "ae_title": "MYPACS", "host": "192.168.1.1", "port": 104}
+        resp = authed_client.post(
+            "/api/user/settings",
+            data=json.dumps({"remote_aes": [ae]}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+
+        data = json.loads(authed_client.get("/api/user/settings").data)
+        assert any(a["name"] == "My PACS" for a in data["settings"]["remote_aes"])
+
+    def test_save_user_dicomweb_presets(self, authed_client):
+        preset = {
+            "name": "My WADO",
+            "base_url": "https://my.pacs.com/wado",
+            "auth_type": "none",
+            "username": "",
+            "password": "",
+        }
+        resp = authed_client.post(
+            "/api/user/settings",
+            data=json.dumps({"dicomweb_presets": [preset]}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+
+        data = json.loads(authed_client.get("/api/user/settings").data)
+        assert any(p["name"] == "My WADO" for p in data["settings"]["dicomweb_presets"])
+
+    def test_unknown_key_rejected(self, authed_client):
+        resp = authed_client.post(
+            "/api/user/settings",
+            data=json.dumps({"not_a_real_setting": True}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+        assert not json.loads(resp.data)["ok"]
+
+    def test_wrong_type_for_show_advanced_tabs_rejected(self, authed_client):
+        resp = authed_client.post(
+            "/api/user/settings",
+            data=json.dumps({"show_advanced_tabs": "yes"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+
+    def test_wrong_type_for_remote_aes_rejected(self, authed_client):
+        resp = authed_client.post(
+            "/api/user/settings",
+            data=json.dumps({"remote_aes": "not-a-list"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+
+    def test_requires_authentication(self, authed_client):
+        fresh = authed_client.application.test_client()
+        assert fresh.get("/api/user/settings").status_code == 401
+        assert fresh.post(
+            "/api/user/settings",
+            data=json.dumps({}),
+            content_type="application/json",
+        ).status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Validator HTTP endpoint  (POST /api/dicom/validate)
+# ---------------------------------------------------------------------------
+
+class TestValidatorEndpoint:
+    @staticmethod
+    def _minimal_dcm_bytes() -> bytes:
+        """Return bytes of a minimal valid CT DICOM file for upload tests."""
+        import io as _io
+        from pydicom.dataset import FileDataset, FileMetaDataset
+        from pydicom.uid import ExplicitVRLittleEndian, generate_uid
+
+        sop_class = "1.2.840.10008.5.1.4.1.1.2"
+        sop_inst  = generate_uid()
+        file_meta = FileMetaDataset()
+        file_meta.MediaStorageSOPClassUID    = sop_class
+        file_meta.MediaStorageSOPInstanceUID = sop_inst
+        file_meta.TransferSyntaxUID          = ExplicitVRLittleEndian
+        file_meta.ImplementationClassUID     = "1.2.826.0.1.3680043.10.954.1"
+
+        ds = FileDataset(None, {}, file_meta=file_meta, preamble=b"\x00" * 128)
+        ds.SOPClassUID       = sop_class
+        ds.SOPInstanceUID    = sop_inst
+        ds.StudyInstanceUID  = generate_uid()
+        ds.SeriesInstanceUID = generate_uid()
+        ds.Modality          = "CT"
+        ds.PatientName       = "Test^Patient"
+        ds.PatientID         = "TEST001"
+        ds.PatientBirthDate  = "19800101"
+        ds.PatientSex        = "M"
+        ds.StudyDate         = "20240101"
+        ds.StudyTime         = "120000"
+        ds.AccessionNumber   = "ACC001"
+        ds.ReferringPhysicianName = ""
+        ds.StudyID           = "1"
+        ds.SpecificCharacterSet = "ISO_IR 6"
+
+        buf = _io.BytesIO()
+        try:
+            ds.save_as(buf, enforce_file_format=True)
+        except TypeError:
+            ds.save_as(buf, write_like_original=False)
+        return buf.getvalue()
+
+    def test_no_file_returns_400(self, authed_client):
+        resp = authed_client.post("/api/dicom/validate")
+        assert resp.status_code == 400
+        data = json.loads(resp.data)
+        assert not data["ok"]
+
+    def test_valid_dicom_returns_200(self, authed_client):
+        import io
+        dcm_bytes = self._minimal_dcm_bytes()
+        resp = authed_client.post(
+            "/api/dicom/validate",
+            data={"file": (io.BytesIO(dcm_bytes), "test.dcm")},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 200
+
+    def test_valid_dicom_response_has_checks_key(self, authed_client):
+        import io
+        dcm_bytes = self._minimal_dcm_bytes()
+        resp = authed_client.post(
+            "/api/dicom/validate",
+            data={"file": (io.BytesIO(dcm_bytes), "test.dcm")},
+            content_type="multipart/form-data",
+        )
+        data = json.loads(resp.data)
+        assert "checks" in data
+        assert isinstance(data["checks"], list)
+
+    def test_valid_dicom_response_has_findings_key(self, authed_client):
+        import io
+        dcm_bytes = self._minimal_dcm_bytes()
+        resp = authed_client.post(
+            "/api/dicom/validate",
+            data={"file": (io.BytesIO(dcm_bytes), "test.dcm")},
+            content_type="multipart/form-data",
+        )
+        data = json.loads(resp.data)
+        assert "findings" in data
+
+    def test_valid_dicom_no_errors(self, authed_client):
+        import io
+        dcm_bytes = self._minimal_dcm_bytes()
+        resp = authed_client.post(
+            "/api/dicom/validate",
+            data={"file": (io.BytesIO(dcm_bytes), "test.dcm")},
+            content_type="multipart/form-data",
+        )
+        data = json.loads(resp.data)
+        assert data["summary"]["errors"] == 0
+
+    def test_non_dicom_bytes_still_returns_200_with_checks(self, authed_client):
+        import io
+        resp = authed_client.post(
+            "/api/dicom/validate",
+            data={"file": (io.BytesIO(b"not a dicom file"), "bad.dcm")},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        assert "checks" in data
+        assert len(data["checks"]) > 0
+
+    def test_requires_authentication(self, authed_client):
+        import io
+        fresh = authed_client.application.test_client()
+        resp = fresh.post(
+            "/api/dicom/validate",
+            data={"file": (io.BytesIO(b"data"), "test.dcm")},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 401
+
