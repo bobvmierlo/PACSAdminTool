@@ -5667,73 +5667,6 @@ function clearSCPList() {
   document.getElementById("scp-count").textContent = "0 files";
 }
 
-async function loadSCPFiles() {
-  const info  = document.getElementById("scp-disk-info");
-  const wrap  = document.getElementById("scp-disk-wrap");
-  const tbody = document.getElementById("scp-disk-tbody");
-  info.textContent = "Loading…";
-  try {
-    const res  = await fetch("/api/scp/files");
-    const data = await res.json();
-    if (!data.ok) { info.textContent = `Error: ${data.error}`; wrap.style.display = "none"; return; }
-    info.textContent = `Directory: ${data.dir}  (${data.files.length} file(s))`;
-    if (!data.files.length) { wrap.style.display = "none"; return; }
-    tbody.innerHTML = "";
-    data.files.forEach(f => {
-      const tr  = document.createElement("tr");
-      const kb  = (f.size / 1024).toFixed(1);
-      const mtime = f.mtime.replace("T", " ").replace("+00:00", "");
-      const nameCel = document.createElement("td");
-      nameCel.textContent = f.name;
-      const sizeCel = document.createElement("td");
-      sizeCel.textContent = `${kb} KB`;
-      const mtimeCel = document.createElement("td");
-      mtimeCel.textContent = mtime;
-      const actCel = document.createElement("td");
-      actCel.style.whiteSpace = "nowrap";
-
-      const prevBtn = document.createElement("button");
-      prevBtn.className = "btn";
-      prevBtn.style.cssText = "font-size:11px; padding:2px 8px; margin-right:4px";
-      prevBtn.textContent = "Preview";
-      prevBtn.onclick = () => scpFilePreview(f.name);
-
-      const inspBtn = document.createElement("button");
-      inspBtn.className = "btn";
-      inspBtn.style.cssText = "font-size:11px; padding:2px 8px; margin-right:4px";
-      inspBtn.textContent = "Inspect";
-      inspBtn.onclick = () => scpFileInspect(f.name);
-
-      const editBtn = document.createElement("button");
-      editBtn.className = "btn";
-      editBtn.style.cssText = "font-size:11px; padding:2px 8px; margin-right:4px";
-      editBtn.setAttribute("data-i18n", "scp.edit_file");
-      editBtn.textContent = "Edit Tags…";
-      editBtn.onclick = () => scpFileEdit(f.name);
-
-      const delBtn = document.createElement("button");
-      delBtn.className = "btn";
-      delBtn.style.cssText = "font-size:11px; padding:2px 8px; color:#dc2626; border-color:#fca5a5";
-      delBtn.textContent = "Delete";
-      delBtn.onclick = () => scpFileDelete(f.name, tr);
-
-      actCel.appendChild(prevBtn);
-      actCel.appendChild(inspBtn);
-      actCel.appendChild(editBtn);
-      actCel.appendChild(delBtn);
-      tr.appendChild(nameCel);
-      tr.appendChild(sizeCel);
-      tr.appendChild(mtimeCel);
-      tr.appendChild(actCel);
-      tbody.appendChild(tr);
-    });
-    wrap.style.display = "";
-  } catch (e) {
-    info.textContent = `Error: ${e.message}`;
-    wrap.style.display = "none";
-  }
-}
-
 async function scpFileInspect(name) {
   try {
     const res  = await fetch(`/api/scp/files/inspect?name=${encodeURIComponent(name)}`);
@@ -6212,14 +6145,6 @@ async function scpFileDelete(name, rowEl) {
     const data = await res.json();
     if (!data.ok) { toast("Error: " + data.error, "err"); return; }
     rowEl.remove();
-    // Update the count in the info line
-    const info = document.getElementById("scp-disk-info");
-    const m = info.textContent.match(/\((\d+) file/);
-    if (m) {
-      const n = Math.max(0, parseInt(m[1]) - 1);
-      info.textContent = info.textContent.replace(/\(\d+ file\(s\)\)/, `(${n} file(s))`);
-      if (n === 0) document.getElementById("scp-disk-wrap").style.display = "none";
-    }
   } catch (e) {
     toast("Error: " + e, "err");
   }
