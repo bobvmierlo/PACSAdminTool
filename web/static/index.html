@@ -6147,7 +6147,7 @@ function _fmtDicomDate(d) {
 }
 
 async function scpDeleteStudy(studyUid, seriesUids, rowEl) {
-  const ok = await _dialog({
+  const confirmed = await _dialog({
     title:   i18n("common.confirm_delete"),
     message: `Delete entire study (${seriesUids.length} series)?\n\n${i18n("common.cannot_undo")}`,
     buttons: [
@@ -6155,7 +6155,7 @@ async function scpDeleteStudy(studyUid, seriesUids, rowEl) {
       { text: i18n("common.cancel"), value: null,   className: "btn" },
     ],
   });
-  if (!ok) return;
+  if (!confirmed) return;
   let ok = true;
   for (const serUid of seriesUids) {
     try {
