@@ -6,6 +6,7 @@ from flask import Blueprint, jsonify, request
 
 import web.context as ctx
 from web.audit import log as _audit
+from web.auth import require_admin
 from web.helpers import _req_ip, _req_user
 
 logger = logging.getLogger(__name__)
@@ -112,6 +113,7 @@ def get_config():
 
 
 @bp.route("/api/config", methods=["POST"])
+@require_admin
 def save_config_route():
     """Validate and persist a config update from the browser."""
     from config.manager import save_config
