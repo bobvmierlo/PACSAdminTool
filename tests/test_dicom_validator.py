@@ -255,8 +255,9 @@ class TestCoreIDs:
         assert match is not None
         assert match["severity"] == SEV_ERROR
 
+    @pytest.mark.filterwarnings("ignore::UserWarning")
     def test_invalid_sop_class_uid_format(self):
-        # Leading-zero arc is invalid per DICOM UID rules
+        # Leading-zero arc is invalid per DICOM UID rules; pydicom warns on assignment
         result = validate_dicom(_make_dcm(SOPClassUID="1.2.3.4.0000"))
         codes = [f["code"] for f in result["findings"]]
         assert "INVALID_SOP_CLASS_UID" in codes
