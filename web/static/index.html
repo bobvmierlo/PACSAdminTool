@@ -3118,6 +3118,27 @@
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════
+     GENERIC CONFIRM / CHOICE DIALOG
+══════════════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="confirm-modal"
+     onclick="if(event.target===this)_dialogCancel()">
+  <div class="modal" style="width:min(90vw,420px)">
+    <div class="modal-header">
+      <span id="confirm-modal-title"></span>
+      <button class="modal-close" onclick="_dialogCancel()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" style="gap:12px">
+      <p id="confirm-modal-message" style="margin:0; font-size:14px; line-height:1.5; white-space:pre-wrap"></p>
+      <input id="confirm-modal-input" type="text"
+             style="display:none; width:100%; box-sizing:border-box; padding:6px 8px; font-size:14px;
+                    border:1px solid #cbd5e0; border-radius:4px; outline:none">
+      <div id="confirm-modal-buttons"
+           style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; margin-top:4px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
      DICOM TAG DETAIL MODAL
 ══════════════════════════════════════════════════════════════════ -->
 <div class="modal-backdrop" id="tag-modal">
@@ -3286,7 +3307,82 @@ function cfindDateRange() {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// 0c. Toast notifications
+// 0c. Custom confirm / choice dialog
+// ─────────────────────────────────────────────────────────────────
+
+let _dialogResolve = null;
+
+/**
+ * Show a branded modal dialog instead of the native browser confirm/prompt.
+ * Returns a Promise that resolves to the chosen button's `value`.
+ * Resolves to `null` when dismissed via backdrop click or Escape.
+ *
+ * @param {object}   opts
+ * @param {string}   opts.title      - Dialog title
+ * @param {string}   [opts.message]  - Body text (supports newlines)
+ * @param {object[]} opts.buttons    - Array of {text, value, className}.
+ *                                     Use value "__input__" to return the input field's current text.
+ * @param {object}   [opts.input]    - When present, shows a text field: {placeholder, defaultValue}
+ */
+function _dialog({ title, message = "", buttons, input }) {
+  return new Promise(resolve => {
+    // Dismiss any previously open dialog without resolving to a value
+    if (_dialogResolve) { _dialogResolve(null); _dialogResolve = null; }
+    _dialogResolve = resolve;
+
+    document.getElementById("confirm-modal-title").textContent   = title;
+    document.getElementById("confirm-modal-message").textContent = message;
+    const msgEl = document.getElementById("confirm-modal-message");
+    msgEl.style.display = message ? "" : "none";
+
+    const inputEl = document.getElementById("confirm-modal-input");
+    if (input) {
+      inputEl.value       = input.defaultValue || "";
+      inputEl.placeholder = input.placeholder  || "";
+      inputEl.style.display = "";
+      // Submit on Enter key inside the input
+      inputEl.onkeydown = e => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          // Click the first button (primary action)
+          document.getElementById("confirm-modal-buttons").querySelector("button")?.click();
+        }
+      };
+      requestAnimationFrame(() => inputEl.focus());
+    } else {
+      inputEl.style.display = "none";
+      inputEl.onkeydown = null;
+    }
+
+    const container = document.getElementById("confirm-modal-buttons");
+    container.innerHTML = "";
+    buttons.forEach(({ text, value, className = "btn" }) => {
+      const btn = document.createElement("button");
+      btn.className   = className;
+      btn.textContent = text;
+      btn.onclick = () => {
+        document.getElementById("confirm-modal").classList.remove("open");
+        const r = _dialogResolve; _dialogResolve = null;
+        r(value === "__input__" ? inputEl.value.trim() : value);
+      };
+      container.appendChild(btn);
+    });
+
+    document.getElementById("confirm-modal").classList.add("open");
+  });
+}
+
+/** Dismiss the dialog as a cancellation (value = null). */
+function _dialogCancel() {
+  const modal = document.getElementById("confirm-modal");
+  if (!modal.classList.contains("open")) return;
+  modal.classList.remove("open");
+  const r = _dialogResolve; _dialogResolve = null;
+  if (r) r(null);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 0d. Toast notifications
 // ─────────────────────────────────────────────────────────────────
 
 /**
@@ -3824,10 +3920,20 @@ async function addPreset() {
   if (!name) { toast(i18n("settings.name_required"), "warn"); return; }
   if (port === null) { toast(i18n("common.invalid_port", {port: document.getElementById("new-ae-port").value.trim()}), "err"); return; }
   const preset = { name, ae_title: aet, host, port };
-  const toSystem = _currentUser
-    ? confirm(`${i18n("settings.preset_save_choice")}\n\nOK = ${i18n("settings.save_to_system")}\nCancel = ${i18n("settings.save_to_my_presets")}`)
-    : true;
-  if (toSystem) {
+  let dest = "system";
+  if (_currentUser) {
+    dest = await _dialog({
+      title:   i18n("settings.preset_save_choice"),
+      message: "",
+      buttons: [
+        { text: i18n("settings.save_to_system"),     value: "system", className: "btn primary" },
+        { text: i18n("settings.save_to_my_presets"), value: "mine",   className: "btn" },
+        { text: i18n("common.cancel"),               value: null,     className: "btn" },
+      ],
+    });
+    if (dest === null) return;
+  }
+  if (dest === "system") {
     if (!appConfig.remote_aes) appConfig.remote_aes = [];
     appConfig.remote_aes = appConfig.remote_aes.filter(a => a.name !== name);
     appConfig.remote_aes.push(preset);
@@ -3846,6 +3952,16 @@ async function addPreset() {
 }
 
 async function deletePreset(i) {
+  const p = appConfig.remote_aes?.[i];
+  const ok = await _dialog({
+    title:   i18n("common.confirm_delete"),
+    message: `Delete preset "${p?.name || p?.ae_title || i}"?\n${i18n("common.cannot_undo")}`,
+    buttons: [
+      { text: i18n("common.delete"), value: true,  className: "btn danger" },
+      { text: i18n("common.cancel"), value: null,   className: "btn" },
+    ],
+  });
+  if (!ok) return;
   appConfig.remote_aes.splice(i, 1);
   await _patchConfig({ remote_aes: appConfig.remote_aes });
   renderPresetTable();
@@ -3912,6 +4028,16 @@ async function addMyAEPreset() {
 
 async function deleteMyAEPreset(i) {
   if (!userSettings.remote_aes) return;
+  const p = userSettings.remote_aes[i];
+  const ok = await _dialog({
+    title:   i18n("common.confirm_delete"),
+    message: `Delete preset "${p?.name || p?.ae_title || i}"?\n${i18n("common.cannot_undo")}`,
+    buttons: [
+      { text: i18n("common.delete"), value: true,  className: "btn danger" },
+      { text: i18n("common.cancel"), value: null,   className: "btn" },
+    ],
+  });
+  if (!ok) return;
   userSettings.remote_aes.splice(i, 1);
   await _patchUserSettings({ remote_aes: userSettings.remote_aes });
   renderMyPreferences();
@@ -3939,6 +4065,16 @@ async function addMyDWPreset() {
 
 async function deleteMyDWPreset(i) {
   if (!userSettings.dicomweb_presets) return;
+  const p = userSettings.dicomweb_presets[i];
+  const ok = await _dialog({
+    title:   i18n("common.confirm_delete"),
+    message: `Delete preset "${p?.name || i}"?\n${i18n("common.cannot_undo")}`,
+    buttons: [
+      { text: i18n("common.delete"), value: true,  className: "btn danger" },
+      { text: i18n("common.cancel"), value: null,   className: "btn" },
+    ],
+  });
+  if (!ok) return;
   userSettings.dicomweb_presets.splice(i, 1);
   await _patchUserSettings({ dicomweb_presets: userSettings.dicomweb_presets });
   renderMyPreferences();
@@ -3985,6 +4121,16 @@ async function addSysDWPreset() {
 
 async function deleteSysDWPreset(i) {
   if (!appConfig.dicomweb_presets) return;
+  const p = appConfig.dicomweb_presets[i];
+  const ok = await _dialog({
+    title:   i18n("common.confirm_delete"),
+    message: `Delete preset "${p?.name || i}"?\n${i18n("common.cannot_undo")}`,
+    buttons: [
+      { text: i18n("common.delete"), value: true,  className: "btn danger" },
+      { text: i18n("common.cancel"), value: null,   className: "btn" },
+    ],
+  });
+  if (!ok) return;
   appConfig.dicomweb_presets.splice(i, 1);
   await _patchConfig({ dicomweb_presets: appConfig.dicomweb_presets });
   renderSysDWPresetsTable();
@@ -6001,7 +6147,15 @@ function _fmtDicomDate(d) {
 }
 
 async function scpDeleteStudy(studyUid, seriesUids, rowEl) {
-  if (!confirm(`Delete entire study (${seriesUids.length} series)?\n\nThis cannot be undone.`)) return;
+  const ok = await _dialog({
+    title:   i18n("common.confirm_delete"),
+    message: `Delete entire study (${seriesUids.length} series)?\n\n${i18n("common.cannot_undo")}`,
+    buttons: [
+      { text: i18n("common.delete"), value: true,  className: "btn danger" },
+      { text: i18n("common.cancel"), value: null,   className: "btn" },
+    ],
+  });
+  if (!ok) return;
   let ok = true;
   for (const serUid of seriesUids) {
     try {
@@ -6017,7 +6171,15 @@ async function scpDeleteStudy(studyUid, seriesUids, rowEl) {
 }
 
 async function scpDeleteSeries(studyUid, serUid, rowEl) {
-  if (!confirm(`Delete series?\n${serUid}\n\nThis cannot be undone.`)) return;
+  const ok = await _dialog({
+    title:   i18n("common.confirm_delete"),
+    message: `Delete series?\n${serUid}\n\n${i18n("common.cannot_undo")}`,
+    buttons: [
+      { text: i18n("common.delete"), value: true,  className: "btn danger" },
+      { text: i18n("common.cancel"), value: null,   className: "btn" },
+    ],
+  });
+  if (!ok) return;
   try {
     const res  = await fetch("/api/scp/series/delete",
       { method: "POST", headers: { "Content-Type": "application/json" },
@@ -6033,7 +6195,15 @@ async function scpDeleteSeries(studyUid, serUid, rowEl) {
 }
 
 async function scpFileDelete(name, rowEl) {
-  if (!confirm(`Delete "${name}"?\nThis cannot be undone.`)) return;
+  const ok = await _dialog({
+    title:   i18n("common.confirm_delete"),
+    message: `Delete "${name}"?\n${i18n("common.cannot_undo")}`,
+    buttons: [
+      { text: i18n("common.delete"), value: true,  className: "btn danger" },
+      { text: i18n("common.cancel"), value: null,   className: "btn" },
+    ],
+  });
+  if (!ok) return;
   try {
     const res  = await fetch("/api/scp/files/delete",
                              { method: "POST",
@@ -6548,17 +6718,34 @@ function dwLoadPreset() {
 }
 
 async function dwSavePreset() {
-  const name = prompt(i18n("dicomweb.preset_name_prompt"), "");
+  const name = await _dialog({
+    title:   i18n("dicomweb.preset_name_prompt"),
+    message: "",
+    input:   { defaultValue: "", placeholder: i18n("dicomweb.preset_name_prompt") },
+    buttons: [
+      { text: i18n("common.ok"),     value: "__input__", className: "btn primary" },
+      { text: i18n("common.cancel"), value: null,        className: "btn" },
+    ],
+  });
   if (!name || !name.trim()) return;
   const trimmed = name.trim();
   const preset  = { name: trimmed, ..._dwCfg() };
 
   // Ask where to save when a user is logged in
-  const toSystem = _currentUser
-    ? confirm(`${i18n("settings.preset_save_choice")}\n\n` +
-              `OK = ${i18n("settings.save_to_system")}\n` +
-              `Cancel = ${i18n("settings.save_to_my_presets")}`)
-    : true; // no auth → system only
+  let toSystem = true;
+  if (_currentUser) {
+    const dest = await _dialog({
+      title:   i18n("settings.preset_save_choice"),
+      message: "",
+      buttons: [
+        { text: i18n("settings.save_to_system"),     value: "system", className: "btn primary" },
+        { text: i18n("settings.save_to_my_presets"), value: "mine",   className: "btn" },
+        { text: i18n("common.cancel"),               value: null,     className: "btn" },
+      ],
+    });
+    if (dest === null) return;
+    toSystem = dest === "system";
+  }
 
   if (toSystem) {
     if (!appConfig.dicomweb_presets) appConfig.dicomweb_presets = [];
@@ -6583,7 +6770,15 @@ async function dwDeletePreset() {
   if (!val) return;
   const isUser = val.startsWith("usr:");
   const name   = val.replace(/^(sys:|usr:)/, "");
-  if (!confirm(i18n("dicomweb.preset_delete_confirm").replace("{name}", name))) return;
+  const delOk = await _dialog({
+    title:   i18n("common.confirm_delete"),
+    message: i18n("dicomweb.preset_delete_confirm").replace("{name}", name),
+    buttons: [
+      { text: i18n("common.delete"), value: true,  className: "btn danger" },
+      { text: i18n("common.cancel"), value: null,   className: "btn" },
+    ],
+  });
+  if (!delOk) return;
 
   if (isUser) {
     userSettings.dicomweb_presets = (userSettings.dicomweb_presets || []).filter(p => p.name !== name);
@@ -6956,7 +7151,15 @@ async function addUser() {
 }
 
 async function deleteUser(username, btn) {
-  if (!confirm(`Delete user '${username}'?`)) return;
+  const ok = await _dialog({
+    title:   i18n("common.confirm_delete"),
+    message: `Delete user '${username}'?`,
+    buttons: [
+      { text: i18n("common.delete"), value: true,  className: "btn danger" },
+      { text: i18n("common.cancel"), value: null,   className: "btn" },
+    ],
+  });
+  if (!ok) return;
   btn.disabled = true;
   const res  = await fetch(`/api/users/${encodeURIComponent(username)}`, { method: "DELETE" });
   const data = await res.json();
@@ -7128,6 +7331,9 @@ async function doLogout() {
   document.addEventListener("keydown", e => {
     // Escape → close the topmost visible modal
     if (e.key === "Escape") {
+      if (document.getElementById("confirm-modal")?.classList.contains("open")) {
+        _dialogCancel(); return;
+      }
       if (document.getElementById("dwv-overlay")?.style.display === "flex") {
         closeDwvViewer(); return;
       }
@@ -7150,6 +7356,7 @@ async function doLogout() {
       const tag = document.activeElement?.tagName;
       if (tag === "TEXTAREA" || tag === "BUTTON" || tag === "SELECT" || tag === "A") return;
       const anyModalOpen = [
+        () => document.getElementById("confirm-modal")?.classList.contains("open"),
         () => document.getElementById("dwv-overlay")?.style.display === "flex",
         () => document.getElementById("preview-modal")?.style.display !== "none",
         () => document.getElementById("tag-modal")?.classList.contains("open"),
@@ -9151,7 +9358,15 @@ async function anonProfileSave() {
 
 async function anonProfileDelete() {
   if (!_apmEditingKey) return;
-  if (!confirm(i18n("anonymizer.mgr_confirm_delete", {name: _apmEditingKey}))) return;
+  const ok = await _dialog({
+    title:   i18n("common.confirm_delete"),
+    message: i18n("anonymizer.mgr_confirm_delete", {name: _apmEditingKey}),
+    buttons: [
+      { text: i18n("common.delete"), value: true,  className: "btn danger" },
+      { text: i18n("common.cancel"), value: null,   className: "btn" },
+    ],
+  });
+  if (!ok) return;
   try {
     await fetch(`/api/dicom/anon_profiles/${encodeURIComponent(_apmEditingKey)}`,
                 { method: "DELETE" });
