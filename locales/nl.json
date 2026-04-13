@@ -42,6 +42,8 @@
     "port": "Poort:",
     "clear": "Wissen",
     "close": "Sluiten",
+    "cancel": "Annuleren",
+    "ok": "OK",
     "delete": "Verwijderen",
     "error": "Fout",
     "filter": "Filter:",
@@ -69,7 +71,9 @@
     "autoscroll": "Automatisch scrollen",
     "dark_mode": "Donkere modus",
     "light_mode": "Lichte modus",
-    "invalid_port": "Ongeldige poort: \"{port}\". Moet een getal zijn tussen 1 en 65535."
+    "invalid_port": "Ongeldige poort: \"{port}\". Moet een getal zijn tussen 1 en 65535.",
+    "confirm_delete": "Verwijderen bevestigen",
+    "cannot_undo": "Dit kan niet ongedaan worden gemaakt."
   },
   "cfind": {
     "query_scp": "Query / Retrieve SCP",

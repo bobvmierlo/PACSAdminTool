@@ -42,6 +42,8 @@
     "port": "Port:",
     "clear": "Clear",
     "close": "Close",
+    "cancel": "Cancel",
+    "ok": "OK",
     "delete": "Delete",
     "error": "Error",
     "filter": "Filter:",
@@ -69,7 +71,9 @@
     "autoscroll": "Auto-scroll",
     "dark_mode": "Dark mode",
     "light_mode": "Light mode",
-    "invalid_port": "Invalid port: \"{port}\". Must be a number between 1 and 65535."
+    "invalid_port": "Invalid port: \"{port}\". Must be a number between 1 and 65535.",
+    "confirm_delete": "Confirm Delete",
+    "cannot_undo": "This cannot be undone."
   },
   "cfind": {
     "query_scp": "Query / Retrieve SCP",
