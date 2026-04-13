@@ -6,7 +6,7 @@ from flask import Blueprint, jsonify, request
 
 import web.context as ctx
 from web.audit import log as _audit
-from web.auth import require_admin
+from web.auth import require_login, is_admin
 from web.helpers import _req_ip, _req_user
 
 logger = logging.getLogger(__name__)
@@ -30,6 +30,9 @@ _CONFIG_SCHEMA = {
 
 _LOG_LEVELS   = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 _MAX_AE_TITLE = 16
+
+# Keys in _CONFIG_SCHEMA that only admins may write
+_ADMIN_WRITE_KEYS = frozenset({"local_ae", "remote_aes", "dicomweb_presets", "hl7", "web", "telemetry"})
 _MAX_HOST_LEN = 253
 
 
@@ -113,7 +116,7 @@ def get_config():
 
 
 @bp.route("/api/config", methods=["POST"])
-@require_admin
+@require_login
 def save_config_route():
     """Validate and persist a config update from the browser."""
     from config.manager import save_config
@@ -126,6 +129,11 @@ def save_config_route():
     if error:
         logger.warning("Config update rejected: %s", error)
         return jsonify({"ok": False, "error": error}), 400
+    # Keys that touch system configuration require admin role
+    restricted = set(data.keys()) & _ADMIN_WRITE_KEYS
+    if restricted and not is_admin():
+        logger.warning("Non-admin attempted to write admin-only config keys: %s", sorted(restricted))
+        return jsonify({"ok": False, "error": "Admin access required."}), 403
     logger.debug("Config update keys: %s", list(data.keys()))
     ctx.config.update(data)
     save_config(ctx.config)

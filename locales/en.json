@@ -288,6 +288,7 @@
     "log_level": "Log Level",
     "log_note": "Logs are written to logs/pacs_admin.log and rotated daily (7-day retention).",
     "save": "Save Settings",
+    "save_preferences": "Save Preferences",
     "saved": "Saved  {ts}",
     "saved_web": "Saved ✓",
     "name_required": "Name is required.",
