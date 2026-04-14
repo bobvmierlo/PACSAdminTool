@@ -399,8 +399,6 @@ def scp_series_frame():
             return jsonify({"ok": False, "error": str(e)}), 500
 
     try:
-        import numpy as np
-        from PIL import Image
         buf, _total_frames, _wc, _ww, _mod = _render_frame(target, frame=0)
         return _send(buf, mimetype="image/png")
     except ImportError:
@@ -479,8 +477,6 @@ def scp_files_preview():
             return jsonify({"ok": False, "error": str(e)}), 500
 
     try:
-        import numpy as np
-        from PIL import Image
         buf, _total, _wc, _ww, _mod = _render_frame(fpath, frame=frame)
         return _send(buf, mimetype="image/png")
     except ImportError:

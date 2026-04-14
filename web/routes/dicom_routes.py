@@ -273,7 +273,6 @@ def dicom_store():
     if not files:
         return jsonify({"ok": False, "message": "No files uploaded"}), 400
 
-    import tempfile
     tmp_dir_obj = tempfile.TemporaryDirectory(prefix="pacsadmin_store_")
     tmp_dir     = tmp_dir_obj.name
     paths = []
@@ -536,8 +535,6 @@ def dicom_dicomdir():
 @require_login
 def dicom_dicomdir_generate():
     """Accept DICOM files and return a ZIP containing a proper DICOM File Set."""
-    import os
-    import tempfile
     import zipfile
     import pydicom
     from pydicom.fileset import FileSet
@@ -775,7 +772,6 @@ def kos_create():
 @require_login
 def dicom_anonymize_and_store():
     """Anonymise a single DICOM file and immediately C-STORE it to a remote AE."""
-    import zipfile
     import pydicom
 
     files = request.files.getlist("files[]")

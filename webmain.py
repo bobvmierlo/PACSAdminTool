@@ -24,7 +24,6 @@ import os
 import argparse
 import logging
 import webbrowser
-import signal
 
 # ── Put our project folder on Python's search path so imports work
 #    regardless of where you launch this script from.
