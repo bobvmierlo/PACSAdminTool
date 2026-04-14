@@ -1003,6 +1003,15 @@
     </div>
     <div class="card">
       <h3 data-i18n="cfind.query_params">Query Parameters</h3>
+      <!-- C-FIND query presets (user-level) -->
+      <div style="margin-bottom:10px; display:flex; flex-wrap:wrap; gap:6px; align-items:center">
+        <select id="cfind-preset-select" onchange="cfindLoadPreset()"
+                style="font-size:13px; padding:5px 8px; border:1px solid #d0d0d0; border-radius:3px; background:#fff">
+          <option value="">— Load preset —</option>
+        </select>
+        <button class="btn" onclick="cfindSavePreset()">Save as…</button>
+        <button class="btn" onclick="cfindDeletePreset()">Delete</button>
+      </div>
       <div class="field-grid">
         <div class="field"><label data-i18n="cfind.patient_id">Patient ID</label><input id="cfind-pid"></div>
         <div class="field"><label data-i18n="cfind.patient_name">Patient Name</label><input id="cfind-pname"></div>
@@ -2199,6 +2208,17 @@
         features are used. No patient data, AE titles, hostnames, or IP addresses.
         Data is sent to PostHog (EU servers). Changes take effect immediately.
       </p>
+    </div>
+    <div class="card">
+      <h3 data-i18n="settings.config_backup">Configuration Backup</h3>
+      <p style="font-size:12px; color:#888; margin:0 0 10px" data-i18n="settings.config_backup_note">Export or restore the system configuration (AE settings, HL7, web server, presets). User settings and the telemetry ID are not included.</p>
+      <div class="btn-row">
+        <button class="btn" onclick="exportConfig()" data-i18n="settings.export_config">Export Config…</button>
+        <label class="btn" style="cursor:pointer" data-i18n="settings.import_config">Import Config…
+          <input type="file" accept=".json" style="display:none" onchange="importConfig(event)">
+        </label>
+        <span id="config-backup-status" style="font-size:12px; color:#888"></span>
+      </div>
     </div>
     <div class="btn-row" style="margin-top:4px; padding:0 0 20px 0">
       <button class="btn primary" onclick="saveSettings()" data-i18n="settings.save">Save Settings</button>
@@ -4213,6 +4233,55 @@ async function saveSettings() {
   setTimeout(() => s.textContent = "", 3000);
 }
 
+// ── Config backup: export / import ───────────────────────────────
+
+async function exportConfig() {
+  try {
+    const res = await fetch("/api/config");
+    if (!res.ok) { toast("Could not fetch config.", "err"); return; }
+    const cfg = await res.json();
+    // Strip the telemetry anonymous_id before exporting
+    if (cfg.telemetry && cfg.telemetry.anonymous_id !== undefined) {
+      const tel = { ...cfg.telemetry };
+      delete tel.anonymous_id;
+      cfg.telemetry = tel;
+    }
+    const ts = new Date().toISOString().slice(0, 10);
+    downloadText(`pacsadmin_config_${ts}.json`, JSON.stringify(cfg, null, 2), "application/json");
+    const st = document.getElementById("config-backup-status");
+    if (st) { st.textContent = "Exported."; setTimeout(() => st.textContent = "", 3000); }
+  } catch (e) {
+    toast("Export error: " + e, "err");
+  }
+}
+
+async function importConfig(event) {
+  const file = event.target.files[0];
+  event.target.value = "";   // reset so same file can be re-selected
+  if (!file) return;
+  const st = document.getElementById("config-backup-status");
+  try {
+    const text = await file.text();
+    const cfg  = JSON.parse(text);
+    const res  = await fetch("/api/config", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(cfg),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast("Import failed: " + (data.error || res.statusText), "err");
+      return;
+    }
+    // Reload config into UI
+    await loadConfig();
+    toast("Configuration imported successfully.", "ok");
+    if (st) { st.textContent = "Imported."; setTimeout(() => st.textContent = "", 3000); }
+  } catch (e) {
+    toast("Import error: " + e, "err");
+  }
+}
+
 async function saveUserPreferences() {
   const patch = {
     language:  document.getElementById("set-language").value,
@@ -4327,6 +4396,7 @@ function refreshAllPresetDropdowns() {
     }
     sel.value = current;  // restore previous selection if still valid
   });
+  cfindRefreshPresetDropdown();
 }
 
 function loadPreset(prefix) {
@@ -4641,6 +4711,97 @@ function loadCFindHistory(i) {
 function clearCFindHistory() {
   localStorage.removeItem(CFIND_HISTORY_KEY);
   renderCFindHistory();
+}
+
+// ── C-FIND: saved query presets (stored in user settings) ────────
+
+function cfindRefreshPresetDropdown() {
+  const presets = userSettings.cfind_presets || [];
+  const sel = document.getElementById("cfind-preset-select");
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— Load preset —</option>';
+  presets.forEach(p => {
+    const opt = document.createElement("option");
+    opt.value       = p.name;
+    opt.textContent = p.name;
+    sel.appendChild(opt);
+  });
+  if (prev) sel.value = prev;
+}
+
+function cfindLoadPreset() {
+  const name = document.getElementById("cfind-preset-select").value;
+  if (!name) return;
+  const p = (userSettings.cfind_presets || []).find(x => x.name === name);
+  if (!p) return;
+  if (p.ae_title)    document.getElementById("cfind-ae").value       = p.ae_title;
+  if (p.host)        document.getElementById("cfind-host").value     = p.host;
+  if (p.port)        document.getElementById("cfind-port").value     = p.port;
+  if (p.query_level) document.getElementById("cfind-level").value    = p.query_level;
+  if (p.query_model) document.getElementById("cfind-model").value    = p.query_model;
+  document.getElementById("cfind-pid").value       = p.patient_id   || "";
+  document.getElementById("cfind-pname").value     = p.patient_name || "";
+  document.getElementById("cfind-acc").value       = p.accession    || "";
+  document.getElementById("cfind-date-from").value = p.date_from    || "";
+  document.getElementById("cfind-date-to").value   = p.date_to      || "";
+  document.getElementById("cfind-mod").value       = p.modality     || "";
+  document.getElementById("cfind-suid").value      = p.study_uid    || "";
+}
+
+async function cfindSavePreset() {
+  const name = await _dialog({
+    title:   "Save C-FIND Preset",
+    message: "",
+    input:   { defaultValue: "", placeholder: "Preset name" },
+    buttons: [
+      { text: i18n("common.ok"),     value: "__input__", className: "btn primary" },
+      { text: i18n("common.cancel"), value: null,        className: "btn" },
+    ],
+  });
+  if (!name || !name.trim()) return;
+  const trimmed = name.trim();
+  const preset = {
+    name:         trimmed,
+    ae_title:     (document.getElementById("cfind-ae")   || {}).value || "",
+    host:         (document.getElementById("cfind-host") || {}).value || "",
+    port:         parseInt(document.getElementById("cfind-port")?.value, 10) || 104,
+    query_level:  document.getElementById("cfind-level").value,
+    query_model:  document.getElementById("cfind-model").value,
+    patient_id:   document.getElementById("cfind-pid").value,
+    patient_name: document.getElementById("cfind-pname").value,
+    accession:    document.getElementById("cfind-acc").value,
+    date_from:    document.getElementById("cfind-date-from").value,
+    date_to:      document.getElementById("cfind-date-to").value,
+    modality:     document.getElementById("cfind-mod").value,
+    study_uid:    document.getElementById("cfind-suid").value,
+  };
+  if (!userSettings.cfind_presets) userSettings.cfind_presets = [];
+  userSettings.cfind_presets = userSettings.cfind_presets.filter(p => p.name !== trimmed);
+  userSettings.cfind_presets.push(preset);
+  await _patchUserSettings({ cfind_presets: userSettings.cfind_presets });
+  cfindRefreshPresetDropdown();
+  document.getElementById("cfind-preset-select").value = trimmed;
+  toast("Preset saved.", "ok");
+}
+
+async function cfindDeletePreset() {
+  const sel  = document.getElementById("cfind-preset-select");
+  const name = sel.value;
+  if (!name) return;
+  const delOk = await _dialog({
+    title:   i18n("common.confirm_delete"),
+    message: `Delete preset "${name}"?`,
+    buttons: [
+      { text: i18n("common.delete"), value: true, className: "btn danger" },
+      { text: i18n("common.cancel"), value: null,  className: "btn" },
+    ],
+  });
+  if (!delOk) return;
+  userSettings.cfind_presets = (userSettings.cfind_presets || []).filter(p => p.name !== name);
+  await _patchUserSettings({ cfind_presets: userSettings.cfind_presets });
+  cfindRefreshPresetDropdown();
+  toast("Preset deleted.", "ok");
 }
 
 // ─────────────────────────────────────────────────────────────────

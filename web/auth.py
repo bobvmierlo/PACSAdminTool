@@ -169,6 +169,7 @@ DEFAULT_USER_SETTINGS: dict = {
     "show_advanced_tabs": False,
     "remote_aes":         [],
     "dicomweb_presets":   [],
+    "cfind_presets":      [],
 }
 
 

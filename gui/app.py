@@ -9,7 +9,6 @@ import threading
 import logging
 import os
 import sys
-import socket
 import csv
 import webbrowser
 from datetime import datetime
@@ -43,7 +42,6 @@ class _UpdateBanner(tk.Frame):
     _FG   = "#ffffff"
     _BTN_BG  = "#ffffff"
     _BTN_FG  = "#1a56db"
-    _BTN2_BG = "rgba(255,255,255,0.18)"   # approximated as a light blue
 
     def __init__(self, parent, info: dict):
         super().__init__(parent, bg=self._BG, pady=6, padx=12)

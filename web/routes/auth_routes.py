@@ -187,7 +187,7 @@ def user_settings_save():
         return jsonify({"ok": False, "error": f"Unknown setting(s): {sorted(unknown)}"}), 400
     if "show_advanced_tabs" in patch and not isinstance(patch["show_advanced_tabs"], bool):
         return jsonify({"ok": False, "error": "'show_advanced_tabs' must be a boolean."}), 400
-    for list_key in ("remote_aes", "dicomweb_presets"):
+    for list_key in ("remote_aes", "dicomweb_presets", "cfind_presets"):
         if list_key in patch and not isinstance(patch[list_key], list):
             return jsonify({"ok": False, "error": f"'{list_key}' must be a list."}), 400
 
