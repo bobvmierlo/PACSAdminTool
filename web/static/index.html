@@ -2177,23 +2177,6 @@
       </div>
     </div>
     <div class="card">
-      <h3 data-i18n="settings.language">Language</h3>
-      <div class="field-grid">
-        <div class="field" style="max-width:200px">
-          <label data-i18n="settings.language_label">Interface Language</label>
-          <select id="set-language"></select>
-        </div>
-      </div>
-      <p style="font-size:12px; color:#888; margin:6px 0 0" data-i18n="settings.language_note">
-        Changes take effect after page reload.
-      </p>
-    </div>
-    <div class="card">
-      <h3 data-i18n="settings.appearance">Appearance</h3>
-      <button id="dark-mode-btn" class="btn" onclick="toggleDarkMode()" data-i18n="common.dark_mode">☾ Dark mode</button>
-      <p style="font-size:12px; color:#888; margin:8px 0 0" data-i18n="settings.appearance_note">Toggle between light and dark colour scheme. Preference is saved in the browser.</p>
-    </div>
-    <div class="card">
       <h3 data-i18n="settings.web_server">Web Server</h3>
       <div class="field-grid">
         <div class="field"><label data-i18n="settings.web_host">Host</label><input id="set-web-host" value="0.0.0.0"></div>
@@ -2201,24 +2184,6 @@
       </div>
       <p style="font-size:12px; color:#888; margin:6px 0 0" data-i18n="settings.web_note">
         Changes take effect after restarting the application.
-      </p>
-    </div>
-    <div class="card">
-      <h3 data-i18n="settings.logging">Logging</h3>
-      <div class="field-grid">
-        <div class="field" style="max-width:160px">
-          <label data-i18n="settings.log_level">Log Level</label>
-          <select id="set-log-level">
-            <option value="DEBUG">DEBUG</option>
-            <option value="INFO" selected>INFO</option>
-            <option value="WARNING">WARNING</option>
-            <option value="ERROR">ERROR</option>
-            <option value="CRITICAL">CRITICAL</option>
-          </select>
-        </div>
-      </div>
-      <p style="font-size:12px; color:#888; margin:6px 0 0" data-i18n="settings.log_note">
-        Logs are written to logs/pacs_admin.log and rotated daily (7-day retention).
       </p>
     </div>
     <div class="card">
@@ -2240,6 +2205,47 @@
       <span id="save-status" style="color:#888; font-size:13px"></span>
     </div>
     </div><!-- /admin-settings-wrap -->
+
+    <!-- ── User preferences (accessible to all logged-in users) ── -->
+    <div class="card">
+      <h3 data-i18n="settings.language">Language</h3>
+      <div class="field-grid">
+        <div class="field" style="max-width:200px">
+          <label data-i18n="settings.language_label">Interface Language</label>
+          <select id="set-language"></select>
+        </div>
+      </div>
+      <p style="font-size:12px; color:#888; margin:6px 0 0" data-i18n="settings.language_note">
+        Changes take effect after page reload.
+      </p>
+    </div>
+    <div class="card">
+      <h3 data-i18n="settings.appearance">Appearance</h3>
+      <button id="dark-mode-btn" class="btn" onclick="toggleDarkMode()" data-i18n="common.dark_mode">☾ Dark mode</button>
+      <p style="font-size:12px; color:#888; margin:8px 0 0" data-i18n="settings.appearance_note">Toggle between light and dark colour scheme. Preference is saved in the browser.</p>
+    </div>
+    <div class="card">
+      <h3 data-i18n="settings.logging">Logging</h3>
+      <div class="field-grid">
+        <div class="field" style="max-width:160px">
+          <label data-i18n="settings.log_level">Log Level</label>
+          <select id="set-log-level">
+            <option value="DEBUG">DEBUG</option>
+            <option value="INFO" selected>INFO</option>
+            <option value="WARNING">WARNING</option>
+            <option value="ERROR">ERROR</option>
+            <option value="CRITICAL">CRITICAL</option>
+          </select>
+        </div>
+      </div>
+      <p style="font-size:12px; color:#888; margin:6px 0 0" data-i18n="settings.log_note">
+        Logs are written to logs/pacs_admin.log and rotated daily (7-day retention).
+      </p>
+    </div>
+    <div class="btn-row" style="margin-top:4px; padding:0 0 20px 0">
+      <button class="btn primary" onclick="saveUserPreferences()" data-i18n="settings.save_preferences">Save Preferences</button>
+      <span id="pref-save-status" style="color:#888; font-size:13px"></span>
+    </div>
 
     <!-- My Preferences card (shown only when a user is logged in) -->
     <div class="card" id="my-preferences-card" style="display:none">
@@ -4182,29 +4188,56 @@ async function saveSettings() {
     host: document.getElementById("set-web-host").value.trim(),
     port: webPort,
   };
-  appConfig.log_level = document.getElementById("set-log-level").value;
-  appConfig.language = document.getElementById("set-language").value;
   appConfig.telemetry = {
     ...(appConfig.telemetry || {}),
     enabled: document.getElementById("set-telemetry-enabled").checked,
   };
-  await fetch("/api/config", {
-    method: "POST",
+  const patch = {
+    local_ae: appConfig.local_ae,
+    hl7:      appConfig.hl7,
+    web:      appConfig.web,
+    telemetry: appConfig.telemetry,
+  };
+  const res = await fetch("/api/config", {
+    method:  "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(appConfig),
+    body:    JSON.stringify(patch),
   });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    toast(err.error || i18n("common.error"), "err");
+    return;
+  }
   const s = document.getElementById("save-status");
   s.textContent = i18n("settings.saved_web");
   setTimeout(() => s.textContent = "", 3000);
-  // Reload translations if language changed
-  if (appConfig.language) {
-    await loadTranslations();
-    // Rebuild AE selectors with new translations
-    [["ae-cfind","cfind"],["ae-cstore","cstore"],["ae-dmwl","dmwl"],["ae-commit","commit"],["ae-iocm","iocm"]]
-      .forEach(([c, p]) => buildAESelector(c, p));
-    refreshAllPresetDropdowns();
-    dwRefreshPresets();
+}
+
+async function saveUserPreferences() {
+  const patch = {
+    language:  document.getElementById("set-language").value,
+    log_level: document.getElementById("set-log-level").value,
+  };
+  const res = await fetch("/api/config", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    toast(err.error || i18n("common.error"), "err");
+    return;
   }
+  Object.assign(appConfig, patch);
+  const s = document.getElementById("pref-save-status");
+  s.textContent = i18n("settings.saved_web");
+  setTimeout(() => s.textContent = "", 3000);
+  // Reload translations if language changed
+  await loadTranslations();
+  [["ae-cfind","cfind"],["ae-cstore","cstore"],["ae-dmwl","dmwl"],["ae-commit","commit"],["ae-iocm","iocm"]]
+    .forEach(([c, p]) => buildAESelector(c, p));
+  refreshAllPresetDropdowns();
+  dwRefreshPresets();
 }
 
 // ─────────────────────────────────────────────────────────────────

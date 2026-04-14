@@ -288,6 +288,7 @@
     "log_level": "Logniveau",
     "log_note": "Logs worden geschreven naar logs/pacs_admin.log en dagelijks geroteerd (7 dagen bewaard).",
     "save": "Instellingen opslaan",
+    "save_preferences": "Voorkeuren opslaan",
     "saved": "Opgeslagen  {ts}",
     "saved_web": "Opgeslagen ✓",
     "name_required": "Naam is verplicht.",
