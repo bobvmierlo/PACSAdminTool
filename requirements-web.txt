@@ -10,7 +10,7 @@ pynetdicom~=3.0
 
 # Image rendering (SCP file preview)
 numpy~=2.4
-pillow~=11.2
+pillow>=12.2.0
 
 # HL7
 hl7~=0.4
