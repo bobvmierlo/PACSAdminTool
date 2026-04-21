@@ -22,7 +22,7 @@ simple-websocket~=1.1
 requests~=2.33
 
 # Telemetry (anonymous usage statistics — PostHog EU)
-posthog~=7.11
+posthog~=7.13
 
 # System tray icon
 pystray~=0.19
