@@ -1,0 +1,8 @@
+# name: ORU^R01 – Image Availability Notification (IAN)
+# description: Send to EMR to announce that images are ready for an encounter. The EMR creates an examination ad-hoc and returns an ORM. Use {{placeholder}} tokens — they are replaced with values from the DICOMize form at send time.
+
+MSH|^~\&|PACSADMINTOOL|{{institution_name}}|EMR|{{institution_name}}|{{datetime}}||ORU^R01|{{msg_id}}|P|2.5
+PID|1||{{patient_id}}^^^LOCAL||{{patient_name}}||{{patient_dob}}|{{patient_sex}}|||||||||||
+PV1|1|O|||||||||||||||||{{accession_number}}
+OBR|1|{{accession_number}}||IMAGE_ACQUISITION^Image Acquisition^LOCAL|||{{study_date}}{{study_time}}||||||||||||||||F
+OBX|1|ST|IMAGE_COMMENT^Image Comment^LOCAL||{{study_description}}||||||F

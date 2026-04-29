@@ -47,6 +47,9 @@ def _apply_patient_study(ds, metadata: dict):
     """Populate patient & study tags from the shared metadata dict."""
     from pydicom.uid import generate_uid
 
+    # Declare UTF-8 first so pydicom uses it when encoding string tags.
+    ds.SpecificCharacterSet = "ISO_IR 192"
+
     ds.PatientName      = metadata.get("patient_name",  "") or ""
     ds.PatientID        = metadata.get("patient_id",    "") or ""
     ds.PatientBirthDate = metadata.get("patient_dob",   "") or ""
@@ -80,7 +83,6 @@ def _finalize_ds(ds, sop_class: str, sop_inst: str, modality: str,
 
     ds.ContentDate = content_date
     ds.ContentTime = content_time
-    ds.SpecificCharacterSet = "ISO_IR 192"
 
 
 def _save_ds(ds) -> bytes:
@@ -174,6 +176,31 @@ def _parse_mp4_info(data: bytes) -> tuple:
     except Exception as exc:
         logger.debug("MP4 parse failed: %s", exc)
         return 0, 0, 0
+
+
+# ---------------------------------------------------------------------------
+# File-type detection (by extension)
+# ---------------------------------------------------------------------------
+
+_IMAGE_EXTS = frozenset({
+    ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp", ".jfif", ".jpe",
+})
+_VIDEO_EXTS = frozenset({
+    ".mp4", ".m4v", ".mov", ".avi", ".mkv", ".webm",
+})
+_PDF_EXTS = frozenset({".pdf"})
+
+
+def detect_file_type(filename: str) -> str:
+    """Return 'image', 'video', 'pdf', or 'unknown' based on file extension."""
+    ext = os.path.splitext(filename.lower())[1]
+    if ext in _IMAGE_EXTS:
+        return "image"
+    if ext in _VIDEO_EXTS:
+        return "video"
+    if ext in _PDF_EXTS:
+        return "pdf"
+    return "unknown"
 
 
 # ---------------------------------------------------------------------------

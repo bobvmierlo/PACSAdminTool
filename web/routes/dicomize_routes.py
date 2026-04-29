@@ -306,3 +306,177 @@ def dicomize_video_store():
     _audit("dicomize.video.store", ip=_req_ip(), user=_req_user(),
            detail={"filename": f.filename, "format": fmt, "ok": ok})
     return jsonify({"ok": ok, "message": msg})
+
+
+# ---------------------------------------------------------------------------
+# Mixed (images + videos + PDFs) to DICOM
+# ---------------------------------------------------------------------------
+
+def _convert_mixed_file(f, metadata: dict, video_fmt: str,
+                         img_idx: int) -> bytes:
+    """Convert a single file to DICOM, auto-detecting type by extension."""
+    from dicom.dicomize import (detect_file_type, pdf_to_dicom,
+                                 image_to_dicom, video_to_dicom,
+                                 video_to_multiframe_dicom)
+    ftype = detect_file_type(f.filename)
+    data  = f.read()
+    if ftype == "pdf":
+        return pdf_to_dicom(data, metadata)
+    if ftype == "image":
+        return image_to_dicom(data, f.filename, metadata, instance_number=img_idx)
+    if ftype == "video":
+        if video_fmt == "multiframe":
+            return video_to_multiframe_dicom(data, f.filename, metadata)
+        return video_to_dicom(data, f.filename, metadata)
+    raise ValueError(f"Unsupported file type: {os.path.splitext(f.filename)[1] or '(no extension)'}")
+
+
+@bp.route("/api/dicomize/mixed", methods=["POST"])
+def dicomize_mixed():
+    """Convert a mix of images, PDFs, and videos to DICOM files, returned as ZIP."""
+    files = request.files.getlist("files")
+    if not files:
+        return jsonify({"ok": False, "error": "No files uploaded"}), 400
+
+    metadata  = _get_metadata()
+    video_fmt = request.form.get("video_format", "encapsulated")
+    results   = []
+    errors    = []
+    img_idx   = 0
+
+    for f in files:
+        from dicom.dicomize import detect_file_type
+        if detect_file_type(f.filename) == "image":
+            img_idx += 1
+        try:
+            dcm = _convert_mixed_file(f, metadata, video_fmt, img_idx)
+            stem = os.path.splitext(os.path.basename(f.filename))[0]
+            results.append((f"{stem}.dcm", dcm))
+        except Exception as exc:
+            logger.warning("Mixed dicomize '%s' failed: %s", f.filename, exc)
+            errors.append(f"{f.filename}: {exc}")
+
+    if not results:
+        return jsonify({"ok": False, "error": "; ".join(errors) or "No files converted"}), 400
+
+    _audit("dicomize.mixed", ip=_req_ip(), user=_req_user(),
+           detail={"count": len(results), "errors": len(errors)})
+
+    if len(results) == 1 and not errors:
+        name, data = results[0]
+        return send_file(io.BytesIO(data), mimetype="application/dicom",
+                         as_attachment=True, download_name=name)
+
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, data in results:
+            zf.writestr(name, data)
+        if errors:
+            zf.writestr("_errors.txt", "\n".join(errors))
+    zip_buf.seek(0)
+    return send_file(zip_buf, mimetype="application/zip",
+                     as_attachment=True, download_name="mixed_dicom.zip")
+
+
+@bp.route("/api/dicomize/mixed/store", methods=["POST"])
+def dicomize_mixed_store():
+    """Convert a mix of files to DICOM and C-STORE them to a PACS."""
+    files = request.files.getlist("files")
+    if not files:
+        return jsonify({"ok": False, "error": "No files uploaded"}), 400
+
+    metadata  = _get_metadata()
+    video_fmt = request.form.get("video_format", "encapsulated")
+    stored    = 0
+    errors    = []
+    img_idx   = 0
+
+    for f in files:
+        from dicom.dicomize import detect_file_type
+        if detect_file_type(f.filename) == "image":
+            img_idx += 1
+        try:
+            dcm = _convert_mixed_file(f, metadata, video_fmt, img_idx)
+            ok, msg = _store_bytes(dcm, "")
+            if ok:
+                stored += 1
+            else:
+                errors.append(f"{f.filename}: {msg}")
+        except Exception as exc:
+            errors.append(f"{f.filename}: {exc}")
+
+    _audit("dicomize.mixed.store", ip=_req_ip(), user=_req_user(),
+           detail={"stored": stored, "errors": len(errors)})
+    return jsonify({
+        "ok":      stored > 0 or not errors,
+        "stored":  stored,
+        "message": f"Stored {stored} file(s)." + (f" Errors: {'; '.join(errors)}" if errors else ""),
+    })
+
+
+# ---------------------------------------------------------------------------
+# ORM message parser (for ORU IAN → ORM workflow)
+# ---------------------------------------------------------------------------
+
+@bp.route("/api/dicomize/parse-orm", methods=["POST"])
+def dicomize_parse_orm():
+    """Parse an ORM^O01 (or similar order) HL7 message and return DICOMize fields."""
+    d   = request.get_json(silent=True) or {}
+    msg = d.get("message", "")
+    if not msg:
+        return jsonify({"ok": False, "error": "No HL7 message provided"}), 400
+
+    # Normalise line endings → split on \r
+    segments: dict[str, list[str]] = {}
+    for seg_str in msg.replace("\r\n", "\r").replace("\n", "\r").split("\r"):
+        seg_str = seg_str.strip()
+        if not seg_str:
+            continue
+        parts = seg_str.split("|")
+        seg_name = parts[0]
+        # Keep first occurrence of each segment type (simplification)
+        if seg_name not in segments:
+            segments[seg_name] = parts
+
+    result: dict[str, str] = {}
+
+    # PID — patient demographics
+    pid = segments.get("PID", [])
+    if len(pid) > 5 and pid[5]:
+        # PID.5: family^given^middle — convert to "Given Family"
+        name_parts = pid[5].split("^")
+        family = name_parts[0] if name_parts else ""
+        given  = name_parts[1] if len(name_parts) > 1 else ""
+        result["patient_name"] = f"{given} {family}".strip() if given else family
+    if len(pid) > 3 and pid[3]:
+        result["patient_id"] = pid[3].split("^")[0].split("~")[0]
+    if len(pid) > 7 and pid[7]:
+        dob = pid[7][:8]
+        if len(dob) == 8:
+            result["patient_dob"] = f"{dob[:4]}-{dob[4:6]}-{dob[6:8]}"
+    if len(pid) > 8 and pid[8]:
+        result["patient_sex"] = pid[8][0].upper()
+
+    # OBR — observation request (accession, procedure, date)
+    obr = segments.get("OBR", [])
+    if len(obr) > 3 and obr[3]:
+        result["accession_number"] = obr[3].split("^")[0]
+    if len(obr) > 4 and obr[4]:
+        parts = obr[4].split("^")
+        result["study_description"] = parts[-1] if len(parts) > 1 else parts[0]
+    if len(obr) > 7 and obr[7]:
+        dt = obr[7][:14]
+        if len(dt) >= 8:
+            d_str = dt[:8]
+            t_str = dt[8:14] if len(dt) >= 14 else ""
+            result["study_date"] = f"{d_str[:4]}-{d_str[4:6]}-{d_str[6:8]}"
+            if len(t_str) >= 6:
+                result["study_time"] = f"{t_str[:2]}:{t_str[2:4]}:{t_str[4:6]}"
+
+    # ORC — order common (fallback accession from filler order number)
+    if "accession_number" not in result:
+        orc = segments.get("ORC", [])
+        if len(orc) > 3 and orc[3]:
+            result["accession_number"] = orc[3].split("^")[0]
+
+    return jsonify({"ok": True, "fields": result})

@@ -2811,6 +2811,9 @@
         <button class="subtab-btn" id="dz-tab-video-btn"
                 onclick="showDicomizeTab('video')"
                 data-i18n="dicomize.subtab_video">Video</button>
+        <button class="subtab-btn" id="dz-tab-mixed-btn"
+                onclick="showDicomizeTab('mixed')"
+                data-i18n="dicomize.subtab_mixed">Mixed</button>
       </div>
 
       <!-- PDF sub-tab -->
@@ -3001,13 +3004,212 @@
           </div>
         </div>
       </div>
+
+      <!-- Mixed sub-tab -->
+      <div id="dz-subtab-mixed" class="subtab-panel">
+        <h3 data-i18n="dicomize.mixed_card_title">Mixed Files to DICOM</h3>
+        <p style="font-size:12px; color:#888; margin:4px 0 10px"
+           data-i18n="dicomize.mixed_note">Select any combination of images, PDFs, and videos. Each file is auto-detected and converted to the appropriate DICOM format.</p>
+        <div class="btn-row" style="margin-top:4px">
+          <input type="file" id="dz-mixed-input" multiple
+                 accept="image/*,video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,video/webm,.pdf,.jfif,.jpe,.mp4,.mov,.avi,.mkv,.webm"
+                 style="display:none" onchange="dzMixedSelected()">
+          <button class="btn" onclick="document.getElementById('dz-mixed-input').click()"
+                  data-i18n="dicomize.mixed_browse">Browse…</button>
+          <span id="dz-mixed-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
+                text-overflow:ellipsis; white-space:nowrap"
+                data-i18n="dicomize.mixed_no_files">No files selected.</span>
+        </div>
+
+        <!-- Per-file list with type badge + preview button -->
+        <div id="dz-mixed-list" style="display:none; margin-top:10px">
+          <table style="width:100%; border-collapse:collapse; font-size:13px">
+            <thead>
+              <tr style="text-align:left; border-bottom:1px solid var(--border)">
+                <th style="padding:4px 8px" data-i18n="dicomize.mixed_col_file">File</th>
+                <th style="padding:4px 8px" data-i18n="dicomize.mixed_col_type">Type</th>
+                <th style="padding:4px 8px" data-i18n="dicomize.mixed_col_size">Size</th>
+                <th style="padding:4px 8px"></th>
+              </tr>
+            </thead>
+            <tbody id="dz-mixed-list-body"></tbody>
+          </table>
+        </div>
+
+        <div class="field-grid" style="margin-top:12px">
+          <div class="field" style="grid-column:span 2">
+            <label data-i18n="dicomize.series_description">Series Description</label>
+            <input id="dz-mixed-series-desc">
+          </div>
+        </div>
+
+        <div style="margin-top:10px">
+          <label style="font-size:13px; font-weight:500" data-i18n="dicomize.video_format_label">Video Output Format</label>
+          <div style="display:flex; flex-wrap:wrap; gap:16px; margin-top:4px">
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px">
+              <input type="radio" name="dz-mixed-video-format" value="encapsulated" checked>
+              <span>
+                <strong data-i18n="dicomize.video_format_enc_name">Encapsulated video</strong>
+                <span style="color:#888; font-size:11px" data-i18n="dicomize.video_format_enc_note"> — stores MP4/MOV as-is, small file, MPEG-4 transfer syntax</span>
+              </span>
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px">
+              <input type="radio" name="dz-mixed-video-format" value="multiframe">
+              <span>
+                <strong data-i18n="dicomize.video_format_mf_name">Multi-frame JPEG</strong>
+                <span style="color:#888; font-size:11px" data-i18n="dicomize.video_format_mf_note"> — extracts frames, native playback in all viewers, requires ffmpeg on server</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div class="btn-row" style="margin-top:16px">
+          <button class="btn primary" onclick="doDicomizeMixed('download')"
+                  data-i18n="dicomize.download_btn">Download DICOM</button>
+          <button class="btn" onclick="doDicomizeMixed('store')"
+                  data-i18n="dicomize.send_pacs_btn">Send to PACS</button>
+        </div>
+        <div id="dz-mixed-ae" style="margin-top:12px; display:none">
+          <div class="ae-selector">
+            <div class="field preset-field">
+              <label data-i18n="dicomize.select_preset">Select a preset…</label>
+              <select id="dz-mixed-ae-preset" onchange="dzFillAE('mixed')">
+                <option value=""></option>
+              </select>
+            </div>
+            <div class="field">
+              <label data-i18n="dicomize.ae_title">AE Title</label>
+              <input id="dz-mixed-ae-title">
+            </div>
+            <div class="field">
+              <label data-i18n="dicomize.ae_host">Host</label>
+              <input id="dz-mixed-ae-host">
+            </div>
+            <div class="field" style="max-width:90px">
+              <label data-i18n="dicomize.ae_port">Port</label>
+              <input id="dz-mixed-ae-port" type="number" min="1" max="65535">
+            </div>
+            <div class="field" style="align-self:flex-end">
+              <button class="btn primary" onclick="doDicomizeMixedStore()"
+                      data-i18n="dicomize.send_pacs_btn">Send to PACS</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
+  </div>
+
+  <!-- ORU IAN → ORM workflow card -->
+  <div class="card">
+    <div style="display:flex; align-items:center; gap:8px">
+      <h3 style="cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px; margin:0"
+          onclick="toggleDzOruIan()">
+        <span id="dz-oruian-arrow" class="seq-arrow">&#9658;</span>
+        <span data-i18n="dicomize.oruian_title">Send ORU IAN to EMR (pre-order workflow)</span>
+      </h3>
+    </div>
+    <div id="dz-oruian-body" style="display:none; margin-top:10px">
+      <p style="font-size:12px; color:#888; margin:0 0 12px"
+         data-i18n="dicomize.oruian_desc">Send an ORU^R01 Image Availability Notification to your EMR. The EMR creates an examination ad-hoc and returns an ORM message. When the ORM arrives via the HL7 listener, click <strong>Fill from ORM</strong> to auto-populate the patient &amp; study fields above — then send the images to PACS.</p>
+
+      <!-- Template selector -->
+      <div class="field-grid">
+        <div class="field" style="grid-column:span 2">
+          <label data-i18n="dicomize.oruian_template_label">HL7 Template</label>
+          <select id="dz-oruian-template" onchange="dzOruIanLoadTemplate()">
+            <option value="" data-i18n="dicomize.oruian_template_placeholder">— select template —</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Template body editor -->
+      <div style="margin-top:12px">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-bottom:6px">
+          <label style="font-size:13px; font-weight:500" data-i18n="dicomize.oruian_editor_label">HL7 Message (editable)</label>
+          <div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center">
+            <span style="font-size:11px; color:#888" data-i18n="dicomize.oruian_insert_label">Insert:</span>
+            <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{patient_name}}')">patient_name</button>
+            <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{patient_id}}')">patient_id</button>
+            <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{patient_dob}}')">patient_dob</button>
+            <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{patient_sex}}')">patient_sex</button>
+            <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{accession_number}}')">accession</button>
+            <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{study_uid}}')">study_uid</button>
+            <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{study_date}}')">study_date</button>
+            <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{study_description}}')">study_desc</button>
+            <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{institution_name}}')">institution</button>
+            <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{datetime}}')">datetime</button>
+            <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{msg_id}}')">msg_id</button>
+          </div>
+        </div>
+        <textarea id="dz-oruian-msg"
+                  style="width:100%; height:180px; font-family:Consolas,monospace; font-size:12px;
+                         resize:vertical; padding:8px; box-sizing:border-box;
+                         background:var(--bg); border:1px solid var(--border);
+                         color:var(--text); border-radius:4px"
+                  data-i18n-placeholder="dicomize.oruian_editor_placeholder"
+                  placeholder="Load a template or type your HL7 message here…"></textarea>
+      </div>
+
+      <!-- Preview + save -->
+      <div style="display:flex; gap:8px; margin-top:6px; flex-wrap:wrap">
+        <button class="btn" onclick="dzOruIanPreview()" data-i18n="dicomize.oruian_preview_btn">Preview filled message</button>
+        <button class="btn" onclick="dzOruIanSaveTemplate()" data-i18n="dicomize.oruian_save_btn">Save as template…</button>
+      </div>
+      <pre id="dz-oruian-preview" style="display:none; margin-top:8px; padding:8px;
+           background:var(--bg-alt,#f5f5f5); border:1px solid var(--border);
+           border-radius:4px; font-size:11px; overflow:auto; max-height:200px;
+           white-space:pre-wrap; word-break:break-all"></pre>
+
+      <!-- HL7 connection -->
+      <div class="ae-selector" style="margin-top:14px">
+        <div class="field">
+          <label data-i18n="dicomize.oruian_host">Host</label>
+          <input id="dz-oruian-host" placeholder="192.168.1.10">
+        </div>
+        <div class="field" style="max-width:90px">
+          <label data-i18n="dicomize.oruian_port">Port</label>
+          <input id="dz-oruian-port" type="number" min="1" max="65535" value="2575">
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn primary" onclick="dzOruIanSend()" data-i18n="dicomize.oruian_send_btn">Send ORU IAN</button>
+        <button class="btn" id="dz-oruian-fill-btn" style="display:none"
+                onclick="dzOruIanFillFromOrm()" data-i18n="dicomize.oruian_fill_btn">Fill from ORM</button>
+      </div>
+      <div id="dz-oruian-status" style="margin-top:8px; font-size:12px; color:#888"></div>
+      <pre id="dz-oruian-orm-text" style="display:none; margin-top:8px; padding:8px;
+           background:var(--bg-alt,#f5f5f5); border:1px solid var(--border);
+           border-radius:4px; font-size:11px; overflow:auto; max-height:200px;
+           white-space:pre-wrap; word-break:break-all"></pre>
+    </div>
+  </div>
 
     <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-dicomize"></div></div>
   </div>
 
 </div><!-- end #tab-content -->
 
+
+<!-- ══════════════════════════════════════════════════════════════════
+     DICOMIZE — SOURCE FILE PREVIEW MODAL
+══════════════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="dz-preview-modal"
+     onclick="if(event.target===this)closeDzPreview()">
+  <div class="modal" style="width:min(96vw,900px); max-height:92vh; display:flex; flex-direction:column">
+    <div class="modal-header">
+      <span id="dz-preview-title" style="font-size:14px; font-weight:600">Preview</span>
+      <button class="modal-close" onclick="closeDzPreview()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" style="flex:1; overflow:auto; align-items:center; justify-content:center; padding:12px">
+      <div id="dz-preview-content"
+           style="width:100%; max-height:75vh; display:flex; align-items:center;
+                  justify-content:center; overflow:auto"></div>
+    </div>
+  </div>
+</div>
 
 <!-- ══════════════════════════════════════════════════════════════════
      DICOMIZE — WORKLIST SELECTION MODAL
@@ -3726,6 +3928,19 @@ socket.on("hl7_message", data => {
 
   // Persist to inbound history
   _hl7InHistorySave({ ts: data.ts, from: data.from, message: data.message });
+
+  // Check if this is an order message relevant to the ORU IAN workflow
+  const _msg = data.message || "";
+  if (/\bORM\b|\bOMG\b|\bOML\b/.test(_msg)) {
+    _dzOruIanOrm = _msg;
+    const fillBtn  = document.getElementById("dz-oruian-fill-btn");
+    const ormPre   = document.getElementById("dz-oruian-orm-text");
+    const statusEl = document.getElementById("dz-oruian-status");
+    if (fillBtn)  fillBtn.style.display  = "";
+    if (ormPre)  { ormPre.textContent = _msg.replace(/\r/g, "\n"); ormPre.style.display = ""; }
+    if (statusEl){ statusEl.textContent = i18n("dicomize.oruian_orm_received"); statusEl.style.color = "var(--ok, green)"; }
+    appendLog("log-dicomize", now(), i18n("dicomize.oruian_orm_received"), "ok");
+  }
 });
 
 // Server pushes SCP/HL7 status on first connect so buttons show correctly.
@@ -7947,7 +8162,7 @@ async function doKOSCreate() {
 // ─────────────────────────────────────────────────────────────────
 
 function showDicomizeTab(sub) {
-  ["pdf", "images", "video"].forEach(s => {
+  ["pdf", "images", "video", "mixed"].forEach(s => {
     document.getElementById(`dz-subtab-${s}`).classList.toggle("active", s === sub);
     document.getElementById(`dz-tab-${s}-btn`).classList.toggle("active", s === sub);
   });
@@ -8020,7 +8235,7 @@ function dzFillAE(prefix) {
 function dzLoadPresets() {
   const sysPresets  = appConfig.remote_aes   || [];
   const userPresets = userSettings.remote_aes || [];
-  ["pdf", "images", "video"].forEach(pfx => {
+  ["pdf", "images", "video", "mixed"].forEach(pfx => {
     const sel = document.getElementById(`dz-${pfx}-ae-preset`);
     if (!sel) return;
     const prev = sel.value;
@@ -8257,6 +8472,339 @@ async function doDicomizeVideoStore() {
       appendLog("log-dicomize", now(), i18n("dicomize.store_ok", {message: data.message}), "ok");
     } else {
       appendLog("log-dicomize", now(), i18n("dicomize.error", {message: data.error || data.message}), "err");
+    }
+  } catch (e) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
+  }
+}
+
+// ── Mixed ─────────────────────────────────────────────────────────
+
+const _DZ_IMAGE_EXTS = new Set([".jpg",".jpeg",".png",".bmp",".tiff",".tif",".webp",".jfif",".jpe"]);
+const _DZ_VIDEO_EXTS = new Set([".mp4",".m4v",".mov",".avi",".mkv",".webm"]);
+const _DZ_PDF_EXTS   = new Set([".pdf"]);
+
+function _dzDetectType(filename) {
+  const ext = filename.slice(filename.lastIndexOf(".")).toLowerCase();
+  if (_DZ_IMAGE_EXTS.has(ext)) return "image";
+  if (_DZ_VIDEO_EXTS.has(ext)) return "video";
+  if (_DZ_PDF_EXTS.has(ext))   return "pdf";
+  return "unknown";
+}
+
+function _dzFmtSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes/1024).toFixed(1)} KB`;
+  return `${(bytes/1048576).toFixed(1)} MB`;
+}
+
+function dzMixedSelected() {
+  const files = document.getElementById("dz-mixed-input").files;
+  const listEl  = document.getElementById("dz-mixed-list");
+  const bodyEl  = document.getElementById("dz-mixed-list-body");
+  const nameEl  = document.getElementById("dz-mixed-filename");
+
+  if (!files.length) {
+    nameEl.textContent = i18n("dicomize.mixed_no_files");
+    listEl.style.display = "none";
+    return;
+  }
+  nameEl.textContent = i18n("dicomize.mixed_files_selected", {n: files.length});
+  listEl.style.display = "";
+
+  const typeBadge = {
+    image:   "<span style='background:#d4edda;color:#155724;border-radius:3px;padding:1px 5px;font-size:11px'>Image</span>",
+    video:   "<span style='background:#cce5ff;color:#004085;border-radius:3px;padding:1px 5px;font-size:11px'>Video</span>",
+    pdf:     "<span style='background:#fff3cd;color:#856404;border-radius:3px;padding:1px 5px;font-size:11px'>PDF</span>",
+    unknown: "<span style='background:#f8d7da;color:#721c24;border-radius:3px;padding:1px 5px;font-size:11px'>?</span>",
+  };
+
+  bodyEl.innerHTML = Array.from(files).map((f, idx) => {
+    const t = _dzDetectType(f.name);
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:4px 8px; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</td>
+      <td style="padding:4px 8px">${typeBadge[t]}</td>
+      <td style="padding:4px 8px; color:#888">${_dzFmtSize(f.size)}</td>
+      <td style="padding:4px 8px">
+        <button class="btn" style="padding:2px 8px;font-size:11px" onclick="dzPreviewFile(${idx})"
+                data-i18n="dicomize.preview_btn">Preview</button>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+function _dzMixedVideoFormat() {
+  const checked = document.querySelector('input[name="dz-mixed-video-format"]:checked');
+  return checked ? checked.value : "encapsulated";
+}
+
+async function doDicomizeMixed(action) {
+  const input = document.getElementById("dz-mixed-input");
+  if (!input.files.length) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: "No files selected."}), "warn");
+    return;
+  }
+  if (action === "store") {
+    _dzToggleAE("mixed", true);
+    dzLoadPresets();
+    return;
+  }
+  appendLog("log-dicomize", now(), i18n("dicomize.converting"));
+  const fd = _dzGetMetadata("dz-mixed-series-desc");
+  Array.from(input.files).forEach(f => fd.append("files", f));
+  fd.append("video_format", _dzMixedVideoFormat());
+  try {
+    const res = await fetch("/api/dicomize/mixed", { method: "POST", body: fd });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({error: res.statusText}));
+      appendLog("log-dicomize", now(), i18n("dicomize.error", {message: err.error || res.statusText}), "err");
+      return;
+    }
+    const blob = await res.blob();
+    const ct   = res.headers.get("Content-Type") || "";
+    const name = res.headers.get("Content-Disposition")?.match(/filename="?([^"]+)"?/)?.[1]
+              || (ct.includes("zip") ? "mixed_dicom.zip" : "output.dcm");
+    _dzDownload(blob, name);
+    appendLog("log-dicomize", now(), i18n("dicomize.download_ok"), "ok");
+  } catch (e) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
+  }
+}
+
+async function doDicomizeMixedStore() {
+  const input = document.getElementById("dz-mixed-input");
+  if (!input.files.length) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: "No files selected."}), "warn");
+    return;
+  }
+  appendLog("log-dicomize", now(), i18n("dicomize.storing"));
+  const fd = _dzGetMetadata("dz-mixed-series-desc");
+  Array.from(input.files).forEach(f => fd.append("files", f));
+  fd.append("video_format", _dzMixedVideoFormat());
+  const ae = _dzGetAE("mixed");
+  fd.append("ae_title", ae.ae_title);
+  fd.append("ae_host",  ae.ae_host);
+  fd.append("ae_port",  ae.ae_port);
+  try {
+    const res  = await fetch("/api/dicomize/mixed/store", { method: "POST", body: fd });
+    const data = await res.json();
+    if (data.ok) {
+      appendLog("log-dicomize", now(), i18n("dicomize.store_ok", {message: data.message}), "ok");
+    } else {
+      appendLog("log-dicomize", now(), i18n("dicomize.error", {message: data.error || data.message}), "err");
+    }
+  } catch (e) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
+  }
+}
+
+// ── Source-file preview modal ─────────────────────────────────────
+
+let _dzPreviewUrl = null;
+
+function dzPreviewFile(idx) {
+  const input = document.getElementById("dz-mixed-input");
+  const file  = input?.files[idx];
+  if (!file) return;
+
+  if (_dzPreviewUrl) { URL.revokeObjectURL(_dzPreviewUrl); _dzPreviewUrl = null; }
+  _dzPreviewUrl = URL.createObjectURL(file);
+
+  const content = document.getElementById("dz-preview-content");
+  const t = _dzDetectType(file.name);
+
+  if (t === "image") {
+    content.innerHTML = `<img src="${_dzPreviewUrl}" style="max-width:100%;max-height:73vh;object-fit:contain;border-radius:4px" alt="${escapeHtml(file.name)}">`;
+  } else if (t === "video") {
+    content.innerHTML = `<video src="${_dzPreviewUrl}" controls style="max-width:100%;max-height:73vh;border-radius:4px"></video>`;
+  } else if (t === "pdf") {
+    content.innerHTML = `<iframe src="${_dzPreviewUrl}" style="width:100%;height:73vh;border:none;border-radius:4px" title="${escapeHtml(file.name)}"></iframe>`;
+  } else {
+    content.innerHTML = `<p style="color:#888">${escapeHtml(i18n("dicomize.preview_unsupported"))}</p>`;
+  }
+
+  document.getElementById("dz-preview-title").textContent = file.name;
+  document.getElementById("dz-preview-modal").classList.add("open");
+}
+
+function closeDzPreview() {
+  document.getElementById("dz-preview-modal").classList.remove("open");
+  document.getElementById("dz-preview-content").innerHTML = "";
+  if (_dzPreviewUrl) { URL.revokeObjectURL(_dzPreviewUrl); _dzPreviewUrl = null; }
+}
+
+// ── ORU IAN → ORM workflow ─────────────────────────────────────────
+
+let _dzOruIanOrm = null;   // Last ORM message received via HL7 listener
+
+function toggleDzOruIan() {
+  const body  = document.getElementById("dz-oruian-body");
+  const arrow = document.getElementById("dz-oruian-arrow");
+  const open  = body.style.display !== "none";
+  body.style.display = open ? "none" : "";
+  arrow.innerHTML    = open ? "&#9658;" : "&#9660;";
+  if (!open) _dzOruIanPopulateTemplates();
+}
+
+async function _dzOruIanPopulateTemplates() {
+  const sel = document.getElementById("dz-oruian-template");
+  try {
+    const res = await fetch("/api/hl7/templates");
+    const list = await res.json();
+    const prev = sel.value;
+    sel.innerHTML = `<option value="">${escapeHtml(i18n("dicomize.oruian_template_placeholder"))}</option>`;
+    list.forEach(t => {
+      const opt = document.createElement("option");
+      opt.value = t.filename;
+      opt.textContent = t.name;
+      sel.appendChild(opt);
+    });
+    sel.value = prev;
+  } catch (e) { /* non-critical */ }
+}
+
+async function dzOruIanLoadTemplate() {
+  const filename = document.getElementById("dz-oruian-template").value;
+  if (!filename) return;
+  try {
+    const res  = await fetch(`/api/hl7/templates/${encodeURIComponent(filename)}`);
+    const tmpl = await res.json();
+    document.getElementById("dz-oruian-msg").value = (tmpl.body || "").replace(/\r/g, "\n");
+    document.getElementById("dz-oruian-preview").style.display = "none";
+  } catch (e) { /* non-critical */ }
+}
+
+function dzOruIanInsert(placeholder) {
+  const ta = document.getElementById("dz-oruian-msg");
+  const s  = ta.selectionStart, e = ta.selectionEnd;
+  ta.value = ta.value.slice(0, s) + placeholder + ta.value.slice(e);
+  ta.selectionStart = ta.selectionEnd = s + placeholder.length;
+  ta.focus();
+}
+
+function _dzOruIanFill(body) {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  const dt  = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const msgId = "MSG" + dt + Math.random().toString(36).slice(2,6).toUpperCase();
+  const get = id => (document.getElementById(id)?.value || "").trim();
+  return body
+    .replace(/\{\{patient_name\}\}/g,      get("dz-patient-name"))
+    .replace(/\{\{patient_id\}\}/g,        get("dz-patient-id"))
+    .replace(/\{\{patient_dob\}\}/g,       dateToDisom(get("dz-patient-dob")))
+    .replace(/\{\{patient_sex\}\}/g,       get("dz-patient-sex"))
+    .replace(/\{\{accession_number\}\}/g,  get("dz-accession"))
+    .replace(/\{\{study_uid\}\}/g,         get("dz-study-uid"))
+    .replace(/\{\{study_date\}\}/g,        dateToDisom(get("dz-study-date")) || dt.slice(0,8))
+    .replace(/\{\{study_time\}\}/g,        timeToDisom(get("dz-study-time")) || dt.slice(8,14))
+    .replace(/\{\{study_description\}\}/g, get("dz-study-desc"))
+    .replace(/\{\{institution_name\}\}/g,  get("dz-institution"))
+    .replace(/\{\{datetime\}\}/g,          dt)
+    .replace(/\{\{date\}\}/g,              dt.slice(0,8))
+    .replace(/\{\{time\}\}/g,              dt.slice(8,14))
+    .replace(/\{\{msg_id\}\}/g,            msgId);
+}
+
+function dzOruIanPreview() {
+  const body   = document.getElementById("dz-oruian-msg").value;
+  const filled = _dzOruIanFill(body);
+  const pre    = document.getElementById("dz-oruian-preview");
+  pre.textContent = filled.replace(/\r/g, "\n");
+  pre.style.display = "";
+}
+
+async function dzOruIanSend() {
+  const body = document.getElementById("dz-oruian-msg").value.trim();
+  if (!body) {
+    appendLog("log-dicomize", now(), i18n("dicomize.oruian_no_msg"), "warn");
+    return;
+  }
+  const host = document.getElementById("dz-oruian-host").value.trim();
+  const port = document.getElementById("dz-oruian-port").value.trim();
+  if (!host || !port) {
+    appendLog("log-dicomize", now(), i18n("dicomize.oruian_no_host"), "warn");
+    return;
+  }
+  const filled  = _dzOruIanFill(body);
+  const statusEl = document.getElementById("dz-oruian-status");
+  statusEl.textContent = i18n("dicomize.oruian_sending");
+  statusEl.style.color = "#888";
+  appendLog("log-dicomize", now(), i18n("dicomize.oruian_sending"));
+
+  try {
+    const res  = await fetch("/api/hl7/send", {
+      method:  "POST",
+      headers: {"Content-Type": "application/json"},
+      body:    JSON.stringify({ host, port: parseInt(port, 10), message: filled }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      statusEl.textContent = i18n("dicomize.oruian_ack_ok");
+      statusEl.style.color = "var(--ok, green)";
+      appendLog("log-dicomize", now(), i18n("dicomize.oruian_ack_ok"), "ok");
+    } else {
+      statusEl.textContent = `${i18n("dicomize.oruian_ack_fail")}: ${data.response}`;
+      statusEl.style.color = "var(--err, red)";
+      appendLog("log-dicomize", now(), `${i18n("dicomize.oruian_ack_fail")}: ${data.response}`, "err");
+    }
+  } catch (e) {
+    statusEl.textContent = String(e);
+    statusEl.style.color = "var(--err, red)";
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
+  }
+}
+
+async function dzOruIanFillFromOrm() {
+  if (!_dzOruIanOrm) return;
+  try {
+    const res  = await fetch("/api/dicomize/parse-orm", {
+      method:  "POST",
+      headers: {"Content-Type": "application/json"},
+      body:    JSON.stringify({ message: _dzOruIanOrm }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      appendLog("log-dicomize", now(), i18n("dicomize.error", {message: data.error}), "err");
+      return;
+    }
+    const f = data.fields || {};
+    if (f.patient_name)      document.getElementById("dz-patient-name").value = f.patient_name;
+    if (f.patient_id)        document.getElementById("dz-patient-id").value   = f.patient_id;
+    if (f.patient_dob)       document.getElementById("dz-patient-dob").value  = f.patient_dob;
+    if (f.patient_sex)       document.getElementById("dz-patient-sex").value  = f.patient_sex;
+    if (f.accession_number)  document.getElementById("dz-accession").value    = f.accession_number;
+    if (f.study_description) document.getElementById("dz-study-desc").value   = f.study_description;
+    if (f.study_date)        document.getElementById("dz-study-date").value   = f.study_date;
+    if (f.study_time)        document.getElementById("dz-study-time").value   = f.study_time;
+    // Expand patient section if collapsed
+    const body  = document.getElementById("dicomize-patient-body");
+    const arrow = document.getElementById("dicomize-patient-arrow");
+    if (body.style.display === "none") { body.style.display = ""; if (arrow) arrow.textContent = "▼"; }
+    appendLog("log-dicomize", now(),
+      i18n("dicomize.oruian_orm_filled", {name: f.patient_name || "?", acc: f.accession_number || "?"}), "ok");
+  } catch (e) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
+  }
+}
+
+async function dzOruIanSaveTemplate() {
+  const body = document.getElementById("dz-oruian-msg").value.trim();
+  if (!body) return;
+  const name = prompt(i18n("dicomize.oruian_save_name_prompt") || "Template name:");
+  if (!name) return;
+  const desc = prompt(i18n("dicomize.oruian_save_desc_prompt") || "Description (optional):") || "";
+  try {
+    const res  = await fetch("/api/hl7/templates/save", {
+      method:  "POST",
+      headers: {"Content-Type": "application/json"},
+      body:    JSON.stringify({ name, description: desc, body }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      appendLog("log-dicomize", now(), i18n("dicomize.oruian_saved", {name}), "ok");
+      _dzOruIanPopulateTemplates();
+    } else {
+      appendLog("log-dicomize", now(), i18n("dicomize.error", {message: data.error}), "err");
     }
   } catch (e) {
     appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
