@@ -47,6 +47,9 @@ def _apply_patient_study(ds, metadata: dict):
     """Populate patient & study tags from the shared metadata dict."""
     from pydicom.uid import generate_uid
 
+    # Declare UTF-8 first so pydicom uses it when encoding string tags.
+    ds.SpecificCharacterSet = "ISO_IR 192"
+
     ds.PatientName      = metadata.get("patient_name",  "") or ""
     ds.PatientID        = metadata.get("patient_id",    "") or ""
     ds.PatientBirthDate = metadata.get("patient_dob",   "") or ""
@@ -64,7 +67,8 @@ def _apply_patient_study(ds, metadata: dict):
 
 def _finalize_ds(ds, sop_class: str, sop_inst: str, modality: str,
                  series_desc: str, series_uid: str,
-                 content_date: str, content_time: str):
+                 content_date: str, content_time: str,
+                 series_number: int = 1):
     """Set SOP common, series, equipment and content date/time."""
     ds.SOPClassUID    = sop_class
     ds.SOPInstanceUID = sop_inst
@@ -72,7 +76,7 @@ def _finalize_ds(ds, sop_class: str, sop_inst: str, modality: str,
 
     ds.Modality          = modality
     ds.SeriesInstanceUID = series_uid
-    ds.SeriesNumber      = "1"
+    ds.SeriesNumber      = str(series_number)
     ds.SeriesDescription = series_desc
 
     ds.Manufacturer          = "PACSAdminTool"
@@ -80,7 +84,6 @@ def _finalize_ds(ds, sop_class: str, sop_inst: str, modality: str,
 
     ds.ContentDate = content_date
     ds.ContentTime = content_time
-    ds.SpecificCharacterSet = "ISO_IR 192"
 
 
 def _save_ds(ds) -> bytes:
@@ -177,10 +180,36 @@ def _parse_mp4_info(data: bytes) -> tuple:
 
 
 # ---------------------------------------------------------------------------
+# File-type detection (by extension)
+# ---------------------------------------------------------------------------
+
+_IMAGE_EXTS = frozenset({
+    ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp", ".jfif", ".jpe",
+})
+_VIDEO_EXTS = frozenset({
+    ".mp4", ".m4v", ".mov", ".avi", ".mkv", ".webm",
+})
+_PDF_EXTS = frozenset({".pdf"})
+
+
+def detect_file_type(filename: str) -> str:
+    """Return 'image', 'video', 'pdf', or 'unknown' based on file extension."""
+    ext = os.path.splitext(filename.lower())[1]
+    if ext in _IMAGE_EXTS:
+        return "image"
+    if ext in _VIDEO_EXTS:
+        return "video"
+    if ext in _PDF_EXTS:
+        return "pdf"
+    return "unknown"
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
-def pdf_to_dicom(pdf_bytes: bytes, metadata: dict) -> bytes:
+def pdf_to_dicom(pdf_bytes: bytes, metadata: dict,
+                 series_uid: str = None, series_number: int = 1) -> bytes:
     """
     Wrap a PDF file as an Encapsulated PDF Storage DICOM object.
 
@@ -200,8 +229,8 @@ def pdf_to_dicom(pdf_bytes: bytes, metadata: dict) -> bytes:
     SOP_CLASS       = "1.2.840.10008.5.1.4.1.1.104.1"   # Encapsulated PDF Storage
     TRANSFER_SYNTAX = "1.2.840.10008.1.2.1"              # Explicit VR Little Endian
 
-    sop_inst      = generate_uid()
-    series_uid    = generate_uid()
+    sop_inst   = generate_uid()
+    series_uid = series_uid or generate_uid()
     content_date, content_time = _now_strs()
 
     ds = Dataset()
@@ -211,11 +240,12 @@ def pdf_to_dicom(pdf_bytes: bytes, metadata: dict) -> bytes:
     _apply_patient_study(ds, metadata)
     _finalize_ds(
         ds, SOP_CLASS, sop_inst,
-        modality     = "DOC",
-        series_desc  = metadata.get("series_description", "") or "Encapsulated PDF",
-        series_uid   = series_uid,
-        content_date = content_date,
-        content_time = content_time,
+        modality      = "DOC",
+        series_desc   = metadata.get("series_description", "") or "Encapsulated PDF",
+        series_uid    = series_uid,
+        content_date  = content_date,
+        content_time  = content_time,
+        series_number = series_number,
     )
 
     # Encapsulated PDF-specific attributes
@@ -229,7 +259,8 @@ def pdf_to_dicom(pdf_bytes: bytes, metadata: dict) -> bytes:
 
 
 def image_to_dicom(image_bytes: bytes, filename: str, metadata: dict,
-                   instance_number: int = 1) -> bytes:
+                   instance_number: int = 1,
+                   series_uid: str = None, series_number: int = 2) -> bytes:
     """
     Convert a raster image (JPEG, PNG, BMP, TIFF, WebP, …) to a
     Secondary Capture DICOM image.
@@ -260,8 +291,8 @@ def image_to_dicom(image_bytes: bytes, filename: str, metadata: dict,
     arr    = np.array(img, dtype=np.uint8)
     height, width = arr.shape[:2]
 
-    sop_inst      = generate_uid()
-    series_uid    = generate_uid()
+    sop_inst   = generate_uid()
+    series_uid = series_uid or generate_uid()
     content_date, content_time = _now_strs()
 
     ds = Dataset()
@@ -271,11 +302,12 @@ def image_to_dicom(image_bytes: bytes, filename: str, metadata: dict,
     _apply_patient_study(ds, metadata)
     _finalize_ds(
         ds, SOP_CLASS, sop_inst,
-        modality     = "OT",
-        series_desc  = metadata.get("series_description", "") or "Secondary Capture",
-        series_uid   = series_uid,
-        content_date = content_date,
-        content_time = content_time,
+        modality      = "OT",
+        series_desc   = metadata.get("series_description", "") or "Secondary Capture",
+        series_uid    = series_uid,
+        content_date  = content_date,
+        content_time  = content_time,
+        series_number = series_number,
     )
     ds.InstanceNumber = str(instance_number)
 
@@ -295,7 +327,8 @@ def image_to_dicom(image_bytes: bytes, filename: str, metadata: dict,
     return _save_ds(ds)
 
 
-def video_to_dicom(video_bytes: bytes, filename: str, metadata: dict) -> bytes:
+def video_to_dicom(video_bytes: bytes, filename: str, metadata: dict,
+                   series_uid: str = None, series_number: int = 3) -> bytes:
     """
     Wrap a video file as an encapsulated Video Photographic Image DICOM object.
 
@@ -328,8 +361,8 @@ def video_to_dicom(video_bytes: bytes, filename: str, metadata: dict) -> bytes:
             "Video '%s': %dx%d, %d frames", filename, width, height, n_frames
         )
 
-    sop_inst      = generate_uid()
-    series_uid    = generate_uid()
+    sop_inst   = generate_uid()
+    series_uid = series_uid or generate_uid()
     content_date, content_time = _now_strs()
 
     ds = Dataset()
@@ -339,11 +372,12 @@ def video_to_dicom(video_bytes: bytes, filename: str, metadata: dict) -> bytes:
     _apply_patient_study(ds, metadata)
     _finalize_ds(
         ds, SOP_CLASS, sop_inst,
-        modality     = "XC",
-        series_desc  = metadata.get("series_description", "") or "Encapsulated Video",
-        series_uid   = series_uid,
-        content_date = content_date,
-        content_time = content_time,
+        modality      = "XC",
+        series_desc   = metadata.get("series_description", "") or "Encapsulated Video",
+        series_uid    = series_uid,
+        content_date  = content_date,
+        content_time  = content_time,
+        series_number = series_number,
     )
 
     # Image / video attributes
@@ -377,7 +411,8 @@ def ffmpeg_available() -> bool:
 
 
 def video_to_multiframe_dicom(video_bytes: bytes, filename: str, metadata: dict,
-                               fps_limit: int = 10) -> bytes:
+                               fps_limit: int = 10,
+                               series_uid: str = None, series_number: int = 3) -> bytes:
     """
     Convert a video to a Multi-frame True Color Secondary Capture DICOM by
     extracting frames at up to *fps_limit* fps using ffmpeg.
@@ -466,7 +501,7 @@ def video_to_multiframe_dicom(video_bytes: bytes, filename: str, metadata: dict,
 
     # ── Build the DICOM dataset ───────────────────────────────────────────
     sop_inst   = generate_uid()
-    series_uid = generate_uid()
+    series_uid = series_uid or generate_uid()
     content_date, content_time = _now_strs()
 
     ds = Dataset()
@@ -476,9 +511,10 @@ def video_to_multiframe_dicom(video_bytes: bytes, filename: str, metadata: dict,
     _apply_patient_study(ds, metadata)
     _finalize_ds(
         ds, MULTIFRAME_SC, sop_inst,
-        modality     = "OT",
-        series_desc  = metadata.get("series_description", "") or "Multi-frame Video",
-        series_uid   = series_uid,
+        modality      = "OT",
+        series_desc   = metadata.get("series_description", "") or "Multi-frame Video",
+        series_uid    = series_uid,
+        series_number = series_number,
         content_date = content_date,
         content_time = content_time,
     )

@@ -21,6 +21,9 @@ _CONFIG_SCHEMA = {
     "remote_aes":        list,
     "dicomweb_presets":  list,
     "hl7":               dict,
+    "hl7_servers":       list,
+    "orm_field_map":     dict,
+    "dicomize":          dict,
     "query_defaults":    dict,
     "web":               dict,
     "log_level":         str,
@@ -32,7 +35,7 @@ _LOG_LEVELS   = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 _MAX_AE_TITLE = 16
 
 # Keys in _CONFIG_SCHEMA that only admins may write
-_ADMIN_WRITE_KEYS = frozenset({"local_ae", "remote_aes", "dicomweb_presets", "hl7", "web", "telemetry"})
+_ADMIN_WRITE_KEYS = frozenset({"local_ae", "remote_aes", "dicomweb_presets", "hl7", "hl7_servers", "web", "telemetry"})
 _MAX_HOST_LEN = 253
 
 
@@ -97,6 +100,17 @@ def _validate_config_payload(data: dict) -> str | None:
             not isinstance(hl7["default_host"], str) or len(hl7["default_host"]) > _MAX_HOST_LEN
         ):
             return f"hl7.default_host must be a string of at most {_MAX_HOST_LEN} characters."
+    if "hl7_servers" in data:
+        for i, srv in enumerate(data["hl7_servers"]):
+            if not isinstance(srv, dict):
+                return f"hl7_servers[{i}] must be an object."
+            for field in ("name", "host"):
+                if field in srv and not isinstance(srv[field], str):
+                    return f"hl7_servers[{i}].{field} must be a string."
+            if "host" in srv and len(srv["host"]) > _MAX_HOST_LEN:
+                return f"hl7_servers[{i}].host exceeds {_MAX_HOST_LEN} characters."
+            if "port" in srv and (not isinstance(srv["port"], int) or not (1 <= srv["port"] <= 65535)):
+                return f"hl7_servers[{i}].port must be an integer between 1 and 65535."
     if "web" in data:
         web = data["web"]
         if "port" in web:

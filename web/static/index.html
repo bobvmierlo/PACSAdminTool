@@ -359,6 +359,11 @@
     .subtab-btn.active { color: #2b6cb0; border-bottom-color: #2b6cb0; font-weight: 600; }
     .subtab-panel { display: none; }
     .subtab-panel.active { display: block; }
+    .dz-dropzone { border:2px dashed var(--border); border-radius:6px; padding:10px 14px;
+      transition:border-color .15s, background .15s; cursor:pointer; }
+    .dz-dropzone.dragover { border-color:#2b6cb0; background:rgba(43,108,176,.07); }
+    .dz-progress { height:6px; border-radius:3px; background:var(--border); margin-top:8px; display:none; overflow:hidden; }
+    .dz-progress-bar { height:100%; width:0; background:#2b6cb0; transition:width .2s; border-radius:3px; }
 
     /* ── Help tab ─────────────────────────────────────────────────── */
     #help-layout { display: flex; gap: 20px; }
@@ -2732,19 +2737,187 @@
   <!-- ── DICOMize ────────────────────────────────────────────────── -->
   <div id="tab-dicomize" class="tab-panel">
 
-    <!-- Shared: Patient & Study Data (collapsible) -->
+    <!-- Shared: Patient & Study Data -->
     <div class="card">
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px">
+      <!-- Header row: title + collapse + workflow source selector -->
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap">
         <h3 style="cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px; margin:0"
             onclick="toggleDicomizePatient()" id="dicomize-patient-hdr">
           <span id="dicomize-patient-arrow" class="seq-arrow">▼</span>
           <span data-i18n="dicomize.patient_study">Patient &amp; Study Data</span>
         </h3>
-        <button class="btn" onclick="openDzWorklistModal()"
-                data-i18n="dicomize.fill_from_wl">Fill from Worklist…</button>
+        <!-- 3-way source selector -->
+        <div style="display:flex; border:1px solid var(--border); border-radius:4px; overflow:hidden" role="group" aria-label="Metadata source">
+          <button id="dz-src-btn-manual" class="subtab-btn active"
+                  style="border-radius:0; border:none; border-right:1px solid var(--border); font-size:12px; padding:4px 10px"
+                  onclick="dzSetSource('manual')" data-i18n="dicomize.src_manual">Manual</button>
+          <button id="dz-src-btn-dmwl" class="subtab-btn"
+                  style="border-radius:0; border:none; border-right:1px solid var(--border); font-size:12px; padding:4px 10px"
+                  onclick="dzSetSource('dmwl')" data-i18n="dicomize.src_dmwl">DMWL Worklist</button>
+          <button id="dz-src-btn-oruian" class="subtab-btn"
+                  style="border-radius:0; border:none; font-size:12px; padding:4px 10px"
+                  onclick="dzSetSource('oruian')" data-i18n="dicomize.src_oruian">ORU IAN → ORM</button>
+        </div>
       </div>
+
       <div id="dicomize-patient-body">
-        <div class="field-grid">
+
+        <!-- ═══ DMWL inline panel ═══ -->
+        <div id="dz-src-panel-dmwl" style="display:none; margin:12px 0 16px; padding-bottom:16px; border-bottom:1px solid var(--border)">
+          <div class="ae-selector">
+            <div class="field preset-field">
+              <label data-i18n="dicomize.select_preset">Select a preset…</label>
+              <select id="dz-src-dmwl-preset" onchange="dzSrcDmwlFillAE()">
+                <option value=""></option>
+              </select>
+            </div>
+            <div class="field">
+              <label data-i18n="dicomize.ae_title">AE Title</label>
+              <input id="dz-src-dmwl-aet">
+            </div>
+            <div class="field">
+              <label data-i18n="dicomize.ae_host">Host</label>
+              <input id="dz-src-dmwl-host">
+            </div>
+            <div class="field" style="max-width:80px">
+              <label data-i18n="dicomize.ae_port">Port</label>
+              <input id="dz-src-dmwl-port" type="number" min="1" max="65535">
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; align-items:flex-end">
+            <div class="field" style="flex:1; min-width:140px">
+              <label data-i18n="dicomize.wl_filter_name">Patient Name (wildcard *)</label>
+              <input id="dz-src-dmwl-name" placeholder="*">
+            </div>
+            <div class="field" style="flex:1; min-width:110px">
+              <label data-i18n="dicomize.wl_filter_id">Patient ID</label>
+              <input id="dz-src-dmwl-id">
+            </div>
+            <div class="field" style="flex:1; min-width:130px">
+              <label data-i18n="dicomize.wl_filter_date">Scheduled Date</label>
+              <input type="date" id="dz-src-dmwl-date">
+            </div>
+            <div class="field" style="align-self:flex-end">
+              <button class="btn primary" onclick="dzSrcDmwlQuery()" data-i18n="dicomize.wl_query_btn">Query</button>
+            </div>
+            <div class="field" style="align-self:flex-end">
+              <button class="btn" onclick="openDzWorklistModal()" data-i18n="dicomize.src_dmwl_full">Full worklist…</button>
+            </div>
+          </div>
+          <div id="dz-src-dmwl-status" style="font-size:12px; color:#888; margin:6px 0"></div>
+          <div id="dz-src-dmwl-results" style="display:none; max-height:220px; overflow-y:auto; margin-top:6px; border:1px solid var(--border); border-radius:4px">
+            <table style="width:100%; border-collapse:collapse; font-size:12px">
+              <thead><tr style="border-bottom:1px solid var(--border); background:var(--bg-alt,#f5f5f5); position:sticky; top:0">
+                <th style="padding:4px 8px; text-align:left" data-i18n="dicomize.wl_col_name">Name</th>
+                <th style="padding:4px 8px; text-align:left" data-i18n="dicomize.wl_col_id">ID</th>
+                <th style="padding:4px 8px; text-align:left" data-i18n="dicomize.wl_col_acc">Accession</th>
+                <th style="padding:4px 8px; text-align:left" data-i18n="dicomize.wl_col_date">Date</th>
+                <th style="padding:4px 8px; text-align:left" data-i18n="dicomize.wl_col_proc">Procedure</th>
+              </tr></thead>
+              <tbody id="dz-src-dmwl-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ═══ ORU IAN → ORM panel ═══ -->
+        <div id="dz-src-panel-oruian" style="display:none; margin:12px 0 16px; padding-bottom:16px; border-bottom:1px solid var(--border)">
+          <p style="font-size:12px; color:#888; margin:0 0 10px"
+             data-i18n="dicomize.oruian_desc">Send an ORU^R01 Image Availability Notification to your EMR. The EMR creates an examination ad-hoc and returns an ORM message. When the ORM arrives via the HL7 listener, click <strong>Fill from ORM</strong> to auto-populate the fields below.</p>
+
+          <div class="field-grid">
+            <div class="field" style="grid-column:span 2">
+              <label data-i18n="dicomize.oruian_template_label">HL7 Template</label>
+              <select id="dz-oruian-template" onchange="dzOruIanLoadTemplate()">
+                <option value="" data-i18n="dicomize.oruian_template_placeholder">— select template —</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-top:10px">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-bottom:6px">
+              <label style="font-size:13px; font-weight:500" data-i18n="dicomize.oruian_editor_label">HL7 Message (editable)</label>
+              <div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center">
+                <span style="font-size:11px; color:#888" data-i18n="dicomize.oruian_insert_label">Insert:</span>
+                <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{patient_name}}')">patient_name</button>
+                <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{patient_id}}')">patient_id</button>
+                <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{patient_dob}}')">patient_dob</button>
+                <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{patient_sex}}')">patient_sex</button>
+                <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{accession_number}}')">accession</button>
+                <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{study_uid}}')">study_uid</button>
+                <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{study_date}}')">study_date</button>
+                <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{study_description}}')">study_desc</button>
+                <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{institution_name}}')">institution</button>
+                <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{datetime}}')">datetime</button>
+                <button class="btn" style="padding:2px 7px; font-size:11px" onclick="dzOruIanInsert('{{msg_id}}')">msg_id</button>
+              </div>
+            </div>
+            <textarea id="dz-oruian-msg"
+                      style="width:100%; height:160px; font-family:Consolas,monospace; font-size:12px;
+                             resize:vertical; padding:8px; box-sizing:border-box;
+                             background:var(--bg); border:1px solid var(--border);
+                             color:var(--text); border-radius:4px"
+                      data-i18n-placeholder="dicomize.oruian_editor_placeholder"
+                      placeholder="Load a template or type your HL7 message here…"></textarea>
+          </div>
+
+          <div style="display:flex; gap:8px; margin-top:6px; flex-wrap:wrap">
+            <button class="btn" onclick="dzOruIanPreview()" data-i18n="dicomize.oruian_preview_btn">Preview filled message</button>
+            <button class="btn" onclick="dzOruIanSaveTemplate()" data-i18n="dicomize.oruian_save_btn">Save as template…</button>
+          </div>
+          <pre id="dz-oruian-preview" style="display:none; margin-top:8px; padding:8px;
+               background:var(--bg-alt,#f5f5f5); border:1px solid var(--border);
+               border-radius:4px; font-size:11px; overflow:auto; max-height:180px;
+               white-space:pre-wrap; word-break:break-all"></pre>
+
+          <!-- HL7 server connection with presets -->
+          <div class="ae-selector" style="margin-top:12px">
+            <div class="field preset-field">
+              <label data-i18n="dicomize.oruian_server_preset">EMR Server</label>
+              <select id="dz-oruian-server-preset" onchange="dzOruIanFillServer()">
+                <option value="">— manual —</option>
+              </select>
+            </div>
+            <div class="field">
+              <label data-i18n="dicomize.oruian_host">Host</label>
+              <input id="dz-oruian-host" placeholder="192.168.1.10">
+            </div>
+            <div class="field" style="max-width:90px">
+              <label data-i18n="dicomize.oruian_port">Port</label>
+              <input id="dz-oruian-port" type="number" min="1" max="65535" value="2575">
+            </div>
+          </div>
+
+          <div class="btn-row" style="margin-top:10px">
+            <button class="btn primary" onclick="dzOruIanSend()" data-i18n="dicomize.oruian_send_btn">Send ORU IAN</button>
+            <button class="btn" id="dz-oruian-fill-btn" style="display:none"
+                    onclick="dzOruIanFillFromOrm()" data-i18n="dicomize.oruian_fill_btn">Fill from ORM</button>
+          </div>
+          <div id="dz-oruian-status" style="margin-top:8px; font-size:12px; color:#888"></div>
+          <pre id="dz-oruian-orm-text" style="display:none; margin-top:8px; padding:8px;
+               background:var(--bg-alt,#f5f5f5); border:1px solid var(--border);
+               border-radius:4px; font-size:11px; overflow:auto; max-height:180px;
+               white-space:pre-wrap; word-break:break-all"></pre>
+
+          <!-- ORM field mapping (advanced, collapsible) -->
+          <details style="margin-top:12px">
+            <summary style="cursor:pointer; font-size:12px; color:#888; user-select:none"
+                     data-i18n="dicomize.orm_map_title">ORM field mapping (advanced)</summary>
+            <p style="font-size:11px; color:#aaa; margin:6px 0"
+               data-i18n="dicomize.orm_map_desc">Map HL7 segment fields (e.g. OBR.3) to DICOM metadata. Changes are saved to configuration.</p>
+            <textarea id="dz-orm-map-editor"
+                      style="width:100%; height:130px; font-family:Consolas,monospace; font-size:11px;
+                             resize:vertical; padding:6px; box-sizing:border-box;
+                             background:var(--bg); border:1px solid var(--border);
+                             color:var(--text); border-radius:4px; margin-top:4px"></textarea>
+            <div style="display:flex; gap:6px; margin-top:4px">
+              <button class="btn" style="font-size:11px" onclick="dzOrmMapSave()" data-i18n="dicomize.orm_map_save">Save mapping</button>
+              <span id="dz-orm-map-status" style="font-size:11px; color:#888; align-self:center"></span>
+            </div>
+          </details>
+        </div>
+
+        <!-- ═══ Always-visible form fields ═══ -->
+        <div class="field-grid" id="dz-patient-fields">
           <div class="field">
             <label data-i18n="dicomize.patient_name">Patient Name</label>
             <input id="dz-patient-name">
@@ -2791,11 +2964,23 @@
             <div style="display:flex; gap:6px">
               <input id="dz-study-uid" style="flex:1; font-family:Consolas; font-size:11px">
               <button class="uid-copy-btn" onclick="copyToClipboard(document.getElementById('dz-study-uid').value)" title="Copy UID">⎘</button>
-              <button class="btn" onclick="dzGenerateUID()"
-                      data-i18n="dicomize.generate_uid">Generate</button>
+              <button class="btn" onclick="dzGenerateUID()" data-i18n="dicomize.generate_uid">Generate</button>
             </div>
           </div>
         </div>
+
+        <!-- DICOM metadata preview (collapsible, always visible) -->
+        <details id="dz-meta-preview-details" style="margin-top:14px">
+          <summary style="cursor:pointer; font-size:12px; color:#888; user-select:none"
+                   data-i18n="dicomize.meta_preview_title">Preview DICOM metadata</summary>
+          <div id="dz-meta-preview-content"
+               style="margin-top:8px; padding:10px; background:var(--bg-alt,#f5f5f5);
+                      border:1px solid var(--border); border-radius:4px;
+                      font-size:12px; font-family:Consolas,monospace; line-height:1.6">
+          </div>
+          <p style="font-size:11px; color:#aaa; margin:4px 0 0" data-i18n="dicomize.meta_preview_hint">Shown before every download/store. Updates automatically when you change the form.</p>
+        </details>
+
       </div>
     </div>
 
@@ -2811,20 +2996,34 @@
         <button class="subtab-btn" id="dz-tab-video-btn"
                 onclick="showDicomizeTab('video')"
                 data-i18n="dicomize.subtab_video">Video</button>
+        <button class="subtab-btn" id="dz-tab-mixed-btn"
+                onclick="showDicomizeTab('mixed')"
+                data-i18n="dicomize.subtab_mixed">Mixed</button>
       </div>
 
       <!-- PDF sub-tab -->
       <div id="dz-subtab-pdf" class="subtab-panel active">
         <h3 data-i18n="dicomize.pdf_card_title">PDF to DICOM</h3>
-        <div class="btn-row" style="margin-top:10px">
+        <div class="dz-dropzone" id="dz-pdf-dropzone"
+             ondragover="_dzDragOver(event,'dz-pdf-dropzone')"
+             ondragleave="_dzDragLeave('dz-pdf-dropzone')"
+             ondrop="_dzDrop(event,'dz-pdf-input')"
+             onclick="document.getElementById('dz-pdf-input').click()"
+             style="margin-top:10px">
           <input type="file" id="dz-pdf-input" accept=".pdf" style="display:none"
                  onchange="dzPDFSelected()">
-          <button class="btn" onclick="document.getElementById('dz-pdf-input').click()"
-                  data-i18n="dicomize.pdf_browse">Browse…</button>
-          <span id="dz-pdf-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
-                text-overflow:ellipsis; white-space:nowrap"
-                data-i18n="dicomize.pdf_no_file">No PDF selected.</span>
+          <div class="btn-row" style="margin:0; pointer-events:none">
+            <button class="btn" style="pointer-events:auto"
+                    onclick="event.stopPropagation();document.getElementById('dz-pdf-input').click()"
+                    data-i18n="dicomize.pdf_browse">Browse…</button>
+            <span id="dz-pdf-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
+                  text-overflow:ellipsis; white-space:nowrap"
+                  data-i18n="dicomize.pdf_no_file">No PDF selected.</span>
+          </div>
+          <div style="font-size:11px; color:#999; margin-top:4px; pointer-events:none"
+               data-i18n="dicomize.drop_hint">or drag &amp; drop here</div>
         </div>
+        <div class="dz-progress" id="dz-pdf-progress"><div class="dz-progress-bar" id="dz-pdf-progress-bar"></div></div>
         <div class="field-grid" style="margin-top:12px">
           <div class="field" style="grid-column:span 2">
             <label data-i18n="dicomize.pdf_document_title">Document Title</label>
@@ -2873,15 +3072,26 @@
       <!-- Images sub-tab -->
       <div id="dz-subtab-images" class="subtab-panel">
         <h3 data-i18n="dicomize.image_card_title">Images to DICOM</h3>
-        <div class="btn-row" style="margin-top:10px">
+        <div class="dz-dropzone" id="dz-images-dropzone"
+             ondragover="_dzDragOver(event,'dz-images-dropzone')"
+             ondragleave="_dzDragLeave('dz-images-dropzone')"
+             ondrop="_dzDrop(event,'dz-images-input')"
+             onclick="document.getElementById('dz-images-input').click()"
+             style="margin-top:10px">
           <input type="file" id="dz-images-input" accept="image/*,.jfif,.jpe" multiple
                  style="display:none" onchange="dzImagesSelected()">
-          <button class="btn" onclick="document.getElementById('dz-images-input').click()"
-                  data-i18n="dicomize.image_browse">Browse…</button>
-          <span id="dz-images-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
-                text-overflow:ellipsis; white-space:nowrap"
-                data-i18n="dicomize.image_no_files">No images selected.</span>
+          <div class="btn-row" style="margin:0; pointer-events:none">
+            <button class="btn" style="pointer-events:auto"
+                    onclick="event.stopPropagation();document.getElementById('dz-images-input').click()"
+                    data-i18n="dicomize.image_browse">Browse…</button>
+            <span id="dz-images-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
+                  text-overflow:ellipsis; white-space:nowrap"
+                  data-i18n="dicomize.image_no_files">No images selected.</span>
+          </div>
+          <div style="font-size:11px; color:#999; margin-top:4px; pointer-events:none"
+               data-i18n="dicomize.drop_hint">or drag &amp; drop here</div>
         </div>
+        <div class="dz-progress" id="dz-images-progress"><div class="dz-progress-bar" id="dz-images-progress-bar"></div></div>
         <p style="font-size:12px; color:#888; margin:8px 0 0"
            data-i18n="dicomize.image_accept">JPEG, PNG, BMP, TIFF, WebP, JFIF and other raster formats</p>
         <div class="field-grid" style="margin-top:12px">
@@ -2890,6 +3100,10 @@
             <input id="dz-images-series-desc">
           </div>
         </div>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; margin-top:10px; cursor:pointer">
+          <input type="checkbox" id="dz-images-group-series">
+          <span data-i18n="dicomize.group_series">Group into one series (shared Series UID)</span>
+        </label>
         <p style="font-size:12px; color:#888; margin-top:8px"
            data-i18n="dicomize.image_note">Each image becomes a separate Secondary Capture DICOM file. Multiple files are returned as a ZIP archive.</p>
         <div class="btn-row" style="margin-top:12px">
@@ -2929,16 +3143,27 @@
       <!-- Video sub-tab -->
       <div id="dz-subtab-video" class="subtab-panel">
         <h3 data-i18n="dicomize.video_card_title">Video to DICOM</h3>
-        <div class="btn-row" style="margin-top:10px">
+        <div class="dz-dropzone" id="dz-video-dropzone"
+             ondragover="_dzDragOver(event,'dz-video-dropzone')"
+             ondragleave="_dzDragLeave('dz-video-dropzone')"
+             ondrop="_dzDrop(event,'dz-video-input')"
+             onclick="document.getElementById('dz-video-input').click()"
+             style="margin-top:10px">
           <input type="file" id="dz-video-input"
                  accept="video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,video/webm,.mp4,.mov,.avi,.mkv,.webm"
                  style="display:none" onchange="dzVideoSelected()">
-          <button class="btn" onclick="document.getElementById('dz-video-input').click()"
-                  data-i18n="dicomize.video_browse">Browse…</button>
-          <span id="dz-video-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
-                text-overflow:ellipsis; white-space:nowrap"
-                data-i18n="dicomize.video_no_file">No video selected.</span>
+          <div class="btn-row" style="margin:0; pointer-events:none">
+            <button class="btn" style="pointer-events:auto"
+                    onclick="event.stopPropagation();document.getElementById('dz-video-input').click()"
+                    data-i18n="dicomize.video_browse">Browse…</button>
+            <span id="dz-video-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
+                  text-overflow:ellipsis; white-space:nowrap"
+                  data-i18n="dicomize.video_no_file">No video selected.</span>
+          </div>
+          <div style="font-size:11px; color:#999; margin-top:4px; pointer-events:none"
+               data-i18n="dicomize.drop_hint">or drag &amp; drop here</div>
         </div>
+        <div class="dz-progress" id="dz-video-progress"><div class="dz-progress-bar" id="dz-video-progress-bar"></div></div>
         <p style="font-size:12px; color:#888; margin:8px 0 0"
            data-i18n="dicomize.video_accept">MP4, MOV and other video formats</p>
         <div class="field-grid" style="margin-top:12px">
@@ -2952,14 +3177,16 @@
             <label data-i18n="dicomize.video_format_label">Output Format</label>
             <div style="display:flex; flex-wrap:wrap; gap:16px; margin-top:4px">
               <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px">
-                <input type="radio" name="dz-video-format" value="encapsulated" checked>
+                <input type="radio" name="dz-video-format" value="encapsulated" checked
+                       onchange="_dzToggleFps('video')">
                 <span>
                   <strong data-i18n="dicomize.video_format_enc_name">Encapsulated video</strong>
                   <span style="color:#888; font-size:11px" data-i18n="dicomize.video_format_enc_note"> — stores MP4/MOV as-is, small file, MPEG-4 transfer syntax</span>
                 </span>
               </label>
               <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px">
-                <input type="radio" name="dz-video-format" value="multiframe">
+                <input type="radio" name="dz-video-format" value="multiframe"
+                       onchange="_dzToggleFps('video')">
                 <span>
                   <strong data-i18n="dicomize.video_format_mf_name">Multi-frame JPEG</strong>
                   <span style="color:#888; font-size:11px" data-i18n="dicomize.video_format_mf_note"> — extracts frames, native playback in all viewers, requires ffmpeg on server</span>
@@ -2967,6 +3194,10 @@
               </label>
             </div>
           </div>
+        </div>
+        <div id="dz-video-fps-row" style="display:none; margin-top:10px; align-items:center; gap:10px" class="btn-row">
+          <label style="font-size:13px; white-space:nowrap" data-i18n="dicomize.fps_label">FPS limit:</label>
+          <input id="dz-video-fps" type="number" min="1" max="120" value="10" style="width:70px">
         </div>
         <div class="btn-row" style="margin-top:12px">
           <button class="btn primary" onclick="doDicomizeVideo('download')"
@@ -3001,13 +3232,152 @@
           </div>
         </div>
       </div>
+
+      <!-- Mixed sub-tab -->
+      <div id="dz-subtab-mixed" class="subtab-panel">
+        <h3 data-i18n="dicomize.mixed_card_title">Mixed Files to DICOM</h3>
+        <p style="font-size:12px; color:#888; margin:4px 0 10px"
+           data-i18n="dicomize.mixed_note">Select any combination of images, PDFs, and videos. Each file is auto-detected and converted to the appropriate DICOM format.</p>
+        <div class="dz-dropzone" id="dz-mixed-dropzone"
+             ondragover="_dzDragOver(event,'dz-mixed-dropzone')"
+             ondragleave="_dzDragLeave('dz-mixed-dropzone')"
+             ondrop="_dzDrop(event,'dz-mixed-input')"
+             onclick="document.getElementById('dz-mixed-input').click()"
+             style="margin-top:4px">
+          <input type="file" id="dz-mixed-input" multiple
+                 accept="image/*,video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,video/webm,.pdf,.jfif,.jpe,.mp4,.mov,.avi,.mkv,.webm"
+                 style="display:none" onchange="dzMixedSelected()">
+          <input type="file" id="dz-mixed-folder-input" multiple webkitdirectory
+                 style="display:none" onchange="dzMixedSelected('folder')">
+          <div class="btn-row" style="margin:0; pointer-events:none">
+            <button class="btn" style="pointer-events:auto"
+                    onclick="event.stopPropagation();document.getElementById('dz-mixed-input').click()"
+                    data-i18n="dicomize.mixed_browse">Browse…</button>
+            <button class="btn" style="pointer-events:auto"
+                    onclick="event.stopPropagation();document.getElementById('dz-mixed-folder-input').click()"
+                    data-i18n="dicomize.folder_browse">Browse Folder…</button>
+            <span id="dz-mixed-filename" style="font-size:13px; color:#555; flex:1; overflow:hidden;
+                  text-overflow:ellipsis; white-space:nowrap"
+                  data-i18n="dicomize.mixed_no_files">No files selected.</span>
+          </div>
+          <div style="font-size:11px; color:#999; margin-top:4px; pointer-events:none"
+               data-i18n="dicomize.drop_hint">or drag &amp; drop here</div>
+        </div>
+        <div class="dz-progress" id="dz-mixed-progress"><div class="dz-progress-bar" id="dz-mixed-progress-bar"></div></div>
+
+        <!-- Per-file list with type badge + preview button -->
+        <div id="dz-mixed-list" style="display:none; margin-top:10px">
+          <table style="width:100%; border-collapse:collapse; font-size:13px">
+            <thead>
+              <tr style="text-align:left; border-bottom:1px solid var(--border)">
+                <th style="padding:4px 8px" data-i18n="dicomize.mixed_col_file">File</th>
+                <th style="padding:4px 8px" data-i18n="dicomize.mixed_col_type">Type</th>
+                <th style="padding:4px 8px" data-i18n="dicomize.mixed_col_size">Size</th>
+                <th style="padding:4px 8px"></th>
+              </tr>
+            </thead>
+            <tbody id="dz-mixed-list-body"></tbody>
+          </table>
+        </div>
+
+        <div class="field-grid" style="margin-top:12px">
+          <div class="field" style="grid-column:span 2">
+            <label data-i18n="dicomize.series_description">Series Description</label>
+            <input id="dz-mixed-series-desc">
+          </div>
+        </div>
+
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; margin-top:10px; cursor:pointer">
+          <input type="checkbox" id="dz-mixed-group-series">
+          <span data-i18n="dicomize.group_series">Group into one series (shared Series UID)</span>
+        </label>
+
+        <div style="margin-top:10px">
+          <label style="font-size:13px; font-weight:500" data-i18n="dicomize.video_format_label">Video Output Format</label>
+          <div style="display:flex; flex-wrap:wrap; gap:16px; margin-top:4px">
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px">
+              <input type="radio" name="dz-mixed-video-format" value="encapsulated" checked
+                     onchange="_dzToggleFps('mixed')">
+              <span>
+                <strong data-i18n="dicomize.video_format_enc_name">Encapsulated video</strong>
+                <span style="color:#888; font-size:11px" data-i18n="dicomize.video_format_enc_note"> — stores MP4/MOV as-is, small file, MPEG-4 transfer syntax</span>
+              </span>
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px">
+              <input type="radio" name="dz-mixed-video-format" value="multiframe"
+                     onchange="_dzToggleFps('mixed')">
+              <span>
+                <strong data-i18n="dicomize.video_format_mf_name">Multi-frame JPEG</strong>
+                <span style="color:#888; font-size:11px" data-i18n="dicomize.video_format_mf_note"> — extracts frames, native playback in all viewers, requires ffmpeg on server</span>
+              </span>
+            </label>
+          </div>
+        </div>
+        <div id="dz-mixed-fps-row" style="display:none; margin-top:10px; align-items:center; gap:10px" class="btn-row">
+          <label style="font-size:13px; white-space:nowrap" data-i18n="dicomize.fps_label">FPS limit:</label>
+          <input id="dz-mixed-fps" type="number" min="1" max="120" value="10" style="width:70px">
+        </div>
+
+        <div class="btn-row" style="margin-top:16px">
+          <button class="btn primary" onclick="doDicomizeMixed('download')"
+                  data-i18n="dicomize.download_btn">Download DICOM</button>
+          <button class="btn" onclick="doDicomizeMixed('store')"
+                  data-i18n="dicomize.send_pacs_btn">Send to PACS</button>
+        </div>
+        <div id="dz-mixed-ae" style="margin-top:12px; display:none">
+          <div class="ae-selector">
+            <div class="field preset-field">
+              <label data-i18n="dicomize.select_preset">Select a preset…</label>
+              <select id="dz-mixed-ae-preset" onchange="dzFillAE('mixed')">
+                <option value=""></option>
+              </select>
+            </div>
+            <div class="field">
+              <label data-i18n="dicomize.ae_title">AE Title</label>
+              <input id="dz-mixed-ae-title">
+            </div>
+            <div class="field">
+              <label data-i18n="dicomize.ae_host">Host</label>
+              <input id="dz-mixed-ae-host">
+            </div>
+            <div class="field" style="max-width:90px">
+              <label data-i18n="dicomize.ae_port">Port</label>
+              <input id="dz-mixed-ae-port" type="number" min="1" max="65535">
+            </div>
+            <div class="field" style="align-self:flex-end">
+              <button class="btn primary" onclick="doDicomizeMixedStore()"
+                      data-i18n="dicomize.send_pacs_btn">Send to PACS</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
+  </div>
 
     <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-dicomize"></div></div>
   </div>
 
 </div><!-- end #tab-content -->
 
+
+<!-- ══════════════════════════════════════════════════════════════════
+     DICOMIZE — SOURCE FILE PREVIEW MODAL
+══════════════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="dz-preview-modal"
+     onclick="if(event.target===this)closeDzPreview()">
+  <div class="modal" style="width:min(96vw,900px); max-height:92vh; display:flex; flex-direction:column">
+    <div class="modal-header">
+      <span id="dz-preview-title" style="font-size:14px; font-weight:600">Preview</span>
+      <button class="modal-close" onclick="closeDzPreview()" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" style="flex:1; overflow:auto; align-items:center; justify-content:center; padding:12px">
+      <div id="dz-preview-content"
+           style="width:100%; max-height:75vh; display:flex; align-items:center;
+                  justify-content:center; overflow:auto"></div>
+    </div>
+  </div>
+</div>
 
 <!-- ══════════════════════════════════════════════════════════════════
      DICOMIZE — WORKLIST SELECTION MODAL
@@ -3726,6 +4096,19 @@ socket.on("hl7_message", data => {
 
   // Persist to inbound history
   _hl7InHistorySave({ ts: data.ts, from: data.from, message: data.message });
+
+  // Check if this is an order message relevant to the ORU IAN workflow
+  const _msg = data.message || "";
+  if (/\bORM\b|\bOMG\b|\bOML\b/.test(_msg)) {
+    _dzOruIanOrm = _msg;
+    const fillBtn  = document.getElementById("dz-oruian-fill-btn");
+    const ormPre   = document.getElementById("dz-oruian-orm-text");
+    const statusEl = document.getElementById("dz-oruian-status");
+    if (fillBtn)  fillBtn.style.display  = "";
+    if (ormPre)  { ormPre.textContent = _msg.replace(/\r/g, "\n"); ormPre.style.display = ""; }
+    if (statusEl){ statusEl.textContent = i18n("dicomize.oruian_orm_received"); statusEl.style.color = "var(--ok, green)"; }
+    appendLog("log-dicomize", now(), i18n("dicomize.oruian_orm_received"), "ok");
+  }
 });
 
 // Server pushes SCP/HL7 status on first connect so buttons show correctly.
@@ -7947,7 +8330,7 @@ async function doKOSCreate() {
 // ─────────────────────────────────────────────────────────────────
 
 function showDicomizeTab(sub) {
-  ["pdf", "images", "video"].forEach(s => {
+  ["pdf", "images", "video", "mixed"].forEach(s => {
     document.getElementById(`dz-subtab-${s}`).classList.toggle("active", s === sub);
     document.getElementById(`dz-tab-${s}-btn`).classList.toggle("active", s === sub);
   });
@@ -8016,11 +8399,281 @@ function dzFillAE(prefix) {
   document.getElementById(`dz-${prefix}-ae-port`).value  = ae.port     || "";
 }
 
+// ── Drag-and-drop helpers ─────────────────────────────────────────
+
+function _dzDragOver(event, zoneId) {
+  event.preventDefault();
+  document.getElementById(zoneId)?.classList.add("dragover");
+}
+
+function _dzDragLeave(zoneId) {
+  document.getElementById(zoneId)?.classList.remove("dragover");
+}
+
+function _dzDrop(event, inputId) {
+  event.preventDefault();
+  const zoneId = event.currentTarget.id;
+  document.getElementById(zoneId)?.classList.remove("dragover");
+  const input = document.getElementById(inputId);
+  if (!input || !event.dataTransfer.files.length) return;
+  const dt = new DataTransfer();
+  Array.from(event.dataTransfer.files).forEach(f => dt.items.add(f));
+  input.files = dt.files;
+  input.dispatchEvent(new Event("change"));
+}
+
+// ── FPS row toggle ─────────────────────────────────────────────────
+
+function _dzToggleFps(prefix) {
+  const fmt = document.querySelector(`input[name="dz-${prefix}-video-format"]:checked`)?.value;
+  const row = document.getElementById(`dz-${prefix}-fps-row`);
+  if (row) row.style.display = fmt === "multiframe" ? "flex" : "none";
+}
+
+// ── Source selector (Manual / DMWL / ORU IAN) ────────────────────
+
+function dzSetSource(src) {
+  ["manual", "dmwl", "oruian"].forEach(s => {
+    const btn   = document.getElementById(`dz-src-btn-${s}`);
+    const panel = document.getElementById(`dz-src-panel-${s}`);
+    if (btn)   btn.classList.toggle("active", s === src);
+    if (panel) panel.style.display = (s === src && s !== "manual") ? "" : "none";
+  });
+  if (src === "oruian") {
+    _dzOruIanPopulateTemplates();
+    _dzPopulateHl7Servers();
+  }
+  if (src === "dmwl") {
+    dzLoadPresets();
+  }
+}
+
+function _dzPopulateHl7Servers() {
+  const sel = document.getElementById("dz-oruian-server-preset");
+  if (!sel) return;
+  const servers = (appConfig.hl7_servers || []).concat(
+    (userSettings.hl7_servers || []).map(s => ({...s, _user: true}))
+  );
+  sel.innerHTML = `<option value="">— manual —</option>`;
+  servers.forEach(s => {
+    const opt = document.createElement("option");
+    opt.value       = JSON.stringify({host: s.host, port: s.port});
+    opt.textContent = s.name || `${s.host}:${s.port}`;
+    sel.appendChild(opt);
+  });
+}
+
+function dzOruIanFillServer() {
+  const sel = document.getElementById("dz-oruian-server-preset");
+  if (!sel?.value) return;
+  try {
+    const s = JSON.parse(sel.value);
+    if (s.host) document.getElementById("dz-oruian-host").value = s.host;
+    if (s.port) document.getElementById("dz-oruian-port").value = s.port;
+  } catch (_) {}
+}
+
+// ── DMWL inline query ─────────────────────────────────────────────
+
+function dzSrcDmwlFillAE() {
+  const val = document.getElementById("dz-src-dmwl-preset").value;
+  if (!val) return;
+  let ae;
+  if (val.startsWith("usr:")) {
+    ae = (userSettings.remote_aes || []).find(a => a.name === val.slice(4));
+  } else {
+    const name = val.startsWith("sys:") ? val.slice(4) : val;
+    ae = (appConfig.remote_aes || []).find(a => a.name === name);
+  }
+  if (!ae) return;
+  document.getElementById("dz-src-dmwl-aet").value  = ae.ae_title || "";
+  document.getElementById("dz-src-dmwl-host").value = ae.host     || "";
+  document.getElementById("dz-src-dmwl-port").value = ae.port     || "";
+}
+
+async function dzSrcDmwlQuery() {
+  const aet  = document.getElementById("dz-src-dmwl-aet").value.trim();
+  const host = document.getElementById("dz-src-dmwl-host").value.trim();
+  const port = document.getElementById("dz-src-dmwl-port").value.trim();
+  const statusEl  = document.getElementById("dz-src-dmwl-status");
+  const resultsEl = document.getElementById("dz-src-dmwl-results");
+  const bodyEl    = document.getElementById("dz-src-dmwl-body");
+  if (!host || !port) {
+    statusEl.textContent = i18n("dicomize.oruian_no_host");
+    return;
+  }
+  statusEl.textContent = i18n("dicomize.wl_querying") || "Querying…";
+  resultsEl.style.display = "none";
+  try {
+    const params = new URLSearchParams({
+      ae_title: aet, host, port,
+      patient_name: document.getElementById("dz-src-dmwl-name").value || "*",
+      patient_id:   document.getElementById("dz-src-dmwl-id").value   || "",
+      scheduled_date: document.getElementById("dz-src-dmwl-date").value || "",
+    });
+    const res  = await fetch(`/api/dicom/dmwl?${params}`);
+    const data = await res.json();
+    if (!data.ok) { statusEl.textContent = data.error || "Error"; return; }
+    const rows = data.results || [];
+    statusEl.textContent = `${rows.length} result(s)`;
+    if (!rows.length) return;
+    bodyEl.innerHTML = rows.map((r, idx) => `<tr style="border-bottom:1px solid var(--border); cursor:pointer"
+      onclick="_dzSrcDmwlFill(${idx})"
+      title="${i18n("dicomize.wl_click_fill") || "Click to fill fields"}">
+      <td style="padding:4px 8px">${escapeHtml(r.patient_name || "")}</td>
+      <td style="padding:4px 8px">${escapeHtml(r.patient_id   || "")}</td>
+      <td style="padding:4px 8px">${escapeHtml(r.accession_number || "")}</td>
+      <td style="padding:4px 8px">${escapeHtml(r.scheduled_datetime || "")}</td>
+      <td style="padding:4px 8px">${escapeHtml(r.procedure_description || "")}</td>
+    </tr>`).join("");
+    resultsEl.style.display = "";
+    window._dzSrcDmwlRows = rows;
+  } catch (e) {
+    statusEl.textContent = String(e);
+  }
+}
+
+function _dzSrcDmwlFill(idx) {
+  const r = (window._dzSrcDmwlRows || [])[idx];
+  if (!r) return;
+  const set = (id, v) => { if (v) document.getElementById(id).value = v; };
+  set("dz-patient-name", r.patient_name);
+  set("dz-patient-id",   r.patient_id);
+  set("dz-patient-dob",  r.patient_dob);
+  set("dz-patient-sex",  r.patient_sex);
+  set("dz-accession",    r.accession_number);
+  set("dz-study-desc",   r.procedure_description);
+  set("dz-study-date",   r.scheduled_date || (r.scheduled_datetime || "").slice(0,10).replace(/\//g,"-"));
+  appendLog("log-dicomize", now(), i18n("dicomize.wl_filled", {name: r.patient_name || "?"}), "ok");
+}
+
+// ── ORM field-map editor ───────────────────────────────────────────
+
+function dzOrmMapSave() {
+  const ta  = document.getElementById("dz-orm-map-editor");
+  const st  = document.getElementById("dz-orm-map-status");
+  let map;
+  try { map = JSON.parse(ta.value); } catch (e) {
+    st.textContent = "Invalid JSON";
+    st.style.color = "var(--err,red)";
+    return;
+  }
+  fetch("/api/config", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ orm_field_map: map }),
+  }).then(r => r.json()).then(d => {
+    st.textContent = d.ok ? (i18n("dicomize.orm_map_saved") || "Saved") : (d.error || "Error");
+    st.style.color = d.ok ? "var(--ok,green)" : "var(--err,red)";
+    if (d.ok && window.appConfig) window.appConfig.orm_field_map = map;
+  }).catch(e => { st.textContent = String(e); st.style.color = "var(--err,red)"; });
+}
+
+// Populate ORM map editor textarea when the details is opened
+document.addEventListener("DOMContentLoaded", () => {
+  const det = document.getElementById("dz-meta-preview-details");
+  if (det) det.addEventListener("toggle", dzShowMetaPreview);
+  const ormDet = document.querySelector("#dz-src-panel-oruian details");
+  if (ormDet) ormDet.addEventListener("toggle", () => {
+    const ta = document.getElementById("dz-orm-map-editor");
+    if (ta && !ta.value) {
+      const map = (window.appConfig || {}).orm_field_map || {};
+      ta.value = JSON.stringify(map, null, 2);
+    }
+  });
+});
+
+// ── DICOM metadata preview ─────────────────────────────────────────
+
+function dzShowMetaPreview() {
+  const det = document.getElementById("dz-meta-preview-details");
+  if (!det || !det.open) return;
+  const get = id => (document.getElementById(id)?.value || "").trim();
+  const lines = [
+    ["Patient Name",      get("dz-patient-name")],
+    ["Patient ID",        get("dz-patient-id")],
+    ["Date of Birth",     get("dz-patient-dob")],
+    ["Sex",               get("dz-patient-sex")],
+    ["Study Date",        get("dz-study-date")],
+    ["Study Time",        get("dz-study-time")],
+    ["Study Description", get("dz-study-desc")],
+    ["Accession #",       get("dz-accession")],
+    ["Institution",       get("dz-institution")],
+    ["Study UID",         get("dz-study-uid")],
+  ].filter(([,v]) => v);
+  const content = document.getElementById("dz-meta-preview-content");
+  if (!content) return;
+  content.innerHTML = lines.length
+    ? lines.map(([k,v]) => `<div><span style="color:#888;min-width:160px;display:inline-block">${escapeHtml(k)}:</span> <strong>${escapeHtml(v)}</strong></div>`).join("")
+    : `<span style="color:#aaa">${i18n("dicomize.meta_preview_empty") || "(no data entered)"}</span>`;
+}
+
+// Hook form changes to auto-refresh metadata preview
+["dz-patient-name","dz-patient-id","dz-patient-dob","dz-patient-sex",
+ "dz-study-date","dz-study-time","dz-study-desc","dz-accession","dz-institution","dz-study-uid"]
+  .forEach(id => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener("input", dzShowMetaPreview);
+    });
+  });
+
+// ── XHR upload with progress bar ──────────────────────────────────
+
+function _dzUpload(url, fd, progressId, barId, { binary = false } = {}) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const progressEl = document.getElementById(progressId);
+    const barEl      = document.getElementById(barId);
+    if (progressEl) progressEl.style.display = "";
+    if (barEl)      barEl.style.width = "0%";
+    if (binary) xhr.responseType = "arraybuffer";
+    xhr.upload.addEventListener("progress", e => {
+      if (e.lengthComputable && barEl) {
+        barEl.style.width = `${Math.round(e.loaded / e.total * 100)}%`;
+      }
+    });
+    xhr.addEventListener("load", () => {
+      if (progressEl) progressEl.style.display = "none";
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(xhr);
+      } else {
+        reject(new Error(`HTTP ${xhr.status}`));
+      }
+    });
+    xhr.addEventListener("error", () => {
+      if (progressEl) progressEl.style.display = "none";
+      reject(new Error("Network error"));
+    });
+    xhr.open("POST", url);
+    xhr.send(fd);
+  });
+}
+
+// ── Duplicate study check ──────────────────────────────────────────
+
+async function dzCheckDuplicate(studyUid, ae) {
+  if (!studyUid) return true;
+  try {
+    const res  = await fetch("/api/dicomize/check-duplicate", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ study_instance_uid: studyUid, ...ae }),
+    });
+    const data = await res.json();
+    if (!data.ok || !data.exists) return true;
+    return confirm(i18n("dicomize.duplicate_warning",
+      {count: data.count, uid: studyUid}) ||
+      `Study UID already exists in PACS (${data.count} instance(s)). Send anyway?`);
+  } catch (_) { return true; }
+}
+
 // Populate AE preset dropdowns from config (with system + user optgroups)
 function dzLoadPresets() {
   const sysPresets  = appConfig.remote_aes   || [];
   const userPresets = userSettings.remote_aes || [];
-  ["pdf", "images", "video"].forEach(pfx => {
+  // AE dropdowns per subtab
+  ["pdf", "images", "video", "mixed"].forEach(pfx => {
     const sel = document.getElementById(`dz-${pfx}-ae-preset`);
     if (!sel) return;
     const prev = sel.value;
@@ -8047,6 +8700,33 @@ function dzLoadPresets() {
     }
     sel.value = prev;
   });
+  // DMWL preset dropdown in source panel
+  const dmwlSel = document.getElementById("dz-src-dmwl-preset");
+  if (dmwlSel) {
+    const prev = dmwlSel.value;
+    dmwlSel.innerHTML = `<option value=""></option>`;
+    if (sysPresets.length > 0) {
+      const grp = document.createElement("optgroup");
+      grp.label = i18n("settings.system_presets");
+      sysPresets.forEach(ae => {
+        const opt = document.createElement("option");
+        opt.value = "sys:" + ae.name; opt.textContent = ae.name;
+        grp.appendChild(opt);
+      });
+      dmwlSel.appendChild(grp);
+    }
+    if (userPresets.length > 0) {
+      const grp = document.createElement("optgroup");
+      grp.label = i18n("settings.user_presets");
+      userPresets.forEach(ae => {
+        const opt = document.createElement("option");
+        opt.value = "usr:" + ae.name; opt.textContent = ae.name;
+        grp.appendChild(opt);
+      });
+      dmwlSel.appendChild(grp);
+    }
+    dmwlSel.value = prev;
+  }
 }
 
 // Toggle AE panel visibility
@@ -8079,15 +8759,10 @@ async function doDicomizePDF(action) {
   fd.append("document_title", document.getElementById("dz-pdf-title")?.value || "");
   fd.append("file", input.files[0]);
   try {
-    const res = await fetch("/api/dicomize/pdf", { method: "POST", body: fd });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({error: res.statusText}));
-      appendLog("log-dicomize", now(), i18n("dicomize.error", {message: err.error || res.statusText}), "err");
-      return;
-    }
-    const blob = await res.blob();
-    const name = res.headers.get("Content-Disposition")?.match(/filename="?([^"]+)"?/)?.[1]
-              || "output.dcm";
+    const xhr = await _dzUpload("/api/dicomize/pdf", fd, "dz-pdf-progress", "dz-pdf-progress-bar", { binary: true });
+    const blob = new Blob([xhr.response], { type: xhr.getResponseHeader("Content-Type") || "application/octet-stream" });
+    const cd   = xhr.getResponseHeader("Content-Disposition") || "";
+    const name = cd.match(/filename="?([^"]+)"?/)?.[1] || "output.dcm";
     _dzDownload(blob, name);
     appendLog("log-dicomize", now(), i18n("dicomize.download_ok"), "ok");
   } catch (e) {
@@ -8101,17 +8776,19 @@ async function doDicomizePDFStore() {
     appendLog("log-dicomize", now(), i18n("dicomize.error", {message: "No PDF selected."}), "warn");
     return;
   }
+  const ae = _dzGetAE("pdf");
+  const studyUid = document.getElementById("dz-study-uid")?.value.trim();
+  if (!await dzCheckDuplicate(studyUid, ae)) return;
   appendLog("log-dicomize", now(), i18n("dicomize.storing"));
   const fd = _dzGetMetadata("dz-pdf-series-desc");
   fd.append("document_title", document.getElementById("dz-pdf-title")?.value || "");
   fd.append("file", input.files[0]);
-  const ae = _dzGetAE("pdf");
   fd.append("ae_title", ae.ae_title);
   fd.append("ae_host",  ae.ae_host);
   fd.append("ae_port",  ae.ae_port);
   try {
-    const res  = await fetch("/api/dicomize/pdf/store", { method: "POST", body: fd });
-    const data = await res.json();
+    const xhr  = await _dzUpload("/api/dicomize/pdf/store", fd, "dz-pdf-progress", "dz-pdf-progress-bar");
+    const data = JSON.parse(xhr.responseText);
     if (data.ok) {
       appendLog("log-dicomize", now(), i18n("dicomize.store_ok", {message: data.message}), "ok");
     } else {
@@ -8145,18 +8822,13 @@ async function doDicomizeImages(action) {
   appendLog("log-dicomize", now(), i18n("dicomize.converting"));
   const fd = _dzGetMetadata("dz-images-series-desc");
   Array.from(input.files).forEach(f => fd.append("files", f));
+  if (document.getElementById("dz-images-group-series")?.checked) fd.append("group_series", "1");
   try {
-    const res = await fetch("/api/dicomize/image", { method: "POST", body: fd });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({error: res.statusText}));
-      appendLog("log-dicomize", now(), i18n("dicomize.error", {message: err.error || res.statusText}), "err");
-      return;
-    }
-    const blob = await res.blob();
-    const ct   = res.headers.get("Content-Type") || "";
-    const name = res.headers.get("Content-Disposition")?.match(/filename="?([^"]+)"?/)?.[1]
-              || (ct.includes("zip") ? "images_dicom.zip" : "output.dcm");
-    _dzDownload(blob, name);
+    const xhr  = await _dzUpload("/api/dicomize/image", fd, "dz-images-progress", "dz-images-progress-bar", { binary: true });
+    const ct   = xhr.getResponseHeader("Content-Type") || "";
+    const cd   = xhr.getResponseHeader("Content-Disposition") || "";
+    const name = cd.match(/filename="?([^"]+)"?/)?.[1] || (ct.includes("zip") ? "images_dicom.zip" : "output.dcm");
+    _dzDownload(new Blob([xhr.response], { type: ct || "application/octet-stream" }), name);
     appendLog("log-dicomize", now(), i18n("dicomize.download_ok"), "ok");
   } catch (e) {
     appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
@@ -8169,16 +8841,19 @@ async function doDicomizeImagesStore() {
     appendLog("log-dicomize", now(), i18n("dicomize.error", {message: "No images selected."}), "warn");
     return;
   }
+  const ae = _dzGetAE("images");
+  const studyUid = document.getElementById("dz-study-uid")?.value.trim();
+  if (!await dzCheckDuplicate(studyUid, ae)) return;
   appendLog("log-dicomize", now(), i18n("dicomize.storing"));
   const fd = _dzGetMetadata("dz-images-series-desc");
   Array.from(input.files).forEach(f => fd.append("files", f));
-  const ae = _dzGetAE("images");
+  if (document.getElementById("dz-images-group-series")?.checked) fd.append("group_series", "1");
   fd.append("ae_title", ae.ae_title);
   fd.append("ae_host",  ae.ae_host);
   fd.append("ae_port",  ae.ae_port);
   try {
-    const res  = await fetch("/api/dicomize/image/store", { method: "POST", body: fd });
-    const data = await res.json();
+    const xhr  = await _dzUpload("/api/dicomize/image/store", fd, "dz-images-progress", "dz-images-progress-bar");
+    const data = JSON.parse(xhr.responseText);
     if (data.ok) {
       appendLog("log-dicomize", now(), i18n("dicomize.store_ok", {message: data.message}), "ok");
     } else {
@@ -8219,17 +8894,15 @@ async function doDicomizeVideo(action) {
   const fd = _dzGetMetadata("dz-video-series-desc");
   fd.append("file", input.files[0]);
   fd.append("video_format", fmt);
+  if (fmt === "multiframe") {
+    const fps = document.getElementById("dz-video-fps")?.value;
+    if (fps) fd.append("fps_limit", fps);
+  }
   try {
-    const res = await fetch("/api/dicomize/video", { method: "POST", body: fd });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({error: res.statusText}));
-      appendLog("log-dicomize", now(), i18n("dicomize.error", {message: err.error || res.statusText}), "err");
-      return;
-    }
-    const blob = await res.blob();
-    const name = res.headers.get("Content-Disposition")?.match(/filename="?([^"]+)"?/)?.[1]
-              || "output.dcm";
-    _dzDownload(blob, name);
+    const xhr  = await _dzUpload("/api/dicomize/video", fd, "dz-video-progress", "dz-video-progress-bar", { binary: true });
+    const cd   = xhr.getResponseHeader("Content-Disposition") || "";
+    const name = cd.match(/filename="?([^"]+)"?/)?.[1] || "output.dcm";
+    _dzDownload(new Blob([xhr.response], { type: xhr.getResponseHeader("Content-Type") || "application/octet-stream" }), name);
     appendLog("log-dicomize", now(), i18n("dicomize.download_ok"), "ok");
   } catch (e) {
     appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
@@ -8242,21 +8915,372 @@ async function doDicomizeVideoStore() {
     appendLog("log-dicomize", now(), i18n("dicomize.error", {message: "No video selected."}), "warn");
     return;
   }
+  const ae = _dzGetAE("video");
+  const studyUid = document.getElementById("dz-study-uid")?.value.trim();
+  if (!await dzCheckDuplicate(studyUid, ae)) return;
   appendLog("log-dicomize", now(), i18n("dicomize.storing"));
+  const fmt = _dzVideoFormat();
   const fd = _dzGetMetadata("dz-video-series-desc");
   fd.append("file", input.files[0]);
-  fd.append("video_format", _dzVideoFormat());
-  const ae = _dzGetAE("video");
+  fd.append("video_format", fmt);
+  if (fmt === "multiframe") {
+    const fps = document.getElementById("dz-video-fps")?.value;
+    if (fps) fd.append("fps_limit", fps);
+  }
   fd.append("ae_title", ae.ae_title);
   fd.append("ae_host",  ae.ae_host);
   fd.append("ae_port",  ae.ae_port);
   try {
-    const res  = await fetch("/api/dicomize/video/store", { method: "POST", body: fd });
-    const data = await res.json();
+    const xhr  = await _dzUpload("/api/dicomize/video/store", fd, "dz-video-progress", "dz-video-progress-bar");
+    const data = JSON.parse(xhr.responseText);
     if (data.ok) {
       appendLog("log-dicomize", now(), i18n("dicomize.store_ok", {message: data.message}), "ok");
     } else {
       appendLog("log-dicomize", now(), i18n("dicomize.error", {message: data.error || data.message}), "err");
+    }
+  } catch (e) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
+  }
+}
+
+// ── Mixed ─────────────────────────────────────────────────────────
+
+const _DZ_IMAGE_EXTS = new Set([".jpg",".jpeg",".png",".bmp",".tiff",".tif",".webp",".jfif",".jpe"]);
+const _DZ_VIDEO_EXTS = new Set([".mp4",".m4v",".mov",".avi",".mkv",".webm"]);
+const _DZ_PDF_EXTS   = new Set([".pdf"]);
+
+function _dzDetectType(filename) {
+  const ext = filename.slice(filename.lastIndexOf(".")).toLowerCase();
+  if (_DZ_IMAGE_EXTS.has(ext)) return "image";
+  if (_DZ_VIDEO_EXTS.has(ext)) return "video";
+  if (_DZ_PDF_EXTS.has(ext))   return "pdf";
+  return "unknown";
+}
+
+function _dzFmtSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes/1024).toFixed(1)} KB`;
+  return `${(bytes/1048576).toFixed(1)} MB`;
+}
+
+function dzMixedSelected(source) {
+  // When files come from the folder input, copy them to the main input so the
+  // rest of the code (doDicomizeMixed etc.) always reads from dz-mixed-input.
+  if (source === "folder") {
+    const folderInput = document.getElementById("dz-mixed-folder-input");
+    const mainInput   = document.getElementById("dz-mixed-input");
+    if (folderInput?.files.length) {
+      const dt = new DataTransfer();
+      Array.from(folderInput.files).forEach(f => dt.items.add(f));
+      mainInput.files = dt.files;
+    }
+  }
+  const files = document.getElementById("dz-mixed-input").files;
+  const listEl  = document.getElementById("dz-mixed-list");
+  const bodyEl  = document.getElementById("dz-mixed-list-body");
+  const nameEl  = document.getElementById("dz-mixed-filename");
+
+  if (!files.length) {
+    nameEl.textContent = i18n("dicomize.mixed_no_files");
+    listEl.style.display = "none";
+    return;
+  }
+  nameEl.textContent = i18n("dicomize.mixed_files_selected", {n: files.length});
+  listEl.style.display = "";
+
+  const typeBadge = {
+    image:   "<span style='background:#d4edda;color:#155724;border-radius:3px;padding:1px 5px;font-size:11px'>Image</span>",
+    video:   "<span style='background:#cce5ff;color:#004085;border-radius:3px;padding:1px 5px;font-size:11px'>Video</span>",
+    pdf:     "<span style='background:#fff3cd;color:#856404;border-radius:3px;padding:1px 5px;font-size:11px'>PDF</span>",
+    unknown: "<span style='background:#f8d7da;color:#721c24;border-radius:3px;padding:1px 5px;font-size:11px'>?</span>",
+  };
+
+  bodyEl.innerHTML = Array.from(files).map((f, idx) => {
+    const t = _dzDetectType(f.name);
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:4px 8px; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</td>
+      <td style="padding:4px 8px">${typeBadge[t]}</td>
+      <td style="padding:4px 8px; color:#888">${_dzFmtSize(f.size)}</td>
+      <td style="padding:4px 8px">
+        <button class="btn" style="padding:2px 8px;font-size:11px" onclick="dzPreviewFile(${idx})"
+                data-i18n="dicomize.preview_btn">Preview</button>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+function _dzMixedVideoFormat() {
+  const checked = document.querySelector('input[name="dz-mixed-video-format"]:checked');
+  return checked ? checked.value : "encapsulated";
+}
+
+async function doDicomizeMixed(action) {
+  const input = document.getElementById("dz-mixed-input");
+  if (!input.files.length) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: "No files selected."}), "warn");
+    return;
+  }
+  if (action === "store") {
+    _dzToggleAE("mixed", true);
+    dzLoadPresets();
+    return;
+  }
+  appendLog("log-dicomize", now(), i18n("dicomize.converting"));
+  const fmt = _dzMixedVideoFormat();
+  const fd = _dzGetMetadata("dz-mixed-series-desc");
+  Array.from(input.files).forEach(f => fd.append("files", f));
+  fd.append("video_format", fmt);
+  if (document.getElementById("dz-mixed-group-series")?.checked) fd.append("group_series", "1");
+  if (fmt === "multiframe") {
+    const fps = document.getElementById("dz-mixed-fps")?.value;
+    if (fps) fd.append("fps_limit", fps);
+  }
+  try {
+    const xhr  = await _dzUpload("/api/dicomize/mixed", fd, "dz-mixed-progress", "dz-mixed-progress-bar", { binary: true });
+    const ct   = xhr.getResponseHeader("Content-Type") || "";
+    const cd   = xhr.getResponseHeader("Content-Disposition") || "";
+    const name = cd.match(/filename="?([^"]+)"?/)?.[1] || (ct.includes("zip") ? "mixed_dicom.zip" : "output.dcm");
+    _dzDownload(new Blob([xhr.response], { type: ct || "application/octet-stream" }), name);
+    appendLog("log-dicomize", now(), i18n("dicomize.download_ok"), "ok");
+  } catch (e) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
+  }
+}
+
+async function doDicomizeMixedStore() {
+  const input = document.getElementById("dz-mixed-input");
+  if (!input.files.length) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: "No files selected."}), "warn");
+    return;
+  }
+  const ae = _dzGetAE("mixed");
+  const studyUid = document.getElementById("dz-study-uid")?.value.trim();
+  if (!await dzCheckDuplicate(studyUid, ae)) return;
+  appendLog("log-dicomize", now(), i18n("dicomize.storing"));
+  const fmt = _dzMixedVideoFormat();
+  const fd = _dzGetMetadata("dz-mixed-series-desc");
+  Array.from(input.files).forEach(f => fd.append("files", f));
+  fd.append("video_format", fmt);
+  if (document.getElementById("dz-mixed-group-series")?.checked) fd.append("group_series", "1");
+  if (fmt === "multiframe") {
+    const fps = document.getElementById("dz-mixed-fps")?.value;
+    if (fps) fd.append("fps_limit", fps);
+  }
+  fd.append("ae_title", ae.ae_title);
+  fd.append("ae_host",  ae.ae_host);
+  fd.append("ae_port",  ae.ae_port);
+  try {
+    const xhr  = await _dzUpload("/api/dicomize/mixed/store", fd, "dz-mixed-progress", "dz-mixed-progress-bar");
+    const data = JSON.parse(xhr.responseText);
+    if (data.ok) {
+      appendLog("log-dicomize", now(), i18n("dicomize.store_ok", {message: data.message}), "ok");
+    } else {
+      appendLog("log-dicomize", now(), i18n("dicomize.error", {message: data.error || data.message}), "err");
+    }
+  } catch (e) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
+  }
+}
+
+// ── Source-file preview modal ─────────────────────────────────────
+
+let _dzPreviewUrl = null;
+
+function dzPreviewFile(idx) {
+  const input = document.getElementById("dz-mixed-input");
+  const file  = input?.files[idx];
+  if (!file) return;
+
+  if (_dzPreviewUrl) { URL.revokeObjectURL(_dzPreviewUrl); _dzPreviewUrl = null; }
+  _dzPreviewUrl = URL.createObjectURL(file);
+
+  const content = document.getElementById("dz-preview-content");
+  const t = _dzDetectType(file.name);
+
+  if (t === "image") {
+    content.innerHTML = `<img src="${_dzPreviewUrl}" style="max-width:100%;max-height:73vh;object-fit:contain;border-radius:4px" alt="${escapeHtml(file.name)}">`;
+  } else if (t === "video") {
+    content.innerHTML = `<video src="${_dzPreviewUrl}" controls style="max-width:100%;max-height:73vh;border-radius:4px"></video>`;
+  } else if (t === "pdf") {
+    content.innerHTML = `<iframe src="${_dzPreviewUrl}" style="width:100%;height:73vh;border:none;border-radius:4px" title="${escapeHtml(file.name)}"></iframe>`;
+  } else {
+    content.innerHTML = `<p style="color:#888">${escapeHtml(i18n("dicomize.preview_unsupported"))}</p>`;
+  }
+
+  document.getElementById("dz-preview-title").textContent = file.name;
+  document.getElementById("dz-preview-modal").classList.add("open");
+}
+
+function closeDzPreview() {
+  document.getElementById("dz-preview-modal").classList.remove("open");
+  document.getElementById("dz-preview-content").innerHTML = "";
+  if (_dzPreviewUrl) { URL.revokeObjectURL(_dzPreviewUrl); _dzPreviewUrl = null; }
+}
+
+// ── ORU IAN → ORM workflow ─────────────────────────────────────────
+
+let _dzOruIanOrm = null;   // Last ORM message received via HL7 listener
+
+
+async function _dzOruIanPopulateTemplates() {
+  const sel = document.getElementById("dz-oruian-template");
+  try {
+    const res = await fetch("/api/hl7/templates");
+    const list = await res.json();
+    const prev = sel.value;
+    sel.innerHTML = `<option value="">${escapeHtml(i18n("dicomize.oruian_template_placeholder"))}</option>`;
+    list.forEach(t => {
+      const opt = document.createElement("option");
+      opt.value = t.filename;
+      opt.textContent = t.name;
+      sel.appendChild(opt);
+    });
+    sel.value = prev;
+  } catch (e) { /* non-critical */ }
+}
+
+async function dzOruIanLoadTemplate() {
+  const filename = document.getElementById("dz-oruian-template").value;
+  if (!filename) return;
+  try {
+    const res  = await fetch(`/api/hl7/templates/${encodeURIComponent(filename)}`);
+    const tmpl = await res.json();
+    document.getElementById("dz-oruian-msg").value = (tmpl.body || "").replace(/\r/g, "\n");
+    document.getElementById("dz-oruian-preview").style.display = "none";
+  } catch (e) { /* non-critical */ }
+}
+
+function dzOruIanInsert(placeholder) {
+  const ta = document.getElementById("dz-oruian-msg");
+  const s  = ta.selectionStart, e = ta.selectionEnd;
+  ta.value = ta.value.slice(0, s) + placeholder + ta.value.slice(e);
+  ta.selectionStart = ta.selectionEnd = s + placeholder.length;
+  ta.focus();
+}
+
+function _dzOruIanFill(body) {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  const dt  = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const msgId = "MSG" + dt + Math.random().toString(36).slice(2,6).toUpperCase();
+  const get = id => (document.getElementById(id)?.value || "").trim();
+  return body
+    .replace(/\{\{patient_name\}\}/g,      get("dz-patient-name"))
+    .replace(/\{\{patient_id\}\}/g,        get("dz-patient-id"))
+    .replace(/\{\{patient_dob\}\}/g,       dateToDisom(get("dz-patient-dob")))
+    .replace(/\{\{patient_sex\}\}/g,       get("dz-patient-sex"))
+    .replace(/\{\{accession_number\}\}/g,  get("dz-accession"))
+    .replace(/\{\{study_uid\}\}/g,         get("dz-study-uid"))
+    .replace(/\{\{study_date\}\}/g,        dateToDisom(get("dz-study-date")) || dt.slice(0,8))
+    .replace(/\{\{study_time\}\}/g,        timeToDisom(get("dz-study-time")) || dt.slice(8,14))
+    .replace(/\{\{study_description\}\}/g, get("dz-study-desc"))
+    .replace(/\{\{institution_name\}\}/g,  get("dz-institution"))
+    .replace(/\{\{datetime\}\}/g,          dt)
+    .replace(/\{\{date\}\}/g,              dt.slice(0,8))
+    .replace(/\{\{time\}\}/g,              dt.slice(8,14))
+    .replace(/\{\{msg_id\}\}/g,            msgId);
+}
+
+function dzOruIanPreview() {
+  const body   = document.getElementById("dz-oruian-msg").value;
+  const filled = _dzOruIanFill(body);
+  const pre    = document.getElementById("dz-oruian-preview");
+  pre.textContent = filled.replace(/\r/g, "\n");
+  pre.style.display = "";
+}
+
+async function dzOruIanSend() {
+  const body = document.getElementById("dz-oruian-msg").value.trim();
+  if (!body) {
+    appendLog("log-dicomize", now(), i18n("dicomize.oruian_no_msg"), "warn");
+    return;
+  }
+  const host = document.getElementById("dz-oruian-host").value.trim();
+  const port = document.getElementById("dz-oruian-port").value.trim();
+  if (!host || !port) {
+    appendLog("log-dicomize", now(), i18n("dicomize.oruian_no_host"), "warn");
+    return;
+  }
+  const filled  = _dzOruIanFill(body);
+  const statusEl = document.getElementById("dz-oruian-status");
+  statusEl.textContent = i18n("dicomize.oruian_sending");
+  statusEl.style.color = "#888";
+  appendLog("log-dicomize", now(), i18n("dicomize.oruian_sending"));
+
+  try {
+    const res  = await fetch("/api/hl7/send", {
+      method:  "POST",
+      headers: {"Content-Type": "application/json"},
+      body:    JSON.stringify({ host, port: parseInt(port, 10), message: filled }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      statusEl.textContent = i18n("dicomize.oruian_ack_ok");
+      statusEl.style.color = "var(--ok, green)";
+      appendLog("log-dicomize", now(), i18n("dicomize.oruian_ack_ok"), "ok");
+    } else {
+      statusEl.textContent = `${i18n("dicomize.oruian_ack_fail")}: ${data.response}`;
+      statusEl.style.color = "var(--err, red)";
+      appendLog("log-dicomize", now(), `${i18n("dicomize.oruian_ack_fail")}: ${data.response}`, "err");
+    }
+  } catch (e) {
+    statusEl.textContent = String(e);
+    statusEl.style.color = "var(--err, red)";
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
+  }
+}
+
+async function dzOruIanFillFromOrm() {
+  if (!_dzOruIanOrm) return;
+  try {
+    const res  = await fetch("/api/dicomize/parse-orm", {
+      method:  "POST",
+      headers: {"Content-Type": "application/json"},
+      body:    JSON.stringify({ message: _dzOruIanOrm }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      appendLog("log-dicomize", now(), i18n("dicomize.error", {message: data.error}), "err");
+      return;
+    }
+    const f = data.fields || {};
+    if (f.patient_name)      document.getElementById("dz-patient-name").value = f.patient_name;
+    if (f.patient_id)        document.getElementById("dz-patient-id").value   = f.patient_id;
+    if (f.patient_dob)       document.getElementById("dz-patient-dob").value  = f.patient_dob;
+    if (f.patient_sex)       document.getElementById("dz-patient-sex").value  = f.patient_sex;
+    if (f.accession_number)  document.getElementById("dz-accession").value    = f.accession_number;
+    if (f.study_description) document.getElementById("dz-study-desc").value   = f.study_description;
+    if (f.study_date)        document.getElementById("dz-study-date").value   = f.study_date;
+    if (f.study_time)        document.getElementById("dz-study-time").value   = f.study_time;
+    // Expand patient section if collapsed
+    const body  = document.getElementById("dicomize-patient-body");
+    const arrow = document.getElementById("dicomize-patient-arrow");
+    if (body.style.display === "none") { body.style.display = ""; if (arrow) arrow.textContent = "▼"; }
+    appendLog("log-dicomize", now(),
+      i18n("dicomize.oruian_orm_filled", {name: f.patient_name || "?", acc: f.accession_number || "?"}), "ok");
+  } catch (e) {
+    appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");
+  }
+}
+
+async function dzOruIanSaveTemplate() {
+  const body = document.getElementById("dz-oruian-msg").value.trim();
+  if (!body) return;
+  const name = prompt(i18n("dicomize.oruian_save_name_prompt") || "Template name:");
+  if (!name) return;
+  const desc = prompt(i18n("dicomize.oruian_save_desc_prompt") || "Description (optional):") || "";
+  try {
+    const res  = await fetch("/api/hl7/templates/save", {
+      method:  "POST",
+      headers: {"Content-Type": "application/json"},
+      body:    JSON.stringify({ name, description: desc, body }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      appendLog("log-dicomize", now(), i18n("dicomize.oruian_saved", {name}), "ok");
+      _dzOruIanPopulateTemplates();
+    } else {
+      appendLog("log-dicomize", now(), i18n("dicomize.error", {message: data.error}), "err");
     }
   } catch (e) {
     appendLog("log-dicomize", now(), i18n("dicomize.error", {message: String(e)}), "err");

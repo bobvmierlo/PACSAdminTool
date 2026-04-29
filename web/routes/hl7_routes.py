@@ -1,6 +1,7 @@
 """HL7 routes: send, templates, listener start/stop/status."""
 
 import logging
+import os
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
@@ -35,6 +36,47 @@ def hl7_template_get(filename):
         if tmpl["filename"] == filename:
             return jsonify(tmpl)
     return jsonify({"error": f"Template '{filename}' not found"}), 404
+
+
+@bp.route("/api/hl7/templates/save", methods=["POST"])
+def hl7_template_save():
+    """Save a new HL7 template file to the templates directory."""
+    import re
+    from hl7_templates import TEMPLATES_DIR
+    d = request.get_json(silent=True) or {}
+    name = (d.get("name") or "").strip()
+    body = (d.get("body") or "").strip()
+    desc = (d.get("description") or "").strip()
+    if not name:
+        return jsonify({"ok": False, "error": "Template name is required"}), 400
+    if not body:
+        return jsonify({"ok": False, "error": "Template body is required"}), 400
+
+    # Derive a safe filename from the name
+    safe = re.sub(r"[^\w\- ]", "", name).strip().replace(" ", "_")
+    if not safe:
+        safe = "Custom_Template"
+    filename = f"{safe}.hl7"
+    filepath = os.path.join(TEMPLATES_DIR, filename)
+
+    # Build file content: metadata comments + body
+    lines = [f"# name: {name}"]
+    if desc:
+        lines.append(f"# description: {desc}")
+    lines.append("")
+    # Normalise line endings to \n for storage
+    lines.extend(body.replace("\r\n", "\n").replace("\r", "\n").split("\n"))
+    content = "\n".join(lines)
+
+    try:
+        with open(filepath, "w", encoding="utf-8") as fh:
+            fh.write(content)
+    except OSError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+    _audit("hl7.template.save", ip=_req_ip(), user=_req_user(),
+           detail={"filename": filename})
+    return jsonify({"ok": True, "filename": filename})
 
 
 @bp.route("/api/hl7/send", methods=["POST"])
