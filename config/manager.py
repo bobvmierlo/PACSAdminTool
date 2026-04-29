@@ -31,6 +31,19 @@ DEFAULT_CONFIG = {
         "default_host": "127.0.0.1",
         "default_port": 2575
     },
+    "hl7_servers": [],
+    "orm_field_map": {
+        "patient_name":      "PID.5",
+        "patient_id":        "PID.3",
+        "patient_dob":       "PID.7",
+        "patient_sex":       "PID.8",
+        "accession_number":  "OBR.3",
+        "study_description": "OBR.4",
+        "study_datetime":    "OBR.7"
+    },
+    "dicomize": {
+        "default_fps": 10
+    },
     "query_defaults": {
         "query_level": "STUDY",
         "date_range": ""
