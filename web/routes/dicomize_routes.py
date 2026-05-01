@@ -541,12 +541,25 @@ def dicomize_parse_orm():
     field_map = ctx.config.get("orm_field_map", {})
 
     def _seg_field(spec: str) -> str:
-        """Extract a value from segments using 'SEG.N' notation."""
+        """Extract a value from segments using 'SEG.field[.component]' notation.
+        Field index is 1-based (HL7 convention); component index is also 1-based.
+        Examples: 'PID.5' → entire field 5 of PID
+                  'PID.5.1' → component 1 (family name) of PID field 5
+                  'OBR.4.2' → component 2 (text) of OBR field 4
+        """
         try:
-            seg_name, idx = spec.split(".")
-            idx = int(idx)
-            seg = segments.get(seg_name, [])
-            return seg[idx] if len(seg) > idx else ""
+            parts    = spec.split(".")
+            seg_name = parts[0]
+            field_no = int(parts[1])          # 1-based field index
+            seg      = segments.get(seg_name, [])
+            # For MSH, field 1 is the field separator character which occupies
+            # position 1 in the split list; other segments: field N is at index N.
+            field_val = seg[field_no] if len(seg) > field_no else ""
+            if len(parts) >= 3:
+                comp_no = int(parts[2])       # 1-based component index
+                comps   = field_val.split("^")
+                field_val = comps[comp_no - 1] if len(comps) >= comp_no else ""
+            return field_val
         except Exception:
             return ""
 
@@ -576,17 +589,33 @@ def dicomize_parse_orm():
         result["patient_sex"] = raw[0].upper()
 
     # --- accession_number ---
-    raw = _seg_field(field_map.get("accession_number", "OBR.3"))
+    # Default: OBR.2 = Placer Order Number (as assigned by the ordering system)
+    raw = _seg_field(field_map.get("accession_number", "OBR.2"))
     if not raw:
-        raw = _seg_field("ORC.3")   # fallback
+        raw = _seg_field("OBR.3")   # fallback: Filler Order Number
+    if not raw:
+        raw = _seg_field("ORC.2")   # fallback: ORC Placer Order Number
     if raw:
         result["accession_number"] = raw.split("^")[0]
 
     # --- study_description ---
-    raw = _seg_field(field_map.get("study_description", "OBR.4"))
+    # OBR.4 = Universal Service Identifier: code^text^coding_system
+    # Component 2 (OBR.4.2) is the human-readable text; component 3 is the
+    # coding system name.  Previous default accidentally used pts[-1] which
+    # returned the coding system, not the description.
+    raw = _seg_field(field_map.get("study_description", "OBR.4.2"))
+    if not raw:
+        # Fallback: try the whole OBR.4 field and take the first component
+        raw2 = _seg_field("OBR.4")
+        raw  = raw2.split("^")[0] if raw2 else ""
     if raw:
-        pts = raw.split("^")
-        result["study_description"] = pts[-1] if len(pts) > 1 else pts[0]
+        result["study_description"] = raw
+
+    # --- institution ---
+    # MSH.3 = Sending Application (typically the department / modality name)
+    raw = _seg_field(field_map.get("institution", "MSH.3"))
+    if raw:
+        result["institution"] = raw.split("^")[0]
 
     # --- study date/time from a combined datetime field ---
     raw = _seg_field(field_map.get("study_datetime", "OBR.7"))
