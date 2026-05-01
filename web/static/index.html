@@ -1845,6 +1845,80 @@
 
   <!-- ── DICOM Anonymizer ──────────────────────────────────────────── -->
   <div id="tab-anonymizer" class="tab-panel">
+
+    <!-- ── Retrieve from PACS (collapsible) ──────────────────────── -->
+    <details id="anon-retrieve-panel" style="margin-bottom:12px">
+      <summary style="cursor:pointer; font-weight:600; font-size:14px; padding:10px 14px;
+                      background:var(--bg-alt,#f8f8f8); border:1px solid var(--border);
+                      border-radius:6px; user-select:none; list-style:none; display:flex; align-items:center; gap:6px">
+        <span style="font-size:11px; color:#888">▶</span>
+        <span data-i18n="anonymizer.retrieve_title">Retrieve study from PACS…</span>
+      </summary>
+      <div style="border:1px solid var(--border); border-top:none; border-radius:0 0 6px 6px;
+                  padding:12px 14px; background:var(--bg,#fff)">
+        <!-- AE selector row -->
+        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; margin-bottom:10px">
+          <div class="field" style="min-width:160px">
+            <label style="font-size:11px; color:#888" data-i18n="cfind.ae_preset">AE Preset</label>
+            <select id="anon-cfind-ae-select" style="font-size:12px" onchange="anonCFindAEChanged()">
+              <option value="">Select preset…</option>
+            </select>
+          </div>
+          <div class="field" style="min-width:100px">
+            <label style="font-size:11px; color:#888" data-i18n="cfind.ae_title">AE Title</label>
+            <input id="anon-cfind-aet" style="font-size:12px">
+          </div>
+          <div class="field" style="min-width:130px">
+            <label style="font-size:11px; color:#888" data-i18n="cfind.host">Host</label>
+            <input id="anon-cfind-host" style="font-size:12px">
+          </div>
+          <div class="field" style="min-width:80px">
+            <label style="font-size:11px; color:#888" data-i18n="cfind.port">Port</label>
+            <input id="anon-cfind-port" type="number" min="1" max="65535" style="font-size:12px">
+          </div>
+        </div>
+        <!-- Filter row -->
+        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; margin-bottom:10px">
+          <div class="field" style="min-width:160px">
+            <label style="font-size:11px; color:#888" data-i18n="cfind.patient_name">Patient Name</label>
+            <input id="anon-cfind-name" placeholder="* (wildcard)" style="font-size:12px">
+          </div>
+          <div class="field" style="min-width:120px">
+            <label style="font-size:11px; color:#888" data-i18n="cfind.patient_id">Patient ID</label>
+            <input id="anon-cfind-pid" style="font-size:12px">
+          </div>
+          <div class="field" style="min-width:130px">
+            <label style="font-size:11px; color:#888" data-i18n="cfind.study_date">Study Date</label>
+            <input id="anon-cfind-date" type="date" style="font-size:12px">
+          </div>
+          <button class="btn primary" style="align-self:flex-end" onclick="anonCFindSearch()">Search</button>
+        </div>
+        <!-- Results -->
+        <div id="anon-cfind-status" style="font-size:12px; color:#888; margin-bottom:6px"></div>
+        <div id="anon-cfind-results" style="display:none; max-height:200px; overflow-y:auto;
+             border:1px solid var(--border); border-radius:4px; font-size:12px">
+          <table style="width:100%; border-collapse:collapse">
+            <thead style="background:var(--bg-alt,#f8f8f8); position:sticky; top:0">
+              <tr>
+                <th style="padding:4px 8px; text-align:left; font-weight:600; font-size:11px" data-i18n="cfind.patient_name">Patient Name</th>
+                <th style="padding:4px 8px; text-align:left; font-weight:600; font-size:11px" data-i18n="cfind.patient_id">Patient ID</th>
+                <th style="padding:4px 8px; text-align:left; font-weight:600; font-size:11px" data-i18n="cfind.study_date">Study Date</th>
+                <th style="padding:4px 8px; text-align:left; font-weight:600; font-size:11px" data-i18n="cfind.modality">Modality</th>
+                <th style="padding:4px 8px; text-align:left; font-weight:600; font-size:11px" data-i18n="cfind.description">Description</th>
+              </tr>
+            </thead>
+            <tbody id="anon-cfind-tbody"></tbody>
+          </table>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap">
+          <button class="btn success" onclick="anonCFindRetrieve()" id="anon-cfind-retrieve-btn" disabled>
+            Retrieve &amp; Load into Anonymizer
+          </button>
+          <span id="anon-cfind-retrieve-status" style="font-size:12px; color:#888"></span>
+        </div>
+      </div>
+    </details>
+
     <div class="card">
       <h3 data-i18n="anonymizer.title">DICOM Anonymizer</h3>
       <div class="btn-row">
@@ -2904,6 +2978,14 @@
                      data-i18n="dicomize.orm_map_title">ORM field mapping (advanced)</summary>
             <p style="font-size:11px; color:#aaa; margin:6px 0"
                data-i18n="dicomize.orm_map_desc">Map HL7 segment fields (e.g. OBR.3) to DICOM metadata. Changes are saved to configuration.</p>
+            <p style="font-size:11px; color:#888; margin:4px 0 8px">
+              When an ORM/ORU message is received, PACSAdminTool extracts patient and study data
+              from the HL7 segments listed here. Each key is a DICOM field name and each value
+              is an HL7 segment reference in <code style="font-size:10px">SEGMENT.field[.component]</code>
+              notation (e.g. <code style="font-size:10px">"PatientName": "PID.5.1"</code>).
+              Unmapped fields fall back to built-in defaults. Expand the JSON editor below,
+              adjust the mapping to match your HL7 sender, then click <strong>Save mapping</strong>.
+            </p>
             <textarea id="dz-orm-map-editor"
                       style="width:100%; height:130px; font-family:Consolas,monospace; font-size:11px;
                              resize:vertical; padding:6px; box-sizing:border-box;
@@ -3353,7 +3435,6 @@
       </div>
 
     </div>
-  </div>
 
     <div class="card"><h3 data-i18n="common.log">Log</h3><div class="log-box" id="log-dicomize"></div></div>
   </div>
@@ -4973,13 +5054,21 @@ async function doRetrieve() {
     const dest = document.getElementById("cfind-movedest").value.trim();
     appendLog("log-cfind", now(),
               `C-MOVE → dest=${dest}  studies=${uids.length}`);
-    for (const uid of uids) {
+    const movePromises = uids.map(uid =>
       fetch("/api/dicom/move", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...ae, study_uid: uid, move_dest: dest, query_model: model }),
-      });
-    }
+      }).then(r => r.json())
+    );
+    Promise.all(movePromises).then(results => {
+      const allOk = results.every(r => r.ok);
+      if (allOk) {
+        appendLog("log-cfind", now(), "C-MOVE started — switching to DICOM Receiver", "ok");
+        showTab("scp");
+        setTimeout(loadSCPStudies, 1500);
+      }
+    }).catch(() => {});
   } else {
     const saveDir = document.getElementById("cfind-getdir").value.trim();
     appendLog("log-cfind", now(),
@@ -6308,10 +6397,11 @@ async function scpFileEdit(path) {
       const div = document.createElement("div");
       div.className = "field";
       div.innerHTML = `<label style="color:#888;font-size:11px">${label}</label>
-                       <span style="font-size:13px">${escapeHtml(String(val))}</span>`;
+                       <span style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${escapeHtml(String(val))}</span>`;
       grid.appendChild(div);
     });
-    document.getElementById("inspector-filename").textContent = filename;
+    const fnEl = document.getElementById("inspector-filename");
+    if (fnEl) fnEl.textContent = filename;
     document.getElementById("inspector-meta-card").style.display = "";
     document.getElementById("tag-editor-card").style.display    = "none";
 
@@ -6336,6 +6426,29 @@ async function scpSeriesEdit(studyUid, seriesUid) {
     const path = url.searchParams.get("path");
     if (!path) { toast("Could not determine file path.", "err"); return; }
     await scpFileEdit(path);
+  } catch (e) {
+    toast("Error: " + e, "err");
+  }
+}
+
+async function scpSeriesAnonymize(studyUid, seriesUid) {
+  toast("Loading series files…", "info");
+  try {
+    const res  = await fetch(`/api/scp/series/list?study=${encodeURIComponent(studyUid)}&series=${encodeURIComponent(seriesUid)}`);
+    const data = await res.json();
+    if (!data.ok || !data.urls?.length) { toast(i18n("scp.edit_no_files"), "warn"); return; }
+    const files = await Promise.all(data.urls.map(async urlStr => {
+      const url  = new URL(urlStr, location.href);
+      const path = url.searchParams.get("path") || urlStr;
+      const r    = await fetch(`/api/scp/files/raw?path=${encodeURIComponent(path)}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const blob = await r.blob();
+      return new File([blob], path.split("/").pop() || "file.dcm", { type: "application/dicom" });
+    }));
+    _anonFiles = files;
+    renderAnonList();
+    showTab("anonymizer");
+    toast(`${files.length} file(s) loaded into Anonymizer`, "ok");
   } catch (e) {
     toast("Error: " + e, "err");
   }
@@ -6612,6 +6725,12 @@ async function loadSCPStudies() {
       editSer.textContent = "Edit Tags…";
       editSer.onclick = () => scpSeriesEdit(study.uid, ser.uid);
 
+      const anonSer = document.createElement("button");
+      anonSer.className = "btn";
+      anonSer.style.cssText = "font-size:11px; padding:2px 8px; flex-shrink:0";
+      anonSer.textContent = "Anonymize…";
+      anonSer.onclick = () => scpSeriesAnonymize(study.uid, ser.uid);
+
       const delSer = document.createElement("button");
       delSer.className = "btn";
       delSer.style.cssText = "font-size:11px; padding:2px 8px; color:#dc2626; border-color:#fca5a5; flex-shrink:0";
@@ -6622,6 +6741,7 @@ async function loadSCPStudies() {
       row.appendChild(sdesc);
       row.appendChild(viewBtn);
       row.appendChild(editSer);
+      row.appendChild(anonSer);
       row.appendChild(delSer);
       body.appendChild(row);
     });
@@ -7783,6 +7903,7 @@ async function doLogout() {
 
   // Populate AE dropdowns that depend on config
   _populateAnonAEDropdown();
+  _populateAnonCFindDropdown();
 
   // Load custom anonymisation profiles
   await _loadAnonProfilesFromServer();
@@ -8505,26 +8626,30 @@ async function dzSrcDmwlQuery() {
   statusEl.textContent = i18n("dicomize.wl_querying") || "Querying…";
   resultsEl.style.display = "none";
   try {
-    const params = new URLSearchParams({
-      ae_title: aet, host, port,
-      patient_name: document.getElementById("dz-src-dmwl-name").value || "*",
-      patient_id:   document.getElementById("dz-src-dmwl-id").value   || "",
-      scheduled_date: document.getElementById("dz-src-dmwl-date").value || "",
+    const res  = await fetch("/api/dicom/dmwl", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        host, port: parseInt(port, 10), ae_title: aet,
+        patient_name: document.getElementById("dz-src-dmwl-name").value.trim() || "*",
+        patient_id:   document.getElementById("dz-src-dmwl-id").value.trim()   || "",
+        accession: "", modality: "", study_date: "", station_aet: "",
+        scheduled_date: document.getElementById("dz-src-dmwl-date").value || "",
+      }),
     });
-    const res  = await fetch(`/api/dicom/dmwl?${params}`);
     const data = await res.json();
-    if (!data.ok) { statusEl.textContent = data.error || "Error"; return; }
+    if (!data.ok) { statusEl.textContent = data.message || data.error || "Error"; return; }
     const rows = data.results || [];
-    statusEl.textContent = `${rows.length} result(s)`;
+    statusEl.textContent = i18n("dicomize.wl_found", {n: rows.length}) || `${rows.length} result(s)`;
     if (!rows.length) return;
     bodyEl.innerHTML = rows.map((r, idx) => `<tr style="border-bottom:1px solid var(--border); cursor:pointer"
       onclick="_dzSrcDmwlFill(${idx})"
-      title="${i18n("dicomize.wl_click_fill") || "Click to fill fields"}">
-      <td style="padding:4px 8px">${escapeHtml(r.patient_name || "")}</td>
-      <td style="padding:4px 8px">${escapeHtml(r.patient_id   || "")}</td>
-      <td style="padding:4px 8px">${escapeHtml(r.accession_number || "")}</td>
-      <td style="padding:4px 8px">${escapeHtml(r.scheduled_datetime || "")}</td>
-      <td style="padding:4px 8px">${escapeHtml(r.procedure_description || "")}</td>
+      title="${escapeHtml(i18n("dicomize.wl_click_fill") || "Click to fill fields")}">
+      <td style="padding:4px 8px">${escapeHtml(r.PatientName || "")}</td>
+      <td style="padding:4px 8px">${escapeHtml(r.PatientID   || "")}</td>
+      <td style="padding:4px 8px">${escapeHtml(r.Accession   || "")}</td>
+      <td style="padding:4px 8px">${escapeHtml(r.ScheduledDate || "")}</td>
+      <td style="padding:4px 8px">${escapeHtml(r.Procedure   || "")}</td>
     </tr>`).join("");
     resultsEl.style.display = "";
     window._dzSrcDmwlRows = rows;
@@ -8536,15 +8661,16 @@ async function dzSrcDmwlQuery() {
 function _dzSrcDmwlFill(idx) {
   const r = (window._dzSrcDmwlRows || [])[idx];
   if (!r) return;
-  const set = (id, v) => { if (v) document.getElementById(id).value = v; };
-  set("dz-patient-name", r.patient_name);
-  set("dz-patient-id",   r.patient_id);
-  set("dz-patient-dob",  r.patient_dob);
-  set("dz-patient-sex",  r.patient_sex);
-  set("dz-accession",    r.accession_number);
-  set("dz-study-desc",   r.procedure_description);
-  set("dz-study-date",   r.scheduled_date || (r.scheduled_datetime || "").slice(0,10).replace(/\//g,"-"));
-  appendLog("log-dicomize", now(), i18n("dicomize.wl_filled", {name: r.patient_name || "?"}), "ok");
+  const set = (id, v) => { if (v !== undefined && v !== null) document.getElementById(id).value = v; };
+  set("dz-patient-name", r.PatientName);
+  set("dz-patient-id",   r.PatientID);
+  set("dz-patient-dob",  dicomDateToInput(r.PatientBirthDate || ""));
+  set("dz-patient-sex",  r.PatientSex);
+  set("dz-accession",    r.Accession);
+  set("dz-study-desc",   r.Procedure);
+  set("dz-study-date",   dicomDateToInput(r.ScheduledDate || ""));
+  if (r.StudyInstanceUID) document.getElementById("dz-study-uid").value = r.StudyInstanceUID;
+  appendLog("log-dicomize", now(), i18n("dicomize.wl_filled", {name: r.PatientName || "?"}), "ok");
 }
 
 // ── ORM field-map editor ───────────────────────────────────────────
@@ -10137,6 +10263,169 @@ function renderAnonList() {
   const cnt = document.getElementById("anon-count");
   cnt.textContent = `${_anonFiles.length} file(s) selected`;
   box.innerHTML = _anonFiles.map(f => f.name).join("<br>");
+}
+
+// ── Anonymizer: Retrieve from PACS helpers ───────────────────────
+
+let _anonCFindResults = [];
+let _anonCFindSelectedIdx = -1;
+
+function _populateAnonCFindDropdown() {
+  const sel = document.getElementById("anon-cfind-ae-select");
+  if (!sel) return;
+  const aes = appConfig.remote_aes || [];
+  sel.innerHTML = '<option value="">Select preset…</option>';
+  aes.forEach((ae, i) => {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = `${ae.name || ae.ae_title} (${ae.ae_title}@${ae.host}:${ae.port})`;
+    sel.appendChild(opt);
+  });
+}
+
+function anonCFindAEChanged() {
+  const sel = document.getElementById("anon-cfind-ae-select");
+  const idx = parseInt(sel.value);
+  if (isNaN(idx)) return;
+  const ae = (appConfig.remote_aes || [])[idx];
+  if (!ae) return;
+  document.getElementById("anon-cfind-aet").value  = ae.ae_title || "";
+  document.getElementById("anon-cfind-host").value = ae.host     || "";
+  document.getElementById("anon-cfind-port").value = ae.port     || "";
+}
+
+async function anonCFindSearch() {
+  const aet    = document.getElementById("anon-cfind-aet").value.trim();
+  const host   = document.getElementById("anon-cfind-host").value.trim();
+  const port   = document.getElementById("anon-cfind-port").value.trim();
+  const name   = document.getElementById("anon-cfind-name").value.trim() || "*";
+  const pid    = document.getElementById("anon-cfind-pid").value.trim();
+  const date   = dateToDisom(document.getElementById("anon-cfind-date").value.trim());
+  const status = document.getElementById("anon-cfind-status");
+  const tbody  = document.getElementById("anon-cfind-tbody");
+  const resDiv = document.getElementById("anon-cfind-results");
+  const btn    = document.getElementById("anon-cfind-retrieve-btn");
+
+  if (!host || !port || !aet) { status.textContent = "Enter AE Title, Host and Port first."; return; }
+  status.textContent = "Searching…";
+  resDiv.style.display = "none";
+  btn.disabled = true;
+  _anonCFindResults = [];
+  _anonCFindSelectedIdx = -1;
+
+  try {
+    const res  = await fetch("/api/dicom/find", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ ae_title: aet, host, port: parseInt(port, 10),
+        patient_name: name, patient_id: pid, study_date: date,
+        query_level: "STUDY", query_model: "S" }),
+    });
+    const data = await res.json();
+    if (!data.ok) { status.textContent = `Error: ${data.error || data.message || "Unknown error"}`; return; }
+    _anonCFindResults = data.results || [];
+    status.textContent = `${_anonCFindResults.length} study/studies found. Click a row to select.`;
+    if (!_anonCFindResults.length) { resDiv.style.display = "none"; return; }
+    tbody.innerHTML = _anonCFindResults.map((r, i) => `
+      <tr data-idx="${i}" style="cursor:pointer; border-top:1px solid var(--border)"
+          onclick="anonCFindSelect(${i})">
+        <td style="padding:4px 8px">${escapeHtml(r.PatientName || "")}</td>
+        <td style="padding:4px 8px">${escapeHtml(r.PatientID   || "")}</td>
+        <td style="padding:4px 8px">${escapeHtml(r.StudyDate   || "")}</td>
+        <td style="padding:4px 8px">${escapeHtml(r.Modality    || "")}</td>
+        <td style="padding:4px 8px">${escapeHtml(r.Description || "")}</td>
+      </tr>`).join("");
+    resDiv.style.display = "";
+  } catch (e) {
+    status.textContent = `Error: ${e}`;
+  }
+}
+
+function anonCFindSelect(idx) {
+  _anonCFindSelectedIdx = idx;
+  document.querySelectorAll("#anon-cfind-tbody tr").forEach((tr, i) => {
+    tr.style.background = i === idx ? "var(--primary-light,#dbeafe)" : "";
+    tr.style.fontWeight  = i === idx ? "600" : "";
+  });
+  document.getElementById("anon-cfind-retrieve-btn").disabled = false;
+  const r = _anonCFindResults[idx];
+  document.getElementById("anon-cfind-status").textContent =
+    `Selected: ${r.PatientName || "?"} — ${r.Description || r.StudyDate || ""}`;
+}
+
+async function anonCFindRetrieve() {
+  const r = _anonCFindResults[_anonCFindSelectedIdx];
+  if (!r) { toast("Select a study first.", "warn"); return; }
+
+  const aet    = document.getElementById("anon-cfind-aet").value.trim();
+  const host   = document.getElementById("anon-cfind-host").value.trim();
+  const port   = document.getElementById("anon-cfind-port").value.trim();
+  const dest   = (appConfig.local_ae || {}).ae_title || "PACSADMIN";
+  const model  = "S";
+  const status = document.getElementById("anon-cfind-retrieve-status");
+  const btn    = document.getElementById("anon-cfind-retrieve-btn");
+
+  btn.disabled = true;
+  status.textContent = `Sending C-MOVE to local SCP (${dest})…`;
+
+  try {
+    const moveRes  = await fetch("/api/dicom/move", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ ae_title: aet, host, port: parseInt(port, 10),
+        study_uid: r.StudyUID, move_dest: dest, query_model: model }),
+    });
+    const moveData = await moveRes.json();
+    if (!moveData.ok) {
+      status.textContent = `C-MOVE error: ${moveData.error || moveData.message}`;
+      btn.disabled = false; return;
+    }
+
+    status.textContent = "C-MOVE started — waiting for files…";
+
+    // Poll the SCP every 2 s for up to 60 s until the study appears
+    const studyUid = r.StudyUID;
+    let attempts = 0;
+    const poll = async () => {
+      attempts++;
+      const scpRes  = await fetch("/api/scp/studies");
+      const scpData = await scpRes.json();
+      const study   = (scpData.studies || []).find(s => s.uid === studyUid);
+      if (study) {
+        // Load all series files as blobs into _anonFiles
+        const allFiles = [];
+        for (const ser of study.series) {
+          const lRes  = await fetch(`/api/scp/series/list?study=${encodeURIComponent(studyUid)}&series=${encodeURIComponent(ser.uid)}`);
+          const lData = await lRes.json();
+          if (!lData.ok) continue;
+          for (const urlStr of (lData.urls || [])) {
+            const url  = new URL(urlStr, location.href);
+            const path = url.searchParams.get("path") || urlStr;
+            const fRes = await fetch(`/api/scp/files/raw?path=${encodeURIComponent(path)}`);
+            if (!fRes.ok) continue;
+            const blob = await fRes.blob();
+            allFiles.push(new File([blob], path.split("/").pop() || "file.dcm", { type: "application/dicom" }));
+          }
+        }
+        _anonFiles = allFiles;
+        renderAnonList();
+        document.getElementById("anon-retrieve-panel").removeAttribute("open");
+        status.textContent = `${allFiles.length} file(s) loaded.`;
+        btn.disabled = false;
+        toast(`${allFiles.length} file(s) loaded into Anonymizer`, "ok");
+      } else if (attempts < 30) {
+        status.textContent = `Waiting… (${attempts * 2}s)`;
+        setTimeout(poll, 2000);
+      } else {
+        status.textContent = "Timeout — study did not arrive within 60 s. Check DICOM Receiver.";
+        btn.disabled = false;
+      }
+    };
+    setTimeout(poll, 2000);
+  } catch (e) {
+    status.textContent = `Error: ${e}`;
+    btn.disabled = false;
+  }
 }
 
 // ── Anonymizer: "Send to PACS" AE helpers ────────────────────────
