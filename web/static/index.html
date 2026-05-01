@@ -2937,6 +2937,7 @@
           <div style="display:flex; gap:8px; margin-top:6px; flex-wrap:wrap">
             <button class="btn" onclick="dzOruIanPreview()" data-i18n="dicomize.oruian_preview_btn">Preview filled message</button>
             <button class="btn" onclick="dzOruIanSaveTemplate()" data-i18n="dicomize.oruian_save_btn">Save as template…</button>
+            <button class="btn" onclick="dzHl7Inspect(document.getElementById('dz-oruian-msg').value)" data-i18n="dicomize.oruian_inspect_btn">Inspect HL7</button>
           </div>
           <pre id="dz-oruian-preview" style="display:none; margin-top:8px; padding:8px;
                background:var(--bg-alt,#f5f5f5); border:1px solid var(--border);
@@ -2971,6 +2972,37 @@
                background:var(--bg-alt,#f5f5f5); border:1px solid var(--border);
                border-radius:4px; font-size:11px; overflow:auto; max-height:180px;
                white-space:pre-wrap; word-break:break-all"></pre>
+          <div id="dz-oruian-orm-inspect-row" style="display:none; margin-top:4px">
+            <button class="btn" style="font-size:11px" onclick="dzHl7Inspect(document.getElementById('dz-oruian-orm-text').textContent)" data-i18n="dicomize.orm_inspect_btn">Inspect ORM</button>
+          </div>
+
+          <!-- Inline HL7 inspector for DICOMize tab -->
+          <div id="dz-hl7-inspector-card" style="display:none; margin-top:10px; padding:10px;
+               background:#f8fafc; border:1px solid var(--border); border-radius:6px">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px">
+              <span style="font-size:12px; font-weight:600; color:#2b6cb0" data-i18n="dicomize.hl7_inspector_title">HL7 Inspector</span>
+              <button style="background:none; border:none; font-size:16px; cursor:pointer; color:#888; padding:0 4px"
+                      onclick="document.getElementById('dz-hl7-inspector-card').style.display='none'">×</button>
+            </div>
+            <div style="display:flex; gap:8px; align-items:flex-start">
+              <div style="flex:1; overflow:auto; max-height:220px">
+                <table style="border-collapse:collapse; font-size:12px; font-family:Consolas,monospace; width:100%">
+                  <thead>
+                    <tr style="background:#edf2f7">
+                      <th style="padding:3px 6px; text-align:left; font-size:11px; color:#4a5568; border-bottom:1px solid #e2e8f0">Seg</th>
+                      <th style="padding:3px 6px; text-align:left; font-size:11px; color:#4a5568; border-bottom:1px solid #e2e8f0">Fields (click to inspect)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dz-hl7-parsed-tbody"></tbody>
+                </table>
+              </div>
+              <div id="dz-hl7-field-info" style="display:none; flex:0 0 220px; min-width:180px;
+                   background:#fff; border:1px solid #e2e8f0; border-radius:4px;
+                   padding:8px; font-size:11px; max-height:220px; overflow:auto">
+                <div id="dz-hl7-field-info-content"></div>
+              </div>
+            </div>
+          </div>
 
           <!-- ORM field mapping (advanced, collapsible) -->
           <details style="margin-top:12px">
@@ -2980,12 +3012,15 @@
                data-i18n="dicomize.orm_map_desc">Map HL7 segment fields (e.g. OBR.3) to DICOM metadata. Changes are saved to configuration.</p>
             <p style="font-size:11px; color:#888; margin:4px 0 8px">
               When an ORM/ORU message is received, PACSAdminTool extracts patient and study data
-              from the HL7 segments listed here. Each key is a DICOM field name and each value
+              from the HL7 segments listed here. Each key is a field name and each value
               is an HL7 segment reference in <code style="font-size:10px">SEGMENT.field[.component]</code>
-              notation (e.g. <code style="font-size:10px">"PatientName": "PID.5.1"</code>).
-              Unmapped fields fall back to built-in defaults. Expand the JSON editor below,
-              adjust the mapping to match your HL7 sender, then click <strong>Save mapping</strong>.
+              notation (e.g. <code style="font-size:10px">"patient_name": "PID.5.1"</code>).
+              Unmapped fields fall back to built-in defaults.
             </p>
+            <div style="display:flex; gap:6px; margin-bottom:6px; flex-wrap:wrap">
+              <button class="btn" style="font-size:11px" onclick="dzShowOrmDefaults()" data-i18n="dicomize.orm_map_show_defaults">Default mapping</button>
+              <button class="btn" style="font-size:11px" onclick="dzShowOrmFields()" data-i18n="dicomize.orm_map_show_fields">Available fields</button>
+            </div>
             <textarea id="dz-orm-map-editor"
                       style="width:100%; height:130px; font-family:Consolas,monospace; font-size:11px;
                              resize:vertical; padding:6px; box-sizing:border-box;
@@ -4187,6 +4222,8 @@ socket.on("hl7_message", data => {
     const statusEl = document.getElementById("dz-oruian-status");
     if (fillBtn)  fillBtn.style.display  = "";
     if (ormPre)  { ormPre.textContent = _msg.replace(/\r/g, "\n"); ormPre.style.display = ""; }
+    const ormInspectRow = document.getElementById("dz-oruian-orm-inspect-row");
+    if (ormInspectRow) ormInspectRow.style.display = "";
     if (statusEl){ statusEl.textContent = i18n("dicomize.oruian_orm_received"); statusEl.style.color = "var(--ok, green)"; }
     appendLog("log-dicomize", now(), i18n("dicomize.oruian_orm_received"), "ok");
   }
@@ -8726,6 +8763,91 @@ function dzOrmMapSave() {
     st.style.color = d.ok ? "var(--ok,green)" : "var(--err,red)";
     if (d.ok && window.appConfig) window.appConfig.orm_field_map = map;
   }).catch(e => { st.textContent = String(e); st.style.color = "var(--err,red)"; });
+}
+
+function dzShowOrmDefaults() {
+  const defaults = {
+    "patient_name":      "PID.5",
+    "patient_id":        "PID.3",
+    "patient_dob":       "PID.7",
+    "patient_sex":       "PID.8",
+    "accession_number":  "OBR.2",
+    "study_description": "OBR.4.2",
+    "study_datetime":    "OBR.7",
+    "institution":       "MSH.3"
+  };
+  _dialog({
+    title: "Default ORM field mapping",
+    message: "These are the built-in defaults used when no custom mapping is configured:\n\n" +
+      Object.entries(defaults).map(([k, v]) => `  "${k}": "${v}"`).join("\n"),
+    buttons: [{ text: "Close", value: null, className: "btn" }],
+  });
+}
+
+function dzShowOrmFields() {
+  const fields = [
+    ["patient_name",      "Patient name (PascalCase → HL7 family^given^…)"],
+    ["patient_id",        "Patient ID / Medical Record Number"],
+    ["patient_dob",       "Date of birth (YYYYMMDD)"],
+    ["patient_sex",       "Sex (M / F / O / U)"],
+    ["accession_number",  "Accession number (placer order number)"],
+    ["study_description", "Study / procedure description text"],
+    ["study_datetime",    "Study date & time (YYYYMMDDHHMMSS)"],
+    ["institution",       "Sending facility / institution name"],
+  ];
+  _dialog({
+    title: "Available ORM mapping fields",
+    message: "Use these snake_case keys in your custom mapping JSON.\n" +
+      "Value is an HL7 segment reference: SEGMENT.field[.component] (1-based).\n\n" +
+      fields.map(([k, d]) => `  "${k}"\n    → ${d}`).join("\n\n"),
+    buttons: [{ text: "Close", value: null, className: "btn" }],
+  });
+}
+
+function dzHl7Inspect(rawText) {
+  if (!rawText || !rawText.trim()) { toast(i18n("hl7.no_message") || "No HL7 message to inspect.", "warn"); return; }
+  const tbodyId   = "dz-hl7-parsed-tbody";
+  const cardId    = "dz-hl7-inspector-card";
+  const infoId    = "dz-hl7-field-info";
+  const infoConId = "dz-hl7-field-info-content";
+  const segments  = _hl7Parse(rawText);
+  const tbody     = document.getElementById(tbodyId);
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  segments.forEach(({ seg, fields }) => {
+    const def     = _HL7_SEGMENTS[seg];
+    const segName = def ? def.name : "Unknown segment";
+    const tr      = document.createElement("tr");
+    tr.style.cssText = "vertical-align:top; border-bottom:1px solid #e2e8f0";
+    const tdSeg = document.createElement("td");
+    tdSeg.style.cssText = "padding:3px 6px; font-weight:700; white-space:nowrap; cursor:pointer; color:#2b6cb0";
+    tdSeg.textContent   = seg;
+    tdSeg.title         = segName;
+    tdSeg.onclick       = () => _hl7ShowSegInfo(seg, infoId, infoConId);
+    tr.appendChild(tdSeg);
+    const tdFields = document.createElement("td");
+    tdFields.style.cssText = "padding:3px 4px; word-break:break-all; line-height:1.8";
+    fields.forEach((val, idx) => {
+      const fieldNum = idx + 1;
+      const fdDef    = def?.fields.find(f => f.seq === fieldNum);
+      const chip     = document.createElement("span");
+      chip.style.cssText =
+        "display:inline-block; margin:1px 2px; padding:1px 5px; border-radius:3px; " +
+        "border:1px solid #cbd5e0; background:#f7fafc; font-size:11px; cursor:pointer; " +
+        "max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:middle";
+      chip.title       = fdDef ? `${seg}.${fieldNum} — ${fdDef.name} (${fdDef.dt})` : `${seg}.${fieldNum}`;
+      chip.textContent = val || (fdDef ? "—" : "");
+      if (val) chip.style.background = "#ebf8ff";
+      chip.onclick = () => _hl7ShowFieldInfo(seg, fieldNum, val, infoId, infoConId);
+      tdFields.appendChild(chip);
+    });
+    tr.appendChild(tdFields);
+    tbody.appendChild(tr);
+  });
+  const card = document.getElementById(cardId);
+  if (card) { card.style.display = ""; card.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
+  const infoEl = document.getElementById(infoId);
+  if (infoEl) infoEl.style.display = "none";
 }
 
 // Populate ORM map editor textarea when the details is opened
