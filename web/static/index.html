@@ -5051,7 +5051,13 @@ async function doRetrieve() {
   const model = document.getElementById("cfind-model").value;
 
   if (method === "move") {
-    const dest = document.getElementById("cfind-movedest").value.trim();
+    const dest    = document.getElementById("cfind-movedest").value.trim();
+    const localAE = (appConfig.local_ae || {}).ae_title || "PACSADMIN";
+    // If C-MOVE destination is our local SCP, make sure it's running first
+    if (dest === localAE) {
+      const ready = await _ensureScpRunningForMove();
+      if (!ready) return;
+    }
     appendLog("log-cfind", now(),
               `C-MOVE → dest=${dest}  studies=${uids.length}`);
     const movePromises = uids.map(uid =>
@@ -6286,6 +6292,33 @@ function clearHL7Received() {
 
 let scpRunning  = false;
 let scpFileCount = 0;
+
+/**
+ * Before a C-MOVE that targets the local SCP, verify the receiver is running.
+ * Returns true if the user wants to proceed (receiver already running or just started).
+ * Returns false if the user cancelled or the start failed.
+ */
+async function _ensureScpRunningForMove() {
+  if (scpRunning) return true;
+  const ok = await _dialog({
+    title:   "DICOM Receiver not running",
+    message: "The C-MOVE will send files to your local DICOM Receiver, but it is currently stopped.\n\nStart the DICOM Receiver now and continue?",
+    buttons: [
+      { text: "Start Receiver & Continue", value: true,  className: "btn primary" },
+      { text: "Cancel",                    value: false, className: "btn" },
+    ],
+  });
+  if (!ok) return false;
+  // Switch to SCP tab so the user can see startup, then start
+  showTab("scp");
+  await toggleSCP();
+  if (!scpRunning) {
+    toast("Failed to start DICOM Receiver. Check port and settings.", "err");
+    return false;
+  }
+  toast("DICOM Receiver started. Proceeding with C-MOVE…", "ok");
+  return true;
+}
 
 async function toggleSCP() {
   if (scpRunning) {
@@ -9378,6 +9411,7 @@ async function dzOruIanFillFromOrm() {
     if (f.study_description) document.getElementById("dz-study-desc").value   = f.study_description;
     if (f.study_date)        document.getElementById("dz-study-date").value   = f.study_date;
     if (f.study_time)        document.getElementById("dz-study-time").value   = f.study_time;
+    if (f.institution)       document.getElementById("dz-institution").value  = f.institution;
     // Expand patient section if collapsed
     const body  = document.getElementById("dicomize-patient-body");
     const arrow = document.getElementById("dicomize-patient-arrow");
@@ -9856,9 +9890,11 @@ async function doBatchDWTest() {
 let _inspectorTags = [];
 
 function inspectorFileSelected() {
-  const f = document.getElementById("inspector-file-input").files[0];
-  document.getElementById("inspector-filename").textContent = f ? f.name : "";
-  document.getElementById("inspector-meta-card").style.display = "none";
+  const f    = document.getElementById("inspector-file-input").files[0];
+  const fnEl = document.getElementById("inspector-filename");
+  if (fnEl) fnEl.textContent = f ? f.name : "";
+  const mc = document.getElementById("inspector-meta-card");
+  if (mc) mc.style.display = "none";
 }
 
 async function doInspect() {
@@ -9919,16 +9955,20 @@ function openTagEditor() {
   if (!_inspectorTags.length) { toast(i18n("tag_editor.parse_first"), "warn"); return; }
   _tagEdits = {};
   _populateTagEditorAEDropdown();
-  document.getElementById("tag-editor-card").style.display = "";
-  document.getElementById("tag-editor-filter").value = "";
+  const card = document.getElementById("tag-editor-card");
+  const filter = document.getElementById("tag-editor-filter");
+  if (!card || !filter) { toast("Tag editor UI not available.", "err"); return; }
+  card.style.display = "";
+  filter.value = "";
   renderEditTagTable();
-  document.getElementById("tag-editor-card").scrollIntoView({ behavior: "smooth" });
+  card.scrollIntoView({ behavior: "smooth" });
 }
 
 function resetTagEdits() {
   _tagEdits = {};
   renderEditTagTable();
-  document.getElementById("tag-editor-change-count").textContent = "";
+  const cnt = document.getElementById("tag-editor-change-count");
+  if (cnt) cnt.textContent = "";
 }
 
 function _populateTagEditorAEDropdown() {
@@ -9989,8 +10029,8 @@ function renderEditTagTable() {
   });
 
   const n = Object.keys(_tagEdits).length;
-  document.getElementById("tag-editor-change-count").textContent =
-    n ? i18n("tag_editor.changes_pending", { n }) : "";
+  const cntEl = document.getElementById("tag-editor-change-count");
+  if (cntEl) cntEl.textContent = n ? i18n("tag_editor.changes_pending", { n }) : "";
 }
 
 function editTagInline(tag, vr) {
@@ -10356,6 +10396,10 @@ function anonCFindSelect(idx) {
 async function anonCFindRetrieve() {
   const r = _anonCFindResults[_anonCFindSelectedIdx];
   if (!r) { toast("Select a study first.", "warn"); return; }
+
+  // Ensure the local SCP is running before C-MOVE
+  const ready = await _ensureScpRunningForMove();
+  if (!ready) return;
 
   const aet    = document.getElementById("anon-cfind-aet").value.trim();
   const host   = document.getElementById("anon-cfind-host").value.trim();
