@@ -46,7 +46,7 @@ def _get_audit_logger() -> logging.Logger:
         os.path.join(LOG_DIR, "audit.log"),
         when="midnight",
         utc=True,
-        backupCount=30,               # keep 30 days of audit history
+        backupCount=7,                # keep 7 days of audit history
         encoding="utf-8",
     )
     handler.setFormatter(logging.Formatter("%(message)s"))

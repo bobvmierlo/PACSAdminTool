@@ -43,7 +43,8 @@ os.makedirs(LOG_DIR, exist_ok=True)
 def _cleanup_old_logs():
     """Delete log files older than 7 days."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=7)
-    for path in glob.glob(os.path.join(LOG_DIR, "pacs_admin*.log*")):
+    patterns = ["pacs_admin*.log*", "audit.log.*"]
+    for path in (p for pat in patterns for p in glob.glob(os.path.join(LOG_DIR, pat))):
         try:
             mtime = datetime.fromtimestamp(os.path.getmtime(path), tz=timezone.utc)
             if mtime < cutoff:
