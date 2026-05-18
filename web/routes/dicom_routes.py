@@ -331,8 +331,7 @@ def dicom_dmwl():
         sps.ScheduledProcedureStepID          = ""
         ds.ScheduledProcedureStepSequence = Sequence([sps])
 
-        station_aet = d.get("station_aet", "").strip()
-        calling_ae  = station_aet if station_aet else _local_ae()
+        calling_ae = d.get("calling_aet", "").strip() or _local_ae()
 
         ok, results, msg = dmwl_find(
             calling_ae, d["host"], int(d["port"]), d["ae_title"], ds,
