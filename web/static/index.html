@@ -1153,6 +1153,7 @@
         <div class="field"><label data-i18n="cfind.modality">Modality</label><input id="dmwl-mod" list="modality-list"></div>
         <div class="field"><label data-i18n="cfind.accession">Accession #</label><input id="dmwl-acc"></div>
         <div class="field"><label data-i18n="dmwl.station_aet">Station AET</label><input id="dmwl-aet"></div>
+        <div class="field"><label data-i18n="dmwl.calling_aet">Calling AET</label><input id="dmwl-calling-aet" placeholder="(uses global local AE if blank)"></div>
       </div>
       <div class="btn-row" style="margin-top:12px">
         <button class="btn primary" onclick="doDMWL()" data-i18n="dmwl.query">Query Worklist</button>
@@ -5381,6 +5382,7 @@ async function doDMWL() {
       modality:     document.getElementById("dmwl-mod").value,
       accession:    document.getElementById("dmwl-acc").value,
       station_aet:  document.getElementById("dmwl-aet").value,
+      calling_aet:  document.getElementById("dmwl-calling-aet").value,
     }),
   });
   const data = await res.json();

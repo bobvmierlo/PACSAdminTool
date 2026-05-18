@@ -142,6 +142,7 @@
     "modality": "Modaliteit:",
     "accession": "Accession nr.:",
     "station_aet": "Station AET:",
+    "calling_aet": "Calling AET:",
     "query": "Werklijst opvragen",
     "export_csv": "Exporteren naar CSV...",
     "export_csv_web": "CSV exporteren",

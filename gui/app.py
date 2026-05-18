@@ -643,7 +643,7 @@ class DMWLTab(ttk.Frame):
         self.ae_sel = AESelector(top, self.app.config, t("dmwl.worklist_scp")); self.ae_sel.pack(fill="x")
         qf = _lf(top,t("dmwl.query_filters")); qf.pack(fill="x",pady=(8,0))
         qf_grid = ttk.Frame(qf); qf_grid.pack(fill="x")
-        for i, (lbl,attr) in enumerate([(t("dmwl.patient_id"),"pid_var"),(t("dmwl.patient_name"),"pname_var"),(t("dmwl.sched_date"),"date_var"),(t("dmwl.modality"),"mod_var"),(t("dmwl.accession"),"acc_var"),(t("dmwl.station_aet"),"aet_var")]):
+        for i, (lbl,attr) in enumerate([(t("dmwl.patient_id"),"pid_var"),(t("dmwl.patient_name"),"pname_var"),(t("dmwl.sched_date"),"date_var"),(t("dmwl.modality"),"mod_var"),(t("dmwl.accession"),"acc_var"),(t("dmwl.station_aet"),"aet_var"),(t("dmwl.calling_aet"),"calling_aet_var")]):
             r, c = divmod(i,3)
             fr = ttk.Frame(qf_grid); fr.grid(row=r,column=c,sticky="w",padx=8,pady=3)
             _label(fr,lbl).pack(side="left")
@@ -705,8 +705,7 @@ class DMWLTab(ttk.Frame):
         self.log.append(f"DMWL query -> {ae['ae_title']}@{ae['host']}:{ae['port']}")
         def run():
             from dicom.operations import dmwl_find
-            station_aet = self.aet_var.get().strip()
-            calling_ae = station_aet if station_aet else local["ae_title"]
+            calling_ae = self.calling_aet_var.get().strip() or local["ae_title"]
             ok, results, msg = dmwl_find(calling_ae, ae["host"], ae["port"], ae["ae_title"], ds, log_callback=lambda m: self.log.append(m))
             self.log.append(msg); self.count_lbl.configure(text=t("dmwl.items_returned", n=len(results)))
             for r in results:

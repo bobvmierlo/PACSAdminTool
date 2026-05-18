@@ -142,6 +142,7 @@
     "modality": "Modality:",
     "accession": "Accession #:",
     "station_aet": "Station AET:",
+    "calling_aet": "Calling AET:",
     "query": "Query Worklist",
     "export_csv": "Export to CSV...",
     "export_csv_web": "Export CSV",
