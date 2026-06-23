@@ -9,7 +9,7 @@ pydicom~=3.0
 pynetdicom~=3.0
 
 # Image rendering (SCP file preview)
-numpy~=2.4
+numpy~=2.5
 pillow>=12.2.0
 
 # HL7
@@ -24,4 +24,4 @@ simple-websocket~=1.1
 requests~=2.34
 
 # Telemetry (anonymous usage statistics — PostHog EU)
-posthog~=7.14
+posthog~=7.20
