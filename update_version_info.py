@@ -19,9 +19,9 @@ if not match:
 
 version_str = match.group(1)  # e.g. "2.3.0"
 parts = version_str.split(".")
-if len(parts) < 3:
-    print(f"ERROR: Expected at least 3 version components, got: {version_str}")
-    sys.exit(1)
+# Pad to at least 3 components so tags like "2.18" are treated as "2.18.0"
+while len(parts) < 3:
+    parts.append("0")
 
 major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
 build = int(parts[3]) if len(parts) > 3 else 0
