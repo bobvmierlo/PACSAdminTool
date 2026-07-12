@@ -6,9 +6,10 @@ below are the remaining ideas, roughly in order of value.
 
 ## Code improvements
 
-1. **Split `web/static/index.html` (~11,000 lines).** Biggest maintainability
-   liability. Split the JS per tab into `web/static/js/*.js` files loaded with
-   plain `<script>` tags — no build system needed.
+1. ~~**Split `web/static/index.html` (~11,000 lines).**~~ ✅ Done — the inline
+   script is now 30 per-domain files under `web/static/js/`, loaded in order as
+   plain scripts (shared global scope, `init.js` last). `index.html` keeps only
+   the markup and CSS.
 2. **Per-level C-FIND query datasets.** `dicom_find()` always sets study-level
    return keys (`ModalitiesInStudy`, `StudyDescription`, …) even for SERIES/IMAGE
    level queries; at SERIES level the correct key is `Modality`, and strict SCPs
