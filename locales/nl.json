@@ -169,7 +169,8 @@
     "send": "N-ACTION verzenden (Commit)",
     "uid_count": "{n} UIDs",
     "no_uids": "Geen UIDs geladen.",
-    "enter_uid": "Voer minimaal één UID in"
+    "enter_uid": "Voer minimaal één UID in",
+    "pair_hint": "Voorkeursformaat: SOPClassUID|SOPInstanceUID (één paar per regel). Een losse SOP Instance UID werkt ook, maar dan wordt een generieke SOP Class aangenomen en sommige PACS-systemen weigeren de commitment daarvoor."
   },
   "iocm": {
     "iocm_scp": "IOCM SCP",
@@ -421,7 +422,9 @@
     "mgr_err_save": "Fout bij opslaan: {error}",
     "mgr_saved": "Opgeslagen: \"{name}\".",
     "mgr_confirm_delete": "Profiel \"{name}\" verwijderen?",
-    "retrieve_title": "Studie ophalen uit PACS…"
+    "retrieve_title": "Studie ophalen uit PACS…",
+    "remove_private": "Privé-tags verwijderen (oneven groepen)",
+    "new_uids": "Nieuwe Study/Series/Instance UID's genereren"
   },
   "dicomdir": {
     "title": "DICOMDIR Lezer",
@@ -695,7 +698,7 @@
     "wl_modal_title": "Werklijstitem selecteren",
     "wl_filter_name": "Patiëntnaam (jokerteken *)",
     "wl_filter_id": "Patiënt-ID",
-    "wl_filter_date": "Geplande datum (JJJJMMDD)",
+    "wl_filter_date": "Geplande datum",
     "wl_filter_mod": "Modaliteit",
     "wl_query_btn": "Werklijst opvragen",
     "wl_col_name": "Patiëntnaam",
@@ -772,8 +775,7 @@
     "oruian_server_preset": "EPD-server",
     "duplicate_warning": "Studie-UID bestaat al in het PACS ({count} instantie(s)). Toch verzenden?",
     "wl_click_fill": "Klik om velden te vullen",
-    "wl_filled": "Werklijstitem toegepast: {name}",
-    "wl_filter_date": "Geplande datum"
+    "wl_filled": "Werklijstitem toegepast: {name}"
   },
   "dicomweb": {
     "server_title": "DICOMweb Server",

@@ -10,8 +10,11 @@ from web.auth import (
     get_user_settings,
     has_users,
     list_users,
+    login_lockout_remaining,
+    record_login_failure,
     require_admin,
     require_login,
+    reset_login_failures,
     save_user_settings,
     verify_password,
 )
@@ -46,12 +49,23 @@ def login_post():
     password = d.get("password") or ""
     if not username or not password:
         return jsonify({"ok": False, "error": "Username and password are required."}), 400
+    wait = login_lockout_remaining(username, _req_ip())
+    if wait:
+        _audit("auth.login", ip=_req_ip(), user=username, result="error",
+               error=f"Rate limited ({wait}s remaining)")
+        resp = jsonify({"ok": False,
+                        "error": f"Too many failed attempts. "
+                                 f"Try again in {wait} second(s)."})
+        resp.headers["Retry-After"] = str(wait)
+        return resp, 429
     if verify_password(username, password):
+        reset_login_failures(username, _req_ip())
         session.clear()
         session["username"] = username
         session.permanent   = True
         _audit("auth.login", ip=_req_ip(), user=username)
         return jsonify({"ok": True})
+    record_login_failure(username, _req_ip())
     _audit("auth.login", ip=_req_ip(), user=username, result="error",
            error="Invalid credentials")
     return jsonify({"ok": False, "error": "Invalid username or password."}), 401

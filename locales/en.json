@@ -169,7 +169,8 @@
     "send": "Send N-ACTION (Commit)",
     "uid_count": "{n} UIDs",
     "no_uids": "No UIDs loaded.",
-    "enter_uid": "Enter at least one UID"
+    "enter_uid": "Enter at least one UID",
+    "pair_hint": "Preferred format: SOPClassUID|SOPInstanceUID (one pair per line). A bare SOP Instance UID also works, but a generic SOP Class is then assumed and some PACS systems will reject the commitment for it."
   },
   "iocm": {
     "iocm_scp": "IOCM SCP",
@@ -421,7 +422,9 @@
     "mgr_err_save": "Error saving: {error}",
     "mgr_saved": "Saved \"{name}\".",
     "mgr_confirm_delete": "Delete profile \"{name}\"?",
-    "retrieve_title": "Retrieve study from PACS…"
+    "retrieve_title": "Retrieve study from PACS…",
+    "remove_private": "Remove private tags (odd groups)",
+    "new_uids": "Generate new Study/Series/Instance UIDs"
   },
   "dicomdir": {
     "title": "DICOMDIR Reader",
@@ -695,7 +698,7 @@
     "wl_modal_title": "Select Worklist Item",
     "wl_filter_name": "Patient Name (wildcard *)",
     "wl_filter_id": "Patient ID",
-    "wl_filter_date": "Scheduled Date (YYYYMMDD)",
+    "wl_filter_date": "Scheduled Date",
     "wl_filter_mod": "Modality",
     "wl_query_btn": "Query Worklist",
     "wl_col_name": "Patient Name",
@@ -772,8 +775,7 @@
     "oruian_server_preset": "EMR Server",
     "duplicate_warning": "Study UID already exists in PACS ({count} instance(s)). Send anyway?",
     "wl_click_fill": "Click to fill fields",
-    "wl_filled": "Worklist item applied: {name}",
-    "wl_filter_date": "Scheduled Date"
+    "wl_filled": "Worklist item applied: {name}"
   },
   "dicomweb": {
     "server_title": "DICOMweb Server",

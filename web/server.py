@@ -126,6 +126,16 @@ socketio = ctx.socketio
 
 app.secret_key = load_or_create_secret_key()
 
+# Session cookie hardening. SameSite=Lax is the primary CSRF defence for the
+# cookie-authenticated JSON API (browsers won't attach the cookie to
+# cross-site POSTs). SESSION_COOKIE_SECURE is enabled by webmain.py when the
+# server is started with TLS (--cert/--key).
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
+)
+
 # Load config into shared context dict (clear first so tests get a fresh state)
 ctx.config.clear()
 ctx.config.update(load_config())

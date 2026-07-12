@@ -1181,7 +1181,11 @@
     <div class="card"><h3 data-i18n="commit.commit_scp">Storage Commitment SCP</h3><div id="ae-commit"></div></div>
     <div class="card">
       <h3 data-i18n="commit.sop_uids_web">SOP Instance UIDs (one per line)</h3>
-      <textarea id="commit-uids" rows="6" placeholder="1.2.840.xxxxx&#10;1.2.840.yyyyy"></textarea>
+      <textarea id="commit-uids" rows="6" placeholder="1.2.840.10008.5.1.4.1.1.2|1.2.840.xxxxx&#10;1.2.840.yyyyy"></textarea>
+      <p style="font-size:12px; color:#888; margin:6px 0 0" data-i18n="commit.pair_hint">
+        Preferred format: SOPClassUID|SOPInstanceUID (one pair per line). A bare
+        SOP Instance UID also works, but a generic SOP Class is then assumed and
+        some PACS systems will reject the commitment for it.</p>
       <div class="btn-row" style="margin-top:10px">
         <button class="btn primary" onclick="doCommit()" data-i18n="commit.send">Send N-ACTION (Commit)</button>
       </div>
@@ -1956,6 +1960,16 @@
           <label data-i18n="anonymizer.replace_id">Replace Patient ID with</label>
           <input id="anon-patient-id" value="ANON">
         </div>
+      </div>
+      <div style="display:flex; gap:24px; flex-wrap:wrap; margin-top:10px">
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer">
+          <input type="checkbox" id="anon-remove-private" checked>
+          <span data-i18n="anonymizer.remove_private">Remove private tags (odd groups)</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer">
+          <input type="checkbox" id="anon-new-uids" checked>
+          <span data-i18n="anonymizer.new_uids">Generate new Study/Series/Instance UIDs</span>
+        </label>
       </div>
       <p style="font-size:12px; color:#888; margin-top:8px" data-i18n="anonymizer.note">
         Result is downloaded as a ZIP archive. Original files are not modified.
@@ -10628,9 +10642,11 @@ function _buildAnonFD() {
   const profile = document.getElementById("anon-profile").value;
   const fd = new FormData();
   _anonFiles.forEach(f => fd.append("files[]", f));
-  fd.append("profile",      profile);
-  fd.append("patient_name", document.getElementById("anon-patient-name").value);
-  fd.append("patient_id",   document.getElementById("anon-patient-id").value);
+  fd.append("profile",        profile);
+  fd.append("patient_name",   document.getElementById("anon-patient-name").value);
+  fd.append("patient_id",     document.getElementById("anon-patient-id").value);
+  fd.append("remove_private", document.getElementById("anon-remove-private").checked ? "1" : "0");
+  fd.append("new_uids",       document.getElementById("anon-new-uids").checked ? "1" : "0");
   if (profile === "custom") {
     fd.append("custom_tags", JSON.stringify(_anonCustomTags));
   }
@@ -10658,7 +10674,13 @@ async function doAnonymize() {
     a.download = fn;
     a.click();
     URL.revokeObjectURL(a.href);
-    status.textContent = `Done — downloaded ${fn}`;
+    const warnCount = parseInt(res.headers.get("X-Anonymize-Warnings") || "0", 10);
+    if (warnCount > 0) {
+      status.textContent = `Done — downloaded ${fn}. ⚠ ${warnCount} warning(s) — see ANONYMIZATION_WARNINGS.txt in the ZIP (possible burned-in PHI).`;
+      toast(`${warnCount} file(s) may contain burned-in PHI — check ANONYMIZATION_WARNINGS.txt in the ZIP.`, "warn");
+    } else {
+      status.textContent = `Done — downloaded ${fn}`;
+    }
   } catch (e) {
     status.textContent = "Error: " + e;
   }
@@ -10675,38 +10697,21 @@ async function doAnonymizeAndSend() {
   }
   const status = document.getElementById("anon-status");
   status.textContent = "Anonymising and sending…";
-  // Anonymise → blob → files → C-STORE (we download internally to get the zip,
-  // then re-send each file from the browser using C-STORE endpoint)
+  // Single request with all files so that UID remapping stays consistent
+  // across the batch (all files of one study get the same new StudyInstanceUID).
   const fd = _buildAnonFD();
+  fd.append("ae_title", aeTitle);
+  fd.append("host",     host);
+  fd.append("port",     port);
   try {
-    const res = await fetch("/api/dicom/anonymize", { method: "POST", body: fd });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      status.textContent = "Error: " + (err.error || res.statusText); return;
+    const res = await fetch("/api/dicom/anonymize-and-store", { method: "POST", body: fd });
+    const d   = await res.json().catch(() => ({}));
+    let text  = d.message || (d.ok ? "Done." : "Error: " + (d.error || res.statusText));
+    if (d.warnings && d.warnings.length) {
+      text += ` ⚠ ${d.warnings.length} warning(s) — possible burned-in PHI.`;
+      toast(`${d.warnings.length} file(s) may contain burned-in PHI — visual review recommended.`, "warn");
     }
-    const blob = await res.blob();
-    // Unzip in-browser using DecompressionStream isn't universally available;
-    // easier: re-upload the zip to a helper, or re-send individual files via
-    // a second anonymize-and-store call for each file.
-    // We'll send files individually for reliability.
-    let sent = 0;
-    for (const f of _anonFiles) {
-      const fd2 = new FormData();
-      fd2.append("files[]", f);
-      fd2.append("profile",      document.getElementById("anon-profile").value);
-      fd2.append("patient_name", document.getElementById("anon-patient-name").value);
-      fd2.append("patient_id",   document.getElementById("anon-patient-id").value);
-      if (document.getElementById("anon-profile").value === "custom") {
-        fd2.append("custom_tags", JSON.stringify(_anonCustomTags));
-      }
-      fd2.append("ae_title", aeTitle);
-      fd2.append("host",     host);
-      fd2.append("port",     port);
-      const r2 = await fetch("/api/dicom/anonymize-and-store", { method: "POST", body: fd2 });
-      const d2 = await r2.json().catch(() => ({}));
-      if (d2.ok) sent++;
-    }
-    status.textContent = `Sent ${sent} of ${_anonFiles.length} file(s).`;
+    status.textContent = text;
   } catch (e) {
     status.textContent = "Error: " + e;
   }

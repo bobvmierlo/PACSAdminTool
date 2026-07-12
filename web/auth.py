@@ -18,6 +18,8 @@ import logging
 import os
 import secrets
 import stat
+import threading
+import time
 import uuid
 from datetime import datetime, timezone
 from functools import wraps
@@ -143,6 +145,64 @@ def verify_password(username: str, password: str) -> bool:
     if not user:
         return False
     return check_password_hash(user["password_hash"], password)
+
+
+# ---------------------------------------------------------------------------
+# Login brute-force protection
+#
+# Failed attempts are tracked in memory per username AND per client IP.
+# After LOGIN_MAX_FAILURES recent failures on either key, further attempts
+# are rejected until LOGIN_LOCKOUT_SECONDS have passed since the last
+# failure. State resets on process restart, which is acceptable — the goal
+# is to make online guessing impractically slow, not to persist bans.
+# ---------------------------------------------------------------------------
+
+LOGIN_MAX_FAILURES    = 5
+LOGIN_WINDOW_SECONDS  = 900   # failures older than this are forgotten
+LOGIN_LOCKOUT_SECONDS = 60    # wait after the limit is reached
+
+_failed_logins: dict[str, list[float]] = {}
+_failed_logins_lock = threading.Lock()
+
+
+def _login_keys(username: str, ip: str) -> tuple[str, str]:
+    return f"user:{(username or '').lower()}", f"ip:{ip or '-'}"
+
+
+def login_lockout_remaining(username: str, ip: str) -> int:
+    """Seconds the caller must still wait before another attempt; 0 if none."""
+    now = time.time()
+    remaining = 0
+    with _failed_logins_lock:
+        for key in _login_keys(username, ip):
+            recent = [t for t in _failed_logins.get(key, [])
+                      if now - t < LOGIN_WINDOW_SECONDS]
+            if recent:
+                _failed_logins[key] = recent
+            else:
+                _failed_logins.pop(key, None)
+                continue
+            if len(recent) >= LOGIN_MAX_FAILURES:
+                wait = LOGIN_LOCKOUT_SECONDS - (now - recent[-1])
+                if wait > 0:
+                    remaining = max(remaining, int(wait) + 1)
+    return remaining
+
+
+def record_login_failure(username: str, ip: str) -> None:
+    now = time.time()
+    with _failed_logins_lock:
+        for key in _login_keys(username, ip):
+            recent = [t for t in _failed_logins.get(key, [])
+                      if now - t < LOGIN_WINDOW_SECONDS]
+            recent.append(now)
+            _failed_logins[key] = recent
+
+
+def reset_login_failures(username: str, ip: str) -> None:
+    with _failed_logins_lock:
+        for key in _login_keys(username, ip):
+            _failed_logins.pop(key, None)
 
 
 # ---------------------------------------------------------------------------
