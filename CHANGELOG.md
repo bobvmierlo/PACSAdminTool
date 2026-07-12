@@ -2,6 +2,18 @@
 
 ## v2.19.0 — 2026-07-12
 
-### Fixed + New — [#142](https://github.com/bobvmierlo/PACSAdminTool/pull/142)
+### Fixed — [#142](https://github.com/bobvmierlo/PACSAdminTool/pull/142)
 
-Fix several reliability issues: outgoing DICOM connections now time out instead of hanging indefinitely when a remote peer becomes unresponsive, SCP auto-purge now correctly removes files stored in Study/Series subdirectories (previously only top-level files were cleaned), and DICOM tag comparisons now detect changes inside nested sequences. Harden security: the login screen now blocks repeated failed attempts for 60 seconds after 5 failures within 15 minutes, session cookies gain HttpOnly/SameSite/Secure flags with a 12-hour expiry, and HTTPS support is now available via `--cert`/`--key` flags in the web interface. The Anonymizer gains two new options — remove private tags and regenerate Study/Series/Instance UIDs — and now warns when exported files likely contain burned-in patient information.
+- Outgoing DICOM connections now time out instead of hanging indefinitely when a remote peer becomes unresponsive.
+- SCP auto-purge now correctly removes files in Study/Series subdirectories — previously only top-level files were cleaned up.
+- DICOM tag comparisons now detect changes inside nested sequences (e.g. ReferencedSeriesSequence).
+- HL7 listener message history is now capped, preventing unbounded memory growth on long-running instances.
+
+### New — [#142](https://github.com/bobvmierlo/PACSAdminTool/pull/142)
+
+- **HTTPS support** — the web interface can now be served over TLS using the `--cert` and `--key` flags.
+- **Login rate-limiting** — after 5 failed attempts within 15 minutes, further attempts are blocked for 60 seconds.
+- **Hardened session cookies** — cookies now carry HttpOnly, SameSite=Lax, and Secure (when TLS is on) flags; sessions expire after 12 hours.
+- **Anonymizer: remove private tags** — new option to strip all vendor-private DICOM tags from exported files.
+- **Anonymizer: regenerate UIDs** — new option to generate fresh Study/Series/Instance UIDs, with consistent remapping across a batch.
+- **Anonymizer: burned-in PHI warning** — files that likely contain burned-in patient data are flagged, with a warning summary included in the export ZIP.
