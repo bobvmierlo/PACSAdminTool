@@ -6,6 +6,7 @@ Supports sending and receiving HL7 messages.
 import socket
 import threading
 import logging
+from collections import deque
 from datetime import datetime
 from typing import Callable, Optional
 
@@ -153,7 +154,8 @@ class HL7Listener:
         self._sock = None
         self._thread = None
         self.running = False
-        self.received_messages = []
+        # Bounded so a long-running listener cannot grow memory without limit
+        self.received_messages = deque(maxlen=500)
 
     def _handle_client(self, conn, addr):
         try:

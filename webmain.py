@@ -63,12 +63,29 @@ if __name__ == "__main__":
         help="Port to listen on (default: config or 5000)")
     parser.add_argument("--debug", action="store_true",
         help="Enable Flask debug mode (auto-reloads on code changes)")
+    parser.add_argument("--cert", default=None,
+        help="Path to a TLS certificate (PEM). Enables HTTPS; requires --key.")
+    parser.add_argument("--key", default=None,
+        help="Path to the TLS private key (PEM) matching --cert.")
     args = parser.parse_args()
 
+    # ── Optional TLS: --cert and --key must be given together
+    ssl_context = None
+    if bool(args.cert) != bool(args.key):
+        parser.error("--cert and --key must be provided together.")
+    if args.cert:
+        for _tls_path in (args.cert, args.key):
+            if not os.path.isfile(_tls_path):
+                parser.error(f"TLS file not found: {_tls_path}")
+        ssl_context = (args.cert, args.key)
+        # Only send the session cookie over HTTPS when TLS is active
+        app.config["SESSION_COOKIE_SECURE"] = True
+
+    scheme = "https" if ssl_context else "http"
     # When binding to all interfaces (0.0.0.0) show localhost URL for convenience
     display_host = "localhost" if args.host in ("0.0.0.0", "::") else args.host
-    url = f"http://{args.host}:{args.port}"
-    display_url = f"http://{display_host}:{args.port}"
+    url = f"{scheme}://{args.host}:{args.port}"
+    display_url = f"{scheme}://{display_host}:{args.port}"
     logger.info("PACS Admin Tool Web Server starting on %s", url)
 
     print(f"""
@@ -112,13 +129,15 @@ if __name__ == "__main__":
     # socketio.run() is used instead of app.run() because Flask-SocketIO
     # needs to manage the server to support WebSocket connections.
     try:
-        socketio.run(
-            app,
+        run_kwargs = dict(
             host=args.host,
             port=args.port,
             debug=args.debug,
             allow_unsafe_werkzeug=True,   # needed for newer Werkzeug versions
         )
+        if ssl_context:
+            run_kwargs["ssl_context"] = ssl_context
+        socketio.run(app, **run_kwargs)
     finally:
         if tray:
             tray.stop()

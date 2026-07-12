@@ -27,7 +27,7 @@ Can also be run locally with Python and pip, or deployed as a Docker container.
 | **SR Viewer** | Parse any DICOM Structured Report as an interactive collapsible tree; colour-coded type/relationship badges; DCM-coded concepts link to the NEMA PS3.16 standard; filter bar |
 | **KOS Creator** | Build a DICOM Key Object Selection document (XDS-I manifest) from existing DICOM files |
 | **DICOMize** | Convert non-DICOM files to DICOM: PDF → Encapsulated PDF, images (JPEG/PNG/BMP/TIFF/WebP) → Secondary Capture, video (MP4/MOV) → Encapsulated Video; download or send directly to a PACS via C-STORE |
-| **Anonymizer** | Strip PHI from one or more DICOM files using a Basic or Full profile; download result as a ZIP |
+| **Anonymizer** | Strip PHI from one or more DICOM files using a Basic or Full profile; optionally remove private tags and generate fresh Study/Series/Instance UIDs (batch-consistent); warns when burned-in pixel PHI is likely; download result as a ZIP |
 | **UID Remapper** | Generate fresh Study / Series / Instance UIDs for a batch of DICOM files while preserving internal referential integrity; preview the old→new UID mapping before downloading as ZIP |
 | **DICOMDIR** | Read a DICOMDIR file and browse the Patient → Study → Series → Instance hierarchy; or generate a standards-compliant DICOMDIR from uploaded files/folder and download as ZIP |
 | **DICOMweb** | QIDO-RS study/series/instance queries, STOW-RS multi-file upload, WADO-RS retrieve (packaged as ZIP); preset-based server configuration with Basic Auth and Bearer Token support |
@@ -120,6 +120,36 @@ python webmain.py --port 8080
 To enable debug mode with auto-reload:
 ```bash
 python webmain.py --debug
+```
+
+### HTTPS / TLS
+
+The web UI handles logins and patient data, so on anything but a trusted, isolated
+network you should serve it over HTTPS. Two options:
+
+**Built-in TLS** — pass a PEM certificate and key:
+```bash
+python webmain.py --cert /path/to/cert.pem --key /path/to/key.pem
+# UI is now at https://localhost:5000
+```
+For internal use a self-signed certificate works (browsers will show a one-time warning):
+```bash
+openssl req -x509 -newkey rsa:4096 -nodes -days 825 \
+  -keyout key.pem -out cert.pem -subj "/CN=$(hostname)"
+```
+When TLS is enabled the session cookie is automatically marked `Secure`.
+
+**Reverse proxy (recommended for Docker / production)** — run the container on
+localhost only and terminate TLS in nginx, Caddy, or Traefik. Remember to proxy
+WebSocket upgrades (`/socket.io/`) as well, e.g. for nginx:
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:5000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+}
 ```
 
 ---
@@ -361,6 +391,9 @@ All files from the same original study receive the same new `StudyInstanceUID`, 
 - Upload one or more DICOM files
 - **Basic profile**: removes patient identifiers and institution details
 - **Full profile**: additionally removes study/series descriptions and other potentially identifying fields
+- **Remove private tags** (on by default): strips all odd-group (vendor private) elements, a common hiding place for PHI
+- **Generate new UIDs** (on by default): replaces Study/Series/SOP Instance UIDs with fresh `2.25.` UIDs, consistently across the whole batch so referential integrity is preserved — the original UIDs are a re-identification vector
+- **Burned-in PHI warnings**: files with `BurnedInAnnotation=YES`, or modalities that typically burn patient data into the pixels (US, SC, OT, XC, ES), are flagged in `ANONYMIZATION_WARNINGS.txt` inside the ZIP — tag anonymisation cannot clean pixel data, so review those images visually
 - Replacement patient name and ID can be specified
 - Output downloaded as a ZIP archive
 

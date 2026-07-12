@@ -70,6 +70,25 @@ def check_available():
         )
 
 
+# Timeouts applied to every outgoing (SCU) association. Without these,
+# pynetdicom's default dimse_timeout is None (infinite), so a peer that
+# accepts the association and then hangs would block the calling thread
+# forever. DIMSE is the most generous because C-MOVE/C-GET sub-operation
+# responses can be slow on large studies.
+ACSE_TIMEOUT    = 30   # association negotiation (seconds)
+DIMSE_TIMEOUT   = 120  # per DIMSE message response (seconds)
+NETWORK_TIMEOUT = 30   # TCP connect / idle socket (seconds)
+
+
+def _make_ae(ae_title: str) -> "AE":
+    """Create an SCU AE with sane timeouts applied."""
+    ae = AE(ae_title=ae_title)
+    ae.acse_timeout    = ACSE_TIMEOUT
+    ae.dimse_timeout   = DIMSE_TIMEOUT
+    ae.network_timeout = NETWORK_TIMEOUT
+    return ae
+
+
 # ---------------------------------------------------------------------------
 # C-ECHO (Verification)
 # ---------------------------------------------------------------------------
@@ -78,7 +97,7 @@ def c_echo(local_ae_title: str, remote_host: str, remote_port: int,
            remote_ae_title: str) -> tuple[bool, str]:
     """Send a C-ECHO to the remote AE. Returns (success, message)."""
     check_available()
-    ae = AE(ae_title=local_ae_title)
+    ae = _make_ae(local_ae_title)
     ae.add_requested_context(Verification)
     assoc = ae.associate(remote_host, remote_port, ae_title=remote_ae_title)
     if assoc.is_established:
@@ -103,7 +122,7 @@ def c_find(local_ae_title: str, remote_host: str, remote_port: int,
     Returns (success, results_list, message)
     """
     check_available()
-    ae = AE(ae_title=local_ae_title)
+    ae = _make_ae(local_ae_title)
 
     if query_model == "PATIENT":
         sop = PatientRootQueryRetrieveInformationModelFind
@@ -141,7 +160,7 @@ def c_move(local_ae_title: str, remote_host: str, remote_port: int,
     Perform a C-MOVE. move_destination is the AE title of the destination SCP.
     """
     check_available()
-    ae = AE(ae_title=local_ae_title)
+    ae = _make_ae(local_ae_title)
 
     if query_model == "PATIENT":
         sop = PatientRootQueryRetrieveInformationModelMove
@@ -220,7 +239,7 @@ def c_get(local_ae_title: str, remote_host: str, remote_port: int,
     else:
         get_sop = StudyRootQueryRetrieveInformationModelGet
 
-    ae = AE(ae_title=local_ae_title)
+    ae = _make_ae(local_ae_title)
     ae.add_requested_context(get_sop)
 
     # Negotiate storage contexts so the SCP can push files back to us.
@@ -311,7 +330,7 @@ def c_store(local_ae_title: str, remote_host: str, remote_port: int,
     (JPEG Baseline, MPEG-4, …) are accepted by the peer.
     """
     check_available()
-    ae = AE(ae_title=local_ae_title)
+    ae = _make_ae(local_ae_title)
 
     # Start with the standard storage SOPs (Explicit VR LE)
     for sop in STORAGE_SOPS:
@@ -405,7 +424,7 @@ def dmwl_find(local_ae_title: str, remote_host: str, remote_port: int,
         _dbg(f"  (could not iterate dataset: {e})")
     _dbg("────────────────────────────────────────────────")
 
-    ae = AE(ae_title=local_ae_title)
+    ae = _make_ae(local_ae_title)
     ae.add_requested_context(ModalityWorklistInformationFind)
     assoc = ae.associate(remote_host, remote_port, ae_title=remote_ae_title)
 
@@ -468,7 +487,7 @@ def storage_commitment_request(local_ae_title: str, remote_host: str,
         ref_sop_seq.append(item)
     ds.ReferencedSOPSequence = ref_sop_seq
 
-    ae = AE(ae_title=local_ae_title)
+    ae = _make_ae(local_ae_title)
     ae.add_requested_context(StorageCommitmentPushModel)
 
     # Handle N-EVENT-REPORT (async response)
@@ -553,7 +572,7 @@ def iocm_send_delete_notification(local_ae_title: str, remote_host: str,
     ref_series_seq.append(series_item)
     ds.ReferencedSeriesSequence = ref_series_seq
 
-    ae = AE(ae_title=local_ae_title)
+    ae = _make_ae(local_ae_title)
     ae.add_requested_context(IAN_SOP)
     assoc = ae.associate(remote_host, remote_port, ae_title=remote_ae_title)
     if not assoc.is_established:

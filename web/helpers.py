@@ -161,23 +161,32 @@ def _scp_storage_dir() -> str | None:
 
 
 def _cleanup_scp_storage(max_age_hours: int = ctx._SCP_RETENTION_HOURS) -> tuple[int, int]:
-    """Delete SCP storage files older than *max_age_hours*. Returns (deleted, errors)."""
+    """Delete SCP storage files older than *max_age_hours*, recursing into the
+    Study/Series directory layout. Empty study/series directories left behind
+    are removed as well (the storage root itself is kept).
+    Returns (deleted, errors)."""
     storage_dir = _scp_storage_dir()
     if not storage_dir:
         return 0, 0
     cutoff  = datetime.now().timestamp() - max_age_hours * 3600
     deleted = errors = 0
+    root = os.path.realpath(storage_dir)
     try:
-        for fname in os.listdir(storage_dir):
-            fpath = os.path.join(storage_dir, fname)
-            if not os.path.isfile(fpath):
-                continue
-            try:
-                if os.stat(fpath).st_mtime < cutoff:
-                    os.remove(fpath)
-                    deleted += 1
-            except Exception:
-                errors += 1
+        for dirpath, dirnames, filenames in os.walk(root, topdown=False):
+            for fname in filenames:
+                fpath = os.path.join(dirpath, fname)
+                try:
+                    if os.stat(fpath).st_mtime < cutoff:
+                        os.remove(fpath)
+                        deleted += 1
+                except Exception:
+                    errors += 1
+            if dirpath != root:
+                try:
+                    if not os.listdir(dirpath):
+                        os.rmdir(dirpath)
+                except Exception:
+                    pass
     except Exception:
         pass
     if deleted or errors:

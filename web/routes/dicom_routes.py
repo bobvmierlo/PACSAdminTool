@@ -8,6 +8,7 @@ import os
 import re
 import tempfile
 import threading
+import uuid
 
 from flask import Blueprint, jsonify, request, send_file
 
@@ -73,6 +74,90 @@ def _tag_str_to_tuple(tag_str: str) -> tuple[int, int] | None:
     if m:
         return int(m.group(1), 16), int(m.group(2), 16)
     return None
+
+
+def _phi_tags_from_form(form) -> list[tuple[int, int]]:
+    """Resolve the PHI tag list from the submitted profile fields."""
+    profile = form.get("profile", "basic")
+    if profile == "full":
+        return _ANON_FULL
+    if profile == "basic":
+        return _ANON_BASIC
+    # Custom profile: tags sent as JSON array of "(GGGG,EEEE)" strings
+    try:
+        custom_list = json.loads(form.get("custom_tags", "[]"))
+    except Exception:
+        custom_list = []
+    return [t for t in (_tag_str_to_tuple(s) for s in custom_list) if t]
+
+
+def _anon_flag(form, name: str, default: bool = False) -> bool:
+    raw = form.get(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _new_anon_uid() -> str:
+    """UUID-derived DICOM UID (2.25. root — globally unique, no registration)."""
+    return f"2.25.{uuid.uuid4().int}"
+
+
+# Modalities whose images very often carry patient data burned into the
+# pixels themselves (ultrasound overlays, secondary captures of reports, …).
+_BURNED_IN_MODALITIES = {"US", "SC", "OT", "XC", "ES"}
+
+
+def _anonymize_dataset(ds, phi_tags, repl_name: str, repl_id: str,
+                       remove_private: bool = False,
+                       uid_maps: dict | None = None) -> list[str]:
+    """Anonymise *ds* in place and return a list of warning strings.
+
+    uid_maps, when given, is a dict of three old→new maps shared across the
+    whole batch ({"study": {}, "series": {}, "instance": {}}) so all files
+    from one study keep referential integrity after remapping.
+    """
+    import pydicom
+
+    warnings: list[str] = []
+    ds.PatientName = repl_name
+    ds.PatientID   = repl_id
+    for group, elem in phi_tags:
+        tag = pydicom.tag.Tag(group, elem)
+        if tag in ds:
+            del ds[tag]
+
+    if remove_private:
+        try:
+            ds.remove_private_tags()
+        except Exception:
+            warnings.append("could not remove private tags")
+
+    if uid_maps is not None:
+        for attr, key in (("StudyInstanceUID",  "study"),
+                          ("SeriesInstanceUID", "series"),
+                          ("SOPInstanceUID",    "instance")):
+            old = str(getattr(ds, attr, "") or "")
+            if not old:
+                continue
+            new = uid_maps[key].setdefault(old, _new_anon_uid())
+            setattr(ds, attr, new)
+            if attr == "SOPInstanceUID":
+                fm = getattr(ds, "file_meta", None)
+                if fm is not None and hasattr(fm, "MediaStorageSOPInstanceUID"):
+                    fm.MediaStorageSOPInstanceUID = new
+
+    # Warn when PHI may be burned into the pixel data itself — tag-level
+    # anonymisation cannot remove that.
+    burned   = str(getattr(ds, "BurnedInAnnotation", "") or "").upper()
+    modality = str(getattr(ds, "Modality", "") or "").upper()
+    if burned == "YES":
+        warnings.append("BurnedInAnnotation=YES — the pixel data itself likely "
+                        "contains patient information; visual review required")
+    elif modality in _BURNED_IN_MODALITIES and hasattr(ds, "PixelData"):
+        warnings.append(f"modality {modality} images frequently contain "
+                        "burned-in patient data; visual review recommended")
+    return warnings
 
 
 # ── C-ECHO ────────────────────────────────────────────────────────────────────
@@ -377,8 +462,26 @@ def dicom_commit():
         return jsonify({"ok": False, "message": "No UIDs provided"}), 400
     try:
         from dicom.operations import storage_commit
+        # Each entry is either "SOPClassUID|SOPInstanceUID" (preferred — many
+        # SCPs validate the pair) or a bare SOPInstanceUID, in which case we
+        # fall back to a generic image SOP class for backwards compatibility.
         GENERIC_SOP_CLASS = "1.2.840.10008.5.1.4.1.1.1"
-        uid_pairs = [(GENERIC_SOP_CLASS, uid) for uid in uids]
+        uid_pairs = []
+        for item in uids:
+            if isinstance(item, dict):
+                sop_class = str(item.get("sop_class_uid", "")).strip()
+                sop_inst  = str(item.get("sop_instance_uid", "")).strip()
+            else:
+                text = str(item).strip()
+                if "|" in text:
+                    sop_class, _, sop_inst = (p.strip() for p in text.partition("|"))
+                else:
+                    sop_class, sop_inst = "", text
+            if not sop_inst:
+                continue
+            uid_pairs.append((sop_class or GENERIC_SOP_CLASS, sop_inst))
+        if not uid_pairs:
+            return jsonify({"ok": False, "message": "No valid UIDs provided"}), 400
 
         def run():
             ok, msg = storage_commit(
@@ -597,33 +700,24 @@ def dicom_anonymize():
     if not files:
         return jsonify({"ok": False, "error": "No files provided."}), 400
 
-    profile   = request.form.get("profile",      "basic")
-    repl_name = request.form.get("patient_name", "Anonymous")
-    repl_id   = request.form.get("patient_id",   "ANON")
-    if profile == "full":
-        phi_tags = _ANON_FULL
-    elif profile == "basic":
-        phi_tags = _ANON_BASIC
-    else:
-        # Custom profile: tags sent as JSON array of "(GGGG,EEEE)" strings
-        custom_raw = request.form.get("custom_tags", "[]")
-        try:
-            custom_list = json.loads(custom_raw)
-        except Exception:
-            custom_list = []
-        phi_tags = [t for t in (_tag_str_to_tuple(s) for s in custom_list) if t]
+    profile        = request.form.get("profile",      "basic")
+    repl_name      = request.form.get("patient_name", "Anonymous")
+    repl_id        = request.form.get("patient_id",   "ANON")
+    phi_tags       = _phi_tags_from_form(request.form)
+    remove_private = _anon_flag(request.form, "remove_private")
+    new_uids       = _anon_flag(request.form, "new_uids")
+    uid_maps = {"study": {}, "series": {}, "instance": {}} if new_uids else None
 
-    zip_buf = io.BytesIO(); count = 0; errors: list[str] = []
+    zip_buf = io.BytesIO(); count = 0
+    errors: list[str] = []; warnings: list[str] = []
     with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for f in files:
             try:
                 ds = pydicom.dcmread(io.BytesIO(f.read()))
-                ds.PatientName = repl_name
-                ds.PatientID   = repl_id
-                for group, elem in phi_tags:
-                    tag = pydicom.tag.Tag(group, elem)
-                    if tag in ds:
-                        del ds[tag]
+                file_warnings = _anonymize_dataset(
+                    ds, phi_tags, repl_name, repl_id,
+                    remove_private=remove_private, uid_maps=uid_maps)
+                warnings.extend(f"{f.filename or '?'}: {w}" for w in file_warnings)
                 out = io.BytesIO()
                 try:
                     ds.save_as(out, enforce_file_format=True)
@@ -635,16 +729,24 @@ def dicom_anonymize():
                 count += 1
             except Exception as exc:
                 errors.append(f"{f.filename or '?'}: {exc}")
+        if warnings:
+            zf.writestr("ANONYMIZATION_WARNINGS.txt",
+                        "The following files need manual review:\n\n"
+                        + "\n".join(warnings) + "\n")
 
     if count == 0:
         return jsonify({"ok": False,
                         "error": "No files could be anonymised. " + "; ".join(errors)}), 400
 
     _audit("dicom.anonymize", ip=_req_ip(), user=_req_user(),
-           detail={"profile": profile, "count": count})
+           detail={"profile": profile, "count": count,
+                   "remove_private": remove_private, "new_uids": new_uids,
+                   "warnings": len(warnings)})
     zip_buf.seek(0)
-    return send_file(zip_buf, mimetype="application/zip",
+    resp = send_file(zip_buf, mimetype="application/zip",
                      as_attachment=True, download_name=f"anonymised_{count}_files.zip")
+    resp.headers["X-Anonymize-Warnings"] = str(len(warnings))
+    return resp
 
 
 # ── SR Reader ─────────────────────────────────────────────────────────────────
@@ -782,35 +884,27 @@ def dicom_anonymize_and_store():
     if err:
         return err
 
-    profile   = request.form.get("profile",      "basic")
-    repl_name = request.form.get("patient_name", "Anonymous")
-    repl_id   = request.form.get("patient_id",   "ANON")
-    if profile == "full":
-        phi_tags = _ANON_FULL
-    elif profile == "basic":
-        phi_tags = _ANON_BASIC
-    else:
-        custom_raw = request.form.get("custom_tags", "[]")
-        try:
-            custom_list = json.loads(custom_raw)
-        except Exception:
-            custom_list = []
-        phi_tags = [t for t in (_tag_str_to_tuple(s) for s in custom_list) if t]
+    profile        = request.form.get("profile",      "basic")
+    repl_name      = request.form.get("patient_name", "Anonymous")
+    repl_id        = request.form.get("patient_id",   "ANON")
+    phi_tags       = _phi_tags_from_form(request.form)
+    remove_private = _anon_flag(request.form, "remove_private")
+    new_uids       = _anon_flag(request.form, "new_uids")
+    uid_maps = {"study": {}, "series": {}, "instance": {}} if new_uids else None
 
     from dicom.operations import c_store
     sent = 0
     errors: list[str] = []
+    warnings: list[str] = []
     with tempfile.TemporaryDirectory() as tmpdir:
         paths = []
         for f in files:
             try:
                 ds = pydicom.dcmread(io.BytesIO(f.read()))
-                ds.PatientName = repl_name
-                ds.PatientID   = repl_id
-                for group, elem in phi_tags:
-                    tag = pydicom.tag.Tag(group, elem)
-                    if tag in ds:
-                        del ds[tag]
+                file_warnings = _anonymize_dataset(
+                    ds, phi_tags, repl_name, repl_id,
+                    remove_private=remove_private, uid_maps=uid_maps)
+                warnings.extend(f"{f.filename or '?'}: {w}" for w in file_warnings)
                 fpath = os.path.join(tmpdir, f.filename or f"anon_{len(paths)}.dcm")
                 try:
                     ds.save_as(fpath, enforce_file_format=True)
@@ -827,9 +921,12 @@ def dicom_anonymize_and_store():
                 errors.append(msg)
 
     _audit("dicom.anonymize_and_store", ip=_req_ip(), user=_req_user(),
-           detail={"ae_title": d["ae_title"], "sent": sent, "profile": profile})
+           detail={"ae_title": d["ae_title"], "sent": sent, "profile": profile,
+                   "remove_private": remove_private, "new_uids": new_uids,
+                   "warnings": len(warnings)})
     return jsonify({"ok": sent > 0,
-                    "message": f"Sent {sent} file(s)." if sent > 0 else "; ".join(errors)})
+                    "message": f"Sent {sent} file(s)." if sent > 0 else "; ".join(errors),
+                    "warnings": warnings})
 
 
 # ── DICOM Tag Editor ──────────────────────────────────────────────────────────
@@ -935,10 +1032,13 @@ def dicom_diff():
     if not fa or not fb:
         return jsonify({"ok": False, "error": "Two files required (file_a, file_b)."}), 400
 
-    def _to_dict(ds):
-        result = {}
+    def _to_dict(ds, prefix="", result=None):
+        """Flatten a dataset to {tag_path: {...}}, recursing into sequences so
+        differences inside SQ items are visible (path like (0008,1115)[0].(0020,000E))."""
+        if result is None:
+            result = {}
         for elem in ds:
-            tag_str = f"({elem.tag.group:04X},{elem.tag.element:04X})"
+            tag_str = f"{prefix}({elem.tag.group:04X},{elem.tag.element:04X})"
             try:
                 if elem.VR == "SQ":
                     val = f"[Sequence: {len(elem.value)} item(s)]"
@@ -953,6 +1053,12 @@ def dicom_diff():
                 "vr":      str(elem.VR),
                 "value":   val,
             }
+            if elem.VR == "SQ":
+                try:
+                    for i, item in enumerate(elem.value):
+                        _to_dict(item, prefix=f"{tag_str}[{i}].", result=result)
+                except Exception:
+                    pass
         return result
 
     try:
