@@ -1,0 +1,67 @@
+name: Release Notes Drafter
+
+# Triggered when a GitHub release is published.
+# Uses claude-code-action to draft a CHANGELOG.md entry for the release
+# (following the format documented in CLAUDE.md), then commits the
+# result straight to main — no PR, since claude-code-action refuses to
+# push to a branch other than the one it was invoked on.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  draft-changelog:
+    name: Draft changelog entry
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Draft changelog entry with Claude
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            A new release was just published:
+
+            Tag: ${{ github.event.release.tag_name }}
+            Name: ${{ github.event.release.name }}
+            Body:
+            ${{ github.event.release.body }}
+
+            Do the following:
+            1. Identify the version and the PRs included in this release from
+               the tag, name, and description above.
+            2. For each PR, read its title/description via `gh pr view` and
+               skip internal-only PRs (tests, CI, build tooling, comments,
+               dead-code removal, dependency bumps, pure refactors).
+            3. For the remaining PRs, read CLAUDE.md in this repo for the
+               required changelog format and follow it exactly.
+            4. Use the release tag as the version number and the release's
+               published_at date as the entry date.
+            5. Read the existing CHANGELOG.md and prepend the new entry at
+               the top.
+            6. Only edit the file — do not commit, push, or open a PR; a
+               later workflow step handles that.
+          claude_args: |
+            --allowedTools "Read,Edit,Write,Bash(gh pr view:*),Bash(gh release view:*)"
+            --max-turns 15
+
+      - name: Commit and push CHANGELOG.md to main
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git diff --cached --quiet \
+            || git commit -m "docs: draft changelog for ${{ github.event.release.tag_name }} [skip ci]"
+          git push origin main
