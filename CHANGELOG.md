@@ -1,15 +1,8 @@
 # Changelog
 
-## v3.0.0 (pre-release) — 2026-07-12
+## v3.0.0 — 2026-07-12
 
-Implements the first code improvement from ROADMAP.md: the single ~7,500-line inline <script> block in web/static/index.html is split into 30 per-domain files under web/static/js/.
-
-What changed
-One file per feature domain: core.js (i18n, toasts, dialogs, shared helpers), socket.js, tabs.js, settings.js, ae-selector.js, and one file per tab (cfind.js, cstore.js, dmwl.js, commit-iocm.js, hl7-templates.js, hl7-tools.js, scp-receiver.js, dicomweb.js, dicomize.js, anonymizer.js, inspector.js, sr-viewer.js, kos.js, uid-remap.js, dicomdir.js, validator.js, dashboard.js, logs.js, help.js, tag-modal.js, scp-stats.js, echo.js), plus updater.js and init.js.
-Plain <script> tags, loaded in the original source order — no build system, no ES modules, shared global scope is unchanged.
-The only reordering: init.js (the page-bootstrap IIFE, which defines nothing) now loads last, so every function exists before it runs.
-index.html: 11,204 → 3,746 lines (markup + CSS + 30 script tags).
-No backend, packaging, or behavior changes. The PyInstaller spec already bundles web/static/* recursively, so built executables pick up the new directory unchanged.
+Internal change — no release note (code refactoring and changelog backfill only).
 
 ## v2.19.0 — 2026-07-12
 
