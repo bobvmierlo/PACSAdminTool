@@ -29,13 +29,14 @@ _CONFIG_SCHEMA = {
     "log_level":         str,
     "language":          str,
     "telemetry":         dict,
+    "dicom_tls":         dict,
 }
 
 _LOG_LEVELS   = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 _MAX_AE_TITLE = 16
 
 # Keys in _CONFIG_SCHEMA that only admins may write
-_ADMIN_WRITE_KEYS = frozenset({"local_ae", "remote_aes", "dicomweb_presets", "hl7", "hl7_servers", "web", "telemetry"})
+_ADMIN_WRITE_KEYS = frozenset({"local_ae", "remote_aes", "dicomweb_presets", "hl7", "hl7_servers", "web", "telemetry", "dicom_tls"})
 _MAX_HOST_LEN = 253
 
 
@@ -120,6 +121,13 @@ def _validate_config_payload(data: dict) -> str | None:
             not isinstance(web["host"], str) or len(web["host"]) > _MAX_HOST_LEN
         ):
             return f"web.host must be a string of at most {_MAX_HOST_LEN} characters."
+    if "dicom_tls" in data:
+        tls = data["dicom_tls"]
+        if "enabled" in tls and not isinstance(tls["enabled"], bool):
+            return "dicom_tls.enabled must be a boolean."
+        for field in ("cert_file", "key_file", "ca_file"):
+            if field in tls and not isinstance(tls[field], str):
+                return f"dicom_tls.{field} must be a string."
     return None
 
 

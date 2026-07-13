@@ -6,6 +6,11 @@
 
 let cfindResults = [];  // keep results for retrieve and detail popup
 
+function cfindExtraTags() {
+  const raw = document.getElementById("cfind-extra-tags")?.value || "";
+  return raw.split(",").map(s => s.trim()).filter(Boolean);
+}
+
 function cfindMethodChanged() {
   const method = document.querySelector('input[name="cfind-method"]:checked').value;
   document.getElementById("cfind-move-row").style.display = method === "move" ? "" : "none";
@@ -50,6 +55,7 @@ async function doCFind() {
       study_date:  cfindDateRange(),
       modality:    document.getElementById("cfind-mod").value,
       study_uid:   document.getElementById("cfind-suid").value,
+      extra_tags:  cfindExtraTags(),
     }),
   });
   const data = await res.json();
@@ -129,6 +135,7 @@ async function doRetrieve() {
       }).then(r => r.json())
     );
     Promise.all(movePromises).then(results => {
+      results.forEach(r => trackJob(r.job_id, "log-cfind"));
       const allOk = results.every(r => r.ok);
       if (allOk) {
         appendLog("log-cfind", now(), "C-MOVE started — switching to DICOM Receiver", "ok");
@@ -145,7 +152,7 @@ async function doRetrieve() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...ae, study_uid: uid, save_dir: saveDir, query_model: model }),
-      });
+      }).then(r => r.json()).then(r => trackJob(r.job_id, "log-cfind"));
     }
   }
 }
@@ -182,6 +189,7 @@ function _cfindHistorySave() {
     study_date_to:   document.getElementById("cfind-date-to").value,
     modality:        document.getElementById("cfind-mod").value,
     study_uid:       document.getElementById("cfind-suid").value,
+    extra_tags:      document.getElementById("cfind-extra-tags")?.value || "",
     ts: new Date().toISOString(),
   };
   const existing = _cfindHistoryLoad();
@@ -245,6 +253,7 @@ function loadCFindHistory(i) {
   if (q.study_uid)    document.getElementById("cfind-suid").value  = q.study_uid;
   if (q.query_level)  document.getElementById("cfind-level").value = q.query_level;
   if (q.query_model)  document.getElementById("cfind-model").value = q.query_model;
+  if (q.extra_tags)   document.getElementById("cfind-extra-tags").value = q.extra_tags;
 }
 
 function clearCFindHistory() {
@@ -286,6 +295,7 @@ function cfindLoadPreset() {
   document.getElementById("cfind-date-to").value   = p.date_to      || "";
   document.getElementById("cfind-mod").value       = p.modality     || "";
   document.getElementById("cfind-suid").value      = p.study_uid    || "";
+  document.getElementById("cfind-extra-tags").value = p.extra_tags  || "";
 }
 
 async function cfindSavePreset() {
@@ -314,6 +324,7 @@ async function cfindSavePreset() {
     date_to:      document.getElementById("cfind-date-to").value,
     modality:     document.getElementById("cfind-mod").value,
     study_uid:    document.getElementById("cfind-suid").value,
+    extra_tags:   document.getElementById("cfind-extra-tags").value,
   };
   if (!userSettings.cfind_presets) userSettings.cfind_presets = [];
   userSettings.cfind_presets = userSettings.cfind_presets.filter(p => p.name !== trimmed);

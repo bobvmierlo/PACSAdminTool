@@ -13,6 +13,7 @@ import uuid
 from flask import Blueprint, jsonify, request, send_file
 
 from config.manager import APP_DIR
+from dicom import save_dataset
 
 import web.context as ctx
 from web.audit import log as _audit
@@ -20,7 +21,9 @@ from web.auth import require_login
 from web.telemetry import capture as _capture
 from web.helpers import (
     _bad_request,
+    _client_room,
     _dataset_to_tag_list,
+    _dicom_tls,
     _local_ae,
     _log,
     _req_ip,
@@ -28,6 +31,7 @@ from web.helpers import (
     _require_dicom_fields,
     _safe_str,
 )
+from web.jobs import create_job, get_job, update_job
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +175,7 @@ def dicom_echo():
         return err
     from dicom.operations import c_echo
     try:
-        ok, msg = c_echo(_local_ae(), d["host"], int(d["port"]), d["ae_title"])
+        ok, msg = c_echo(_local_ae(), d["host"], int(d["port"]), d["ae_title"], tls=_dicom_tls())
         _audit("dicom.c_echo", ip=_req_ip(), user=_req_user(),
                detail={"ae_title": d["ae_title"], "host": d["host"], "port": d["port"]},
                result="ok" if ok else "error", error=None if ok else msg)
@@ -193,21 +197,24 @@ def dicom_echo_batch():
     if not remote_aes:
         return jsonify({"ok": True, "message": "No remote AE presets configured.", "total": 0})
 
+    to = _client_room()
+
     def run():
         from dicom.operations import c_echo
         for ae_cfg in remote_aes:
             name = ae_cfg.get("name") or ae_cfg.get("ae_title", "?")
             try:
                 ok, msg = c_echo(
-                    _local_ae(), ae_cfg["host"], int(ae_cfg["port"]), ae_cfg["ae_title"])
+                    _local_ae(), ae_cfg["host"], int(ae_cfg["port"]), ae_cfg["ae_title"],
+                    tls=_dicom_tls())
             except Exception as exc:
                 ok, msg = False, str(exc)
             ctx.socketio.emit("batch_echo_result", {
                 "name": name, "ae_title": ae_cfg.get("ae_title", ""),
                 "host": ae_cfg.get("host", ""), "port": ae_cfg.get("port", 0),
                 "ok": ok, "message": msg,
-            })
-        ctx.socketio.emit("batch_echo_done", {"total": len(remote_aes)})
+            }, to=to)
+        ctx.socketio.emit("batch_echo_done", {"total": len(remote_aes)}, to=to)
 
     threading.Thread(target=run, daemon=True).start()
     return jsonify({"ok": True, "message": f"Testing {len(remote_aes)} AE(s)…",
@@ -215,6 +222,54 @@ def dicom_echo_batch():
 
 
 # ── C-FIND ────────────────────────────────────────────────────────────────────
+
+# Return keys valid at each Query/Retrieve level (DICOM PS3.4 C.6). Strict
+# SCPs reject keys that don't belong to the requested level, so only the
+# relevant subset is added to the identifier — e.g. StudyDescription is never
+# sent for a SERIES/IMAGE-level query.
+_CFIND_LEVEL_KEYS = {
+    "PATIENT": ["PatientID", "PatientName", "PatientBirthDate", "PatientSex",
+                "NumberOfPatientRelatedStudies"],
+    "STUDY":   ["PatientID", "PatientName", "StudyDate", "StudyTime",
+                "AccessionNumber", "StudyInstanceUID", "StudyDescription",
+                "ModalitiesInStudy", "NumberOfStudyRelatedSeries",
+                "NumberOfStudyRelatedInstances"],
+    "SERIES":  ["StudyInstanceUID", "SeriesInstanceUID", "Modality",
+                "SeriesNumber", "SeriesDescription",
+                "NumberOfSeriesRelatedInstances"],
+    "IMAGE":   ["StudyInstanceUID", "SeriesInstanceUID", "SOPInstanceUID",
+                "InstanceNumber"],
+}
+
+# UI filter field -> the return key it populates, when that key is valid at
+# the requested level.
+_CFIND_FILTER_KEYS = {
+    "patient_id":   "PatientID",
+    "patient_name": "PatientName",
+    "accession":    "AccessionNumber",
+    "study_date":   "StudyDate",
+    "study_uid":    "StudyInstanceUID",
+}
+
+
+def _cfind_extra_tag(ds, raw: str) -> None:
+    """Add one user-supplied extra return tag (keyword or "(gggg,eeee)") to *ds*."""
+    from pydicom.datadict import dictionary_VR, tag_for_keyword
+    from pydicom.tag import Tag
+
+    raw = raw.strip()
+    if not raw:
+        return
+    m = re.match(r"^\(?\s*([0-9A-Fa-f]{4})\s*,\s*([0-9A-Fa-f]{4})\s*\)?$", raw)
+    if m:
+        tag = Tag(int(m.group(1), 16), int(m.group(2), 16))
+        vr = dictionary_VR(tag)
+        ds.add_new(tag, vr, "")
+        return
+    tag = tag_for_keyword(raw)
+    if tag is not None:
+        setattr(ds, raw, "")
+
 
 @bp.route("/api/dicom/find", methods=["POST"])
 def dicom_find():
@@ -227,27 +282,37 @@ def dicom_find():
         from dicom.operations import c_find
         from pydicom.dataset import Dataset
 
+        level = str(d.get("query_level") or "STUDY").upper()
+        if level not in _CFIND_LEVEL_KEYS:
+            level = "STUDY"
+        level_keys = _CFIND_LEVEL_KEYS[level]
+
         ds = Dataset()
-        ds.QueryRetrieveLevel             = d.get("query_level",  "STUDY")
-        ds.PatientID                      = d.get("patient_id",   "")
-        ds.PatientName                    = d.get("patient_name",  "")
-        ds.AccessionNumber                = d.get("accession",     "")
-        ds.StudyDate                      = d.get("study_date",    "")
-        ds.ModalitiesInStudy              = d.get("modality",      "")
-        ds.StudyInstanceUID               = d.get("study_uid",     "")
-        ds.StudyDescription               = ""
-        ds.StudyTime                      = ""
-        ds.NumberOfStudyRelatedInstances  = ""
+        ds.QueryRetrieveLevel = level
+        for key in level_keys:
+            setattr(ds, key, "")
+
+        for field, key in _CFIND_FILTER_KEYS.items():
+            if key in level_keys:
+                setattr(ds, key, d.get(field, ""))
+
+        modality_key = "ModalitiesInStudy" if level == "STUDY" else "Modality"
+        if modality_key in level_keys:
+            setattr(ds, modality_key, d.get("modality", ""))
+
+        for raw_tag in d.get("extra_tags", []) or []:
+            _cfind_extra_tag(ds, str(raw_tag))
 
         ok, results, msg = c_find(
             _local_ae(), d["host"], int(d["port"]), d["ae_title"],
-            ds, d.get("query_model", "STUDY"))
+            ds, d.get("query_model", "STUDY"), tls=_dicom_tls())
 
         rows = [{
             "PatientID":   _safe_str(getattr(r, "PatientID",          "")),
             "PatientName": _safe_str(getattr(r, "PatientName",         "")),
             "StudyDate":   _safe_str(getattr(r, "StudyDate",           "")),
-            "Modality":    _safe_str(getattr(r, "ModalitiesInStudy",   "")),
+            "Modality":    _safe_str(getattr(r, "ModalitiesInStudy",
+                                     getattr(r, "Modality", ""))),
             "Accession":   _safe_str(getattr(r, "AccessionNumber",     "")),
             "Description": _safe_str(getattr(r, "StudyDescription",    "")),
             "StudyUID":    _safe_str(getattr(r, "StudyInstanceUID",    "")),
@@ -287,17 +352,25 @@ def dicom_move():
         ds.QueryRetrieveLevel = "STUDY"
         ds.StudyInstanceUID   = d.get("study_uid", "")
 
+        to = _client_room()
+        job_id = create_job("cmove")
+
+        def on_progress(m):
+            _log("cfind", m, to=to)
+            update_job(job_id, message=m)
+
         def run():
             ok, msg = c_move(
                 _local_ae(), d["host"], int(d["port"]), d["ae_title"],
                 ds, d.get("move_dest", _local_ae()),
                 d.get("query_model", "STUDY"),
-                callback=lambda m: _log("cfind", m))
-            _log("cfind", msg, "ok" if ok else "err")
+                callback=on_progress, tls=_dicom_tls())
+            _log("cfind", msg, "ok" if ok else "err", to=to)
+            update_job(job_id, state="completed" if ok else "error", message=msg)
 
         threading.Thread(target=run, daemon=True).start()
         _capture("feature_used", {"feature": "dicom_move"})
-        return jsonify({"ok": True, "message": "C-MOVE started"})
+        return jsonify({"ok": True, "message": "C-MOVE started", "job_id": job_id})
     except Exception as e:
         logger.exception("C-MOVE setup error")
         return jsonify({"ok": False, "message": str(e)}), 500
@@ -322,18 +395,26 @@ def dicom_get():
         ds.QueryRetrieveLevel = "STUDY"
         ds.StudyInstanceUID   = d.get("study_uid", "")
 
+        to = _client_room()
+        job_id = create_job("cget")
+
+        def on_progress(m):
+            _log("cfind", m, to=to)
+            update_job(job_id, message=m)
+
         def run():
             ok, msg = c_get(
                 _local_ae(), d["host"], int(d["port"]), d["ae_title"],
                 ds, save_dir, d.get("query_model", "STUDY"),
-                callback=lambda m: _log("cfind", m))
-            _log("cfind", msg, "ok" if ok else "err")
+                callback=on_progress, tls=_dicom_tls())
+            _log("cfind", msg, "ok" if ok else "err", to=to)
+            update_job(job_id, state="completed" if ok else "error", message=msg)
 
         threading.Thread(target=run, daemon=True).start()
         _audit("dicom.c_get", ip=_req_ip(), user=_req_user(),
                detail={"ae_title": d["ae_title"], "study_uid": d.get("study_uid"),
                        "save_dir": save_dir})
-        return jsonify({"ok": True, "message": "C-GET started"})
+        return jsonify({"ok": True, "message": "C-GET started", "job_id": job_id})
     except Exception as e:
         logger.exception("C-GET setup error")
         return jsonify({"ok": False, "message": str(e)}), 500
@@ -366,21 +447,41 @@ def dicom_store():
         f.save(path)
         paths.append(path)
 
+    to = _client_room()
+    job_id = create_job("cstore")
+
+    def on_progress(m):
+        _log("cstore", m, to=to)
+        update_job(job_id, message=m)
+
     def run():
         try:
             from dicom.operations import c_store
             ok, msg = c_store(_local_ae(), host, port, ae_title, paths,
-                              callback=lambda m: _log("cstore", m))
-            _log("cstore", msg, "ok" if ok else "err")
+                              callback=on_progress, tls=_dicom_tls())
+            _log("cstore", msg, "ok" if ok else "err", to=to)
+            update_job(job_id, state="completed" if ok else "error", message=msg)
         except Exception as e:
             logger.exception("C-STORE background error")
-            _log("cstore", f"Error: {e}", "err")
+            _log("cstore", f"Error: {e}", "err", to=to)
+            update_job(job_id, state="error", message=str(e))
         finally:
             tmp_dir_obj.cleanup()
 
     threading.Thread(target=run, daemon=True).start()
     _capture("feature_used", {"feature": "dicom_store", "file_count": len(paths)})
-    return jsonify({"ok": True, "message": f"Sending {len(paths)} file(s)…"})
+    return jsonify({"ok": True, "message": f"Sending {len(paths)} file(s)…", "job_id": job_id})
+
+
+# ── Background jobs ───────────────────────────────────────────────────────────
+
+@bp.route("/api/jobs/<job_id>", methods=["GET"])
+def dicom_job_status(job_id):
+    """Return the current state of a background C-MOVE/C-GET/C-STORE job."""
+    job = get_job(job_id)
+    if job is None:
+        return jsonify({"ok": False, "error": "Unknown job id"}), 404
+    return jsonify({"ok": True, "job": job})
 
 
 # ── DMWL ─────────────────────────────────────────────────────────────────────
@@ -418,9 +519,10 @@ def dicom_dmwl():
 
         calling_ae = d.get("calling_aet", "").strip() or _local_ae()
 
+        to = _client_room()
         ok, results, msg = dmwl_find(
             calling_ae, d["host"], int(d["port"]), d["ae_title"], ds,
-            log_callback=lambda m: _log("dmwl", m))
+            log_callback=lambda m: _log("dmwl", m, to=to), tls=_dicom_tls())
 
         rows = []
         for r in results:
@@ -483,11 +585,13 @@ def dicom_commit():
         if not uid_pairs:
             return jsonify({"ok": False, "message": "No valid UIDs provided"}), 400
 
+        to = _client_room()
+
         def run():
             ok, msg = storage_commit(
                 {"ae_title": _local_ae()}, d["host"], int(d["port"]), d["ae_title"],
-                uid_pairs, callback=lambda m: _log("commit", m))
-            _log("commit", msg, "ok" if ok else "err")
+                uid_pairs, callback=lambda m: _log("commit", m, to=to), tls=_dicom_tls())
+            _log("commit", msg, "ok" if ok else "err", to=to)
 
         threading.Thread(target=run, daemon=True).start()
         return jsonify({"ok": True, "message": "Commitment request sent"})
@@ -509,11 +613,13 @@ def dicom_iocm():
         from dicom.operations import iocm_send_delete_notification
         sop_instances = [(d.get("sop_class_uid", ""), d.get("sop_inst_uid", ""))]
 
+        to = _client_room()
+
         def run():
             ok, msg = iocm_send_delete_notification(
                 _local_ae(), d["host"], int(d["port"]), d["ae_title"],
-                d.get("study_uid", ""), sop_instances)
-            _log("iocm", msg, "ok" if ok else "err")
+                d.get("study_uid", ""), sop_instances, tls=_dicom_tls())
+            _log("iocm", msg, "ok" if ok else "err", to=to)
 
         threading.Thread(target=run, daemon=True).start()
         return jsonify({"ok": True, "message": "IOCM notification sent"})
@@ -719,10 +825,7 @@ def dicom_anonymize():
                     remove_private=remove_private, uid_maps=uid_maps)
                 warnings.extend(f"{f.filename or '?'}: {w}" for w in file_warnings)
                 out = io.BytesIO()
-                try:
-                    ds.save_as(out, enforce_file_format=True)
-                except TypeError:
-                    ds.save_as(out, write_like_original=False)
+                save_dataset(ds, out)
                 out.seek(0)
                 fname = f.filename if f.filename else f"anon_{count}.dcm"
                 zf.writestr(fname, out.read())
@@ -854,10 +957,7 @@ def kos_create():
             local_ae_title     = _local_ae(),
         )
         buf = io.BytesIO()
-        try:
-            ds.save_as(buf, enforce_file_format=True)
-        except TypeError:
-            ds.save_as(buf, write_like_original=False)
+        save_dataset(ds, buf)
         buf.seek(0)
         filename = f"KOS_{study_uid[-12:].replace('.', '_')}.dcm"
         return send_file(buf, mimetype="application/octet-stream",
@@ -906,15 +1006,13 @@ def dicom_anonymize_and_store():
                     remove_private=remove_private, uid_maps=uid_maps)
                 warnings.extend(f"{f.filename or '?'}: {w}" for w in file_warnings)
                 fpath = os.path.join(tmpdir, f.filename or f"anon_{len(paths)}.dcm")
-                try:
-                    ds.save_as(fpath, enforce_file_format=True)
-                except TypeError:
-                    ds.save_as(fpath, write_like_original=False)
+                save_dataset(ds, fpath)
                 paths.append(fpath)
             except Exception as exc:
                 errors.append(f"{f.filename or '?'}: {exc}")
         if paths:
-            ok, msg = c_store(_local_ae(), d["host"], int(d["port"]), d["ae_title"], paths)
+            ok, msg = c_store(_local_ae(), d["host"], int(d["port"]), d["ae_title"], paths,
+                              tls=_dicom_tls())
             if ok:
                 sent = len(paths)
             else:
@@ -967,10 +1065,7 @@ def dicom_edit():
         ds = pydicom.dcmread(io.BytesIO(f.read()))
         _apply_tag_edits(ds, edits)
         out = io.BytesIO()
-        try:
-            ds.save_as(out, enforce_file_format=True)
-        except TypeError:
-            ds.save_as(out, write_like_original=False)
+        save_dataset(ds, out)
         out.seek(0)
         fname = f.filename or "edited.dcm"
         _audit("dicom.edit", ip=_req_ip(), user=_req_user(),
@@ -1003,13 +1098,11 @@ def dicom_edit_and_store():
         _apply_tag_edits(ds, edits)
         with tempfile.TemporaryDirectory() as tmpdir:
             fpath = os.path.join(tmpdir, f.filename or "edited.dcm")
-            try:
-                ds.save_as(fpath, enforce_file_format=True)
-            except TypeError:
-                ds.save_as(fpath, write_like_original=False)
+            save_dataset(ds, fpath)
             from dicom.operations import c_store
             ok, msg = c_store(
-                _local_ae(), d["host"], int(d["port"]), d["ae_title"], [fpath]
+                _local_ae(), d["host"], int(d["port"]), d["ae_title"], [fpath],
+                tls=_dicom_tls()
             )
         _audit("dicom.edit_and_store", ip=_req_ip(), user=_req_user(),
                detail={"ae_title": d["ae_title"], "edits": len(edits)})

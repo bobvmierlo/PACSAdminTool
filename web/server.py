@@ -31,6 +31,7 @@ import web.context as ctx
 from config.manager import load_config, save_config, APP_DIR, LOG_DIR
 from locales import set_language
 from web.auth import has_users, load_or_create_secret_key
+from web.helpers import _client_room
 from web.routes import register_all
 
 # ===========================================================================
@@ -215,7 +216,8 @@ def on_connect():
                        request.remote_addr)
         return False
     logger.info("Browser connected via WebSocket")
-    from flask_socketio import emit
+    from flask_socketio import emit, join_room
+    join_room(_client_room())
     with ctx._listener_lock:
         scp_running = bool(ctx._scp_listener and ctx._scp_listener.running)
         hl7_running = bool(ctx._hl7_listener and ctx._hl7_listener.running)

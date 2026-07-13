@@ -78,7 +78,7 @@ def create_kos(
         local_ae_title:      ContentCreatorName (identifies this tool).
 
     Returns:
-        A pydicom FileDataset ready to save via ``ds.save_as(path, enforce_file_format=True)``.
+        A pydicom FileDataset ready to save via ``dicom.save_dataset(ds, path)``.
     """
     try:
         from pydicom.dataset import Dataset, FileMetaDataset

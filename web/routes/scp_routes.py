@@ -15,6 +15,7 @@ from web.helpers import (
     _bad_request,
     _cleanup_scp_storage,
     _dataset_to_tag_list,
+    _dicom_tls,
     _log,
     _local_ae,
     _req_ip,
@@ -55,7 +56,7 @@ def scp_start():
 
         ctx._scp_listener = SCPListener(ae_title=ae_title, port=port,
                                         storage_dir=save_dir, log_callback=on_log,
-                                        n_event_callback=on_commit)
+                                        n_event_callback=on_commit, tls=_dicom_tls())
         try:
             ctx._scp_listener.start()
             ctx._last_scp_storage_dir = save_dir

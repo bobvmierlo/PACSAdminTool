@@ -9,7 +9,7 @@ from flask import Blueprint, jsonify, request
 import web.context as ctx
 from web.audit import log as _audit
 from web.auth import require_login
-from web.helpers import _bad_request, _log, _req_ip, _req_user, _require_hl7_fields
+from web.helpers import _bad_request, _client_room, _log, _req_ip, _req_user, _require_hl7_fields
 from web.telemetry import capture as _capture
 
 logger = logging.getLogger(__name__)
@@ -89,14 +89,15 @@ def hl7_send():
     debug = bool(d.get("debug", False))
     try:
         from hl7_module.messaging import send_mllp
+        to = _client_room()
         debug_active = debug or logger.isEnabledFor(logging.DEBUG)
-        dbg = (lambda m: _log("hl7_send", m, "debug")) if debug_active else None
+        dbg = (lambda m: _log("hl7_send", m, "debug", to=to)) if debug_active else None
         ok, response = send_mllp(
             d["host"], int(d["port"]),
             d["message"].replace("\n", "\r"),
             debug_callback=dbg)
         _log("hl7_send", f"{'ACK received' if ok else 'FAILED'}: {response[:200]}",
-             "ok" if ok else "err")
+             "ok" if ok else "err", to=to)
         _audit("hl7.send", ip=_req_ip(), user=_req_user(),
                detail={"host": d["host"], "port": d["port"]},
                result="ok" if ok else "error", error=None if ok else response[:200])

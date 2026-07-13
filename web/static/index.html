@@ -1033,6 +1033,11 @@
         <div class="field"><label data-i18n="cfind.study_uid">Study UID</label>
           <div style="display:flex;gap:4px"><input id="cfind-suid" style="flex:1;font-family:Consolas;font-size:11px">
           <button class="uid-copy-btn" onclick="copyToClipboard(document.getElementById('cfind-suid').value)" title="Copy UID">⎘</button></div></div>
+        <div class="field" style="grid-column:span 3">
+          <label data-i18n="cfind.extra_tags">Extra Return Tags</label>
+          <input id="cfind-extra-tags" placeholder="InstitutionName, (0008,0080), ReferringPhysicianName"
+                 title="Comma-separated DICOM keywords or (gggg,eeee) tags to request in addition to the standard set for this level">
+        </div>
       </div>
       <div class="btn-row" style="margin-top:12px">
         <div class="field" style="width:130px">
@@ -2226,6 +2231,22 @@
       <div class="field-grid">
         <div class="field"><label data-i18n="settings.ae_title_web">Local AE Title</label><input id="set-ae-title" value="PACSADMIN"></div>
         <div class="field" style="max-width:120px"><label data-i18n="settings.port_web">Default Port</label><input id="set-ae-port" type="number" min="1" max="65535" value="11112"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 data-i18n="settings.dicom_tls">DICOM TLS</h3>
+      <p style="font-size:12px; color:#888; margin-top:-6px" data-i18n="settings.dicom_tls_hint">
+        When enabled, every outgoing DICOM connection (C-ECHO, C-FIND, C-MOVE, C-GET, C-STORE, DMWL,
+        Storage Commitment, IOCM) and the Storage SCP listener use TLS instead of a plaintext socket.
+        Cert/key/CA are file paths on the server.
+      </p>
+      <div class="field-grid">
+        <div class="field"><label data-i18n="settings.dicom_tls_enabled">Enabled</label>
+          <input type="checkbox" id="set-dicom-tls-enabled" style="width:auto; margin-top:8px">
+        </div>
+        <div class="field"><label data-i18n="settings.dicom_tls_cert">Certificate File</label><input id="set-dicom-tls-cert" placeholder="/path/to/cert.pem"></div>
+        <div class="field"><label data-i18n="settings.dicom_tls_key">Private Key File</label><input id="set-dicom-tls-key" placeholder="/path/to/key.pem"></div>
+        <div class="field"><label data-i18n="settings.dicom_tls_ca">CA Bundle File</label><input id="set-dicom-tls-ca" placeholder="/path/to/ca.pem (optional)"></div>
       </div>
     </div>
     <div class="card">
@@ -3721,6 +3742,7 @@
 <script src="/static/js/echo.js"></script>
 <script src="/static/js/cfind.js"></script>
 <script src="/static/js/cstore.js"></script>
+<script src="/static/js/jobs.js"></script>
 <script src="/static/js/dmwl.js"></script>
 <script src="/static/js/commit-iocm.js"></script>
 <script src="/static/js/hl7-templates.js"></script>
