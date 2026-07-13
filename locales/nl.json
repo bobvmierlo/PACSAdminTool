@@ -215,6 +215,7 @@
     "recv_facility": "Ontvangende instelling:",
     "assigning_auth": "Toewijzende autoriteit:",
     "show_mllp": "Ruwe MLLP-bytes tonen in log",
+    "ack_mode": "ACK-antwoord",
     "send_mllp": "Verzenden via MLLP",
     "clear_msg": "Bericht wissen",
     "no_message": "Geen bericht om te verzenden.",

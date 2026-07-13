@@ -1343,6 +1343,14 @@
         <h3 data-i18n="hl7.listener_config">Listener Configuration</h3>
         <div class="field-grid">
           <div class="field" style="max-width:120px"><label data-i18n="hl7.port">Port</label><input id="hl7-listen-port" type="number" min="1" max="65535" value="2575"></div>
+          <div class="field" style="max-width:280px">
+            <label data-i18n="hl7.ack_mode">ACK Response</label>
+            <select id="hl7-ack-mode" title="MSA-1 code returned for every received message — use AE/AR to test a sender's negative-ACK handling">
+              <option value="AA">AA — Accept (normal)</option>
+              <option value="AE">AE — Application Error</option>
+              <option value="AR">AR — Application Reject</option>
+            </select>
+          </div>
         </div>
         <div class="btn-row" style="margin-top:12px">
           <button class="btn primary" id="hl7-listen-btn" onclick="toggleHL7Listener()" data-i18n="hl7.start_hl7_web">&#9654; Start HL7 Listener</button>

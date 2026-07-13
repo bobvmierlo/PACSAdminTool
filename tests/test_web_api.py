@@ -685,3 +685,51 @@ class TestValidatorEndpoint:
         )
         assert resp.status_code == 401
 
+
+# ---------------------------------------------------------------------------
+# HL7 listener options + persisted history
+# ---------------------------------------------------------------------------
+
+class TestHL7ListenerAndHistory:
+    def test_listener_start_rejects_bad_ack_code(self, authed_client):
+        resp = authed_client.post("/api/hl7/listener/start",
+                                  json={"port": 2575, "ack_code": "XX"})
+        assert resp.status_code == 400
+        assert "ack_code" in json.loads(resp.data)["error"]
+
+    def test_history_roundtrip(self, authed_client):
+        import web.routes.hl7_routes as hl7_routes
+
+        # Start empty
+        authed_client.post("/api/hl7/history/clear")
+        resp = authed_client.get("/api/hl7/history")
+        assert resp.status_code == 200
+        assert json.loads(resp.data)["messages"] == []
+
+        # Append via the same helper the listener callback uses
+        hl7_routes._history_append(
+            {"ts": "2026-01-01T12:00:00", "from": "10.0.0.1:1234",
+             "message": "MSH|^~\\&|A|B|C|D|20260101||ADT^A04|1|P|2.5\r"})
+        resp = authed_client.get("/api/hl7/history")
+        messages = json.loads(resp.data)["messages"]
+        assert len(messages) == 1
+        assert messages[0]["from"] == "10.0.0.1:1234"
+
+        # Clear removes everything
+        resp = authed_client.post("/api/hl7/history/clear")
+        assert json.loads(resp.data)["ok"]
+        resp = authed_client.get("/api/hl7/history")
+        assert json.loads(resp.data)["messages"] == []
+
+    def test_history_capped(self, authed_client):
+        import web.routes.hl7_routes as hl7_routes
+        authed_client.post("/api/hl7/history/clear")
+        for i in range(hl7_routes._HISTORY_MAX + 25):
+            hl7_routes._history_append(
+                {"ts": "2026-01-01T12:00:00", "from": "x", "message": str(i)})
+        resp = authed_client.get("/api/hl7/history")
+        messages = json.loads(resp.data)["messages"]
+        assert len(messages) == hl7_routes._HISTORY_MAX
+        # Newest entry is first
+        assert messages[0]["message"] == str(hl7_routes._HISTORY_MAX + 24)
+

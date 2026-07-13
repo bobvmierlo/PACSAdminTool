@@ -1,7 +1,9 @@
-"""HL7 routes: send, templates, listener start/stop/status."""
+"""HL7 routes: send, templates, listener start/stop/status, message history."""
 
+import json
 import logging
 import os
+import threading
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
@@ -15,6 +17,53 @@ from web.telemetry import capture as _capture
 logger = logging.getLogger(__name__)
 
 bp = Blueprint("hl7", __name__)
+
+# ── Persisted inbound-message history ────────────────────────────────────────
+# The last _HISTORY_MAX received messages survive a server restart, unlike the
+# listener's in-memory deque or the browser's localStorage copy.
+
+_HISTORY_MAX  = 200
+_history_lock = threading.Lock()
+
+
+def _history_path() -> str:
+    # Resolved lazily so it tracks the live APP_DIR (PACS_DATA_DIR may be
+    # re-evaluated when config.manager is reloaded, e.g. in tests).
+    import config.manager as config_mod
+    return os.path.join(config_mod.APP_DIR, "hl7_history.json")
+
+
+def _history_load() -> list:
+    try:
+        with open(_history_path(), "r", encoding="utf-8") as fh:
+            entries = json.load(fh)
+        return entries if isinstance(entries, list) else []
+    except (OSError, ValueError):
+        return []
+
+
+def _history_append(entry: dict) -> None:
+    with _history_lock:
+        entries = _history_load()
+        entries.insert(0, entry)
+        del entries[_HISTORY_MAX:]
+        path = _history_path()
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(entries, fh)
+        except OSError:
+            logger.exception("Could not persist HL7 history")
+
+
+def _history_clear() -> None:
+    with _history_lock:
+        try:
+            os.remove(_history_path())
+        except FileNotFoundError:
+            pass
+        except OSError:
+            logger.exception("Could not clear HL7 history")
 
 
 @bp.route("/api/hl7/templates", methods=["GET"])
@@ -124,13 +173,19 @@ def hl7_listener_start():
             f"'port' must be an integer between 1 and 65535, got: {d.get('port')!r}.")
     debug = bool(d.get("debug", False))
 
+    from hl7_module.messaging import ACK_CODES, HL7Listener
+    ack_code = str(d.get("ack_code", "AA")).upper()
+    if ack_code not in ACK_CODES:
+        return _bad_request(f"'ack_code' must be one of {list(ACK_CODES)}, got: {d.get('ack_code')!r}.")
+
     with ctx._listener_lock:
         if ctx._hl7_listener and ctx._hl7_listener.running:
             return jsonify({"ok": False, "message": "Listener already running"})
 
-        from hl7_module.messaging import HL7Listener
-
         def on_message(msg, addr):
+            ts_iso = datetime.now().isoformat(timespec="seconds")
+            _history_append({"ts": ts_iso, "from": f"{addr[0]}:{addr[1]}",
+                             "message": msg})
             ctx.socketio.emit("hl7_message", {
                 "ts":      datetime.now().strftime("%H:%M:%S"),
                 "from":    f"{addr[0]}:{addr[1]}",
@@ -142,13 +197,14 @@ def hl7_listener_start():
         dbg = (lambda m: _log("hl7_recv", m, "debug")) if debug_active else None
 
         ctx._hl7_listener = HL7Listener(port=port, callback=on_message,
-                                        debug_callback=dbg)
+                                        debug_callback=dbg, ack_code=ack_code)
         try:
             ctx._hl7_listener.start()
             _audit("hl7.listener.start", ip=_req_ip(), user=_req_user(),
-                   detail={"port": port})
+                   detail={"port": port, "ack_code": ack_code})
             _capture("feature_used", {"feature": "hl7_listener_start"})
-            return jsonify({"ok": True, "message": f"HL7 listener started on port {port}"})
+            ack_note = "" if ack_code == "AA" else f" (returning {ack_code} ACKs)"
+            return jsonify({"ok": True, "message": f"HL7 listener started on port {port}{ack_note}"})
         except Exception as e:
             logger.exception("HL7 Listener start failed")
             _audit("hl7.listener.start", ip=_req_ip(), user=_req_user(),
@@ -173,3 +229,17 @@ def hl7_listener_status():
     with ctx._listener_lock:
         running = bool(ctx._hl7_listener and ctx._hl7_listener.running)
     return jsonify({"running": running})
+
+
+@bp.route("/api/hl7/history", methods=["GET"])
+def hl7_history():
+    """Return the persisted inbound HL7 message history (newest first)."""
+    return jsonify({"ok": True, "messages": _history_load()})
+
+
+@bp.route("/api/hl7/history/clear", methods=["POST"])
+def hl7_history_clear():
+    """Delete the persisted inbound HL7 message history."""
+    _history_clear()
+    _audit("hl7.history.clear", ip=_req_ip(), user=_req_user())
+    return jsonify({"ok": True})

@@ -376,8 +376,10 @@ function _hl7OutHistorySave(entry) {
   renderHL7OutHistory();
 }
 
-function _hl7InHistorySave(entry) {
-  _hl7HistSave(HL7_HIST_IN_KEY, entry);
+// Inbound history is persisted server-side (survives restarts); the server
+// appends each message before emitting the socket event, so a refresh from
+// /api/hl7/history is all that's needed here.
+function _hl7InHistorySave(_entry) {
   renderHL7InHistory();
 }
 
@@ -425,10 +427,18 @@ function renderHL7OutHistory() {
   arr.forEach(item => list.appendChild(_hl7HistItemEl(item, "out")));
 }
 
-function renderHL7InHistory() {
-  const arr  = _hl7HistLoad(HL7_HIST_IN_KEY);
+async function renderHL7InHistory() {
   const card = document.getElementById("hl7-in-history-card");
   const list = document.getElementById("hl7-in-history-list");
+  let arr = [];
+  try {
+    const res  = await fetch("/api/hl7/history");
+    const data = await res.json();
+    arr = (data.messages || []).map(m => ({
+      ts: m.ts, from: m.from,
+      message: (m.message || "").replace(/\r/g, "\n"),
+    }));
+  } catch { /* server unreachable — leave list empty */ }
   if (!arr.length) { card.style.display = "none"; return; }
   card.style.display = "";
   list.innerHTML = "";
@@ -440,8 +450,9 @@ function clearHL7OutHistory() {
   renderHL7OutHistory();
 }
 
-function clearHL7InHistory() {
-  localStorage.removeItem(HL7_HIST_IN_KEY);
+async function clearHL7InHistory() {
+  localStorage.removeItem(HL7_HIST_IN_KEY);  // clean up pre-server-history data
+  await fetch("/api/hl7/history/clear", { method: "POST" }).catch(() => {});
   renderHL7InHistory();
 }
 
@@ -465,6 +476,7 @@ async function toggleHL7Listener() {
       body: JSON.stringify({
         port: port,
         debug: document.getElementById("hl7-recv-debug").checked,
+        ack_code: document.getElementById("hl7-ack-mode").value,
       }),
     });
     const data = await res.json();

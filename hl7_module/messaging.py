@@ -142,15 +142,32 @@ def format_hl7_display(message: str) -> str:
 # HL7 MLLP Listener
 # ---------------------------------------------------------------------------
 
+# ACK codes the listener can be configured to return (MSA-1).
+# AA = Application Accept, AE = Application Error, AR = Application Reject.
+ACK_CODES = ("AA", "AE", "AR")
+
+_ACK_TEXT = {
+    "AA": "Message received successfully",
+    "AE": "Application error (configured test response)",
+    "AR": "Application reject (configured test response)",
+}
+
+
 class HL7Listener:
-    """Simple MLLP TCP server to receive HL7 messages."""
+    """Simple MLLP TCP server to receive HL7 messages.
+
+    ack_code: MSA-1 value returned for every message — "AA" (default),
+              or "AE"/"AR" so senders' negative-ACK handling can be tested.
+    """
 
     def __init__(self, port: int, callback: Optional[Callable] = None,
-                 debug_callback: Optional[Callable] = None):
+                 debug_callback: Optional[Callable] = None,
+                 ack_code: str = "AA"):
         self.port = port
         self.callback = callback
         # debug_callback receives formatted raw-byte strings when enabled
         self.debug_callback = debug_callback
+        self.ack_code = ack_code if ack_code in ACK_CODES else "AA"
         self._sock = None
         self._thread = None
         self.running = False
@@ -196,10 +213,15 @@ class HL7Listener:
             conn.close()
 
     def _build_ack(self, message: str) -> str:
-        """Build a simple AA ACK, swapping sender/receiver from the incoming MSH."""
+        """Build an ACK, swapping sender/receiver from the incoming MSH.
+
+        The MSA-1 code comes from self.ack_code (AA/AE/AR) and the MSH-12
+        version is echoed from the incoming message rather than hardcoded.
+        """
         now = datetime.now().strftime("%Y%m%d%H%M%S")
         lines = message.strip().split("\r")
         ctrl_id = "UNKNOWN"
+        version = "2.3"
         # Default to the incoming message's receiving fields (i.e. us)
         send_app = ""
         send_fac = ""
@@ -214,10 +236,13 @@ class HL7Listener:
                 recv_fac = parts[3] if len(parts) > 3 else ""
                 send_app = parts[4] if len(parts) > 4 else ""
                 send_fac = parts[5] if len(parts) > 5 else ""
+                if len(parts) > 11 and parts[11].strip():
+                    version = parts[11].strip()
                 break
+        code = self.ack_code if self.ack_code in ACK_CODES else "AA"
         return (
-            f"MSH|^~\\&|{send_app}|{send_fac}|{recv_app}|{recv_fac}|{now}||ACK|{now}|P|2.3\r"
-            f"MSA|AA|{ctrl_id}|Message received successfully\r"
+            f"MSH|^~\\&|{send_app}|{send_fac}|{recv_app}|{recv_fac}|{now}||ACK|{now}|P|{version}\r"
+            f"MSA|{code}|{ctrl_id}|{_ACK_TEXT[code]}\r"
         )
 
     def _run(self):

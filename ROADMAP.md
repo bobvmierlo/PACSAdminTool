@@ -38,8 +38,9 @@ below are the remaining ideas, roughly in order of value.
    uptime/latency trends and flapping links.
 4. ~~**CSV export for C-FIND results**~~ ✅ Done — Export CSV button on the
    C-FIND results table (was already implemented; roadmap entry was stale).
-5. **Persisted HL7 message history + configurable ACK.** Persist the last N
-   received messages to disk; let the listener return AE/AR for negative-ACK
-   testing; echo the incoming message's HL7 version in the ACK instead of the
-   hardcoded `2.3`.
-6. **Docker `HEALTHCHECK`** hitting `/api/health` in the Dockerfile / compose file.
+5. ~~**Persisted HL7 message history + configurable ACK.**~~ ✅ Done — the last
+   200 received messages are persisted to disk (`hl7_history.json`, served via
+   `/api/hl7/history`); the listener can return AE/AR for negative-ACK testing
+   (ACK Response dropdown); the ACK echoes the incoming message's HL7 version.
+6. ~~**Docker `HEALTHCHECK`**~~ ✅ Done — `HEALTHCHECK` hitting `/api/health`
+   in the Dockerfile, mirrored in `docker-compose.yml`.
