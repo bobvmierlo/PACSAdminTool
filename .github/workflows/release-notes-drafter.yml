@@ -1,19 +1,16 @@
 name: Release Notes Drafter
 
-# claude-code-action does not support the `release` event (it fails with
-# "Unsupported event type: release"), so the release trigger only runs a
-# small bridge job that re-dispatches this same workflow as a
-# workflow_dispatch run — an event the action does support — passing the
-# release tag as an input.
+# Dispatched by release.yml when a GitHub release is published (or run
+# manually from the Actions tab with a tag name). It is a separate
+# workflow_dispatch workflow because claude-code-action does not
+# support the `release` event ("Unsupported event type: release").
 #
-# The drafting job uses claude-code-action to write a CHANGELOG.md entry
-# for the release (following the format documented in CLAUDE.md), then
-# commits the result straight to main — no PR, since claude-code-action
-# refuses to push to a branch other than the one it was invoked on.
+# Uses claude-code-action to draft a CHANGELOG.md entry for the release
+# (following the format documented in CLAUDE.md), then commits the
+# result straight to main — no PR, since claude-code-action refuses to
+# push to a branch other than the one it was invoked on.
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag_name:
@@ -23,26 +20,11 @@ on:
 
 permissions:
   contents: write
-  actions: write
   id-token: write
 
 jobs:
-  dispatch:
-    name: Re-dispatch as workflow_dispatch
-    if: github.event_name == 'release'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Dispatch drafting run for this release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh workflow run release-notes-drafter.yml \
-            --repo "${{ github.repository }}" \
-            -f tag_name="${{ github.event.release.tag_name }}"
-
   draft-changelog:
     name: Draft changelog entry
-    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
