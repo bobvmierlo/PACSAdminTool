@@ -1,23 +1,48 @@
 name: Release Notes Drafter
 
-# Triggered when a GitHub release is published.
-# Uses claude-code-action to draft a CHANGELOG.md entry for the release
-# (following the format documented in CLAUDE.md), then commits the
-# result straight to main — no PR, since claude-code-action refuses to
-# push to a branch other than the one it was invoked on.
+# claude-code-action does not support the `release` event (it fails with
+# "Unsupported event type: release"), so the release trigger only runs a
+# small bridge job that re-dispatches this same workflow as a
+# workflow_dispatch run — an event the action does support — passing the
+# release tag as an input.
+#
+# The drafting job uses claude-code-action to write a CHANGELOG.md entry
+# for the release (following the format documented in CLAUDE.md), then
+# commits the result straight to main — no PR, since claude-code-action
+# refuses to push to a branch other than the one it was invoked on.
 
 on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag to draft the changelog entry for (e.g. v3.1.0)"
+        required: true
+        type: string
 
 permissions:
   contents: write
+  actions: write
   id-token: write
 
 jobs:
+  dispatch:
+    name: Re-dispatch as workflow_dispatch
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch drafting run for this release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run release-notes-drafter.yml \
+            --repo "${{ github.repository }}" \
+            -f tag_name="${{ github.event.release.tag_name }}"
+
   draft-changelog:
     name: Draft changelog entry
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
@@ -34,26 +59,24 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
-            A new release was just published:
-
-            Tag: ${{ github.event.release.tag_name }}
-            Name: ${{ github.event.release.name }}
-            Body:
-            ${{ github.event.release.body }}
+            A release with tag ${{ inputs.tag_name }} was just published in
+            ${{ github.repository }}.
 
             Do the following:
-            1. Identify the version and the PRs included in this release from
-               the tag, name, and description above.
-            2. For each PR, read its title/description via `gh pr view` and
+            1. Run `gh release view ${{ inputs.tag_name }}` to get the
+               release's name, description, and published date.
+            2. Identify the version and the PRs included in this release from
+               the tag, name, and description.
+            3. For each PR, read its title/description via `gh pr view` and
                skip internal-only PRs (tests, CI, build tooling, comments,
                dead-code removal, dependency bumps, pure refactors).
-            3. For the remaining PRs, read CLAUDE.md in this repo for the
+            4. For the remaining PRs, read CLAUDE.md in this repo for the
                required changelog format and follow it exactly.
-            4. Use the release tag as the version number and the release's
-               published_at date as the entry date.
-            5. Read the existing CHANGELOG.md and prepend the new entry at
+            5. Use the release tag as the version number and the release's
+               published date as the entry date.
+            6. Read the existing CHANGELOG.md and prepend the new entry at
                the top.
-            6. Only edit the file — do not commit, push, or open a PR; a
+            7. Only edit the file — do not commit, push, or open a PR; a
                later workflow step handles that.
           claude_args: |
             --allowedTools "Read,Edit,Write,Bash(gh pr view:*),Bash(gh release view:*)"
@@ -65,5 +88,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add CHANGELOG.md
           git diff --cached --quiet \
-            || git commit -m "docs: draft changelog for ${{ github.event.release.tag_name }} [skip ci]"
+            || git commit -m "docs: draft changelog for ${{ inputs.tag_name }} [skip ci]"
           git push origin main
