@@ -7,8 +7,16 @@ name: Release
 #   2. docker          — builds and pushes the Docker image (needs: 1)
 #   3. executables     — builds Windows EXEs and attaches them to the
 #                        release (needs: 1)
-# Jobs 2 and 3 run in parallel once job 1 succeeds, and both check out
-# the version-bumped commit so the correct version number is embedded.
+#   4. draft-changelog — dispatches the Release Notes Drafter workflow
+#                        (needs: 1, so its CHANGELOG commit to main
+#                        doesn't race the version-bump commit).
+# Jobs 2–4 run in parallel once job 1 succeeds; 2 and 3 check out the
+# version-bumped commit so the correct version number is embedded.
+#
+# The changelog drafting runs as a separate workflow_dispatch workflow
+# because claude-code-action does not support the `release` event
+# ("Unsupported event type: release") — so this workflow only
+# dispatches it, passing the release tag as an input.
 
 on:
   release:
@@ -192,3 +200,22 @@ jobs:
           files: |
             dist/PacsAdminTool.exe
             dist/PacsAdminToolWeb.exe
+
+
+  # ── 4. Changelog draft ────────────────────────────────────────────
+  draft-changelog:
+    name: Dispatch Release Notes Drafter
+    needs: update-version
+    runs-on: ubuntu-latest
+
+    permissions:
+      actions: write
+
+    steps:
+      - name: Dispatch drafting run for this release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run release-notes-drafter.yml \
+            --repo "${{ github.repository }}" \
+            -f tag_name="${{ github.event.release.tag_name }}"

@@ -1,19 +1,27 @@
 name: Release Notes Drafter
 
-# Triggered when a GitHub release is published.
+# Dispatched by release.yml when a GitHub release is published (or run
+# manually from the Actions tab with a tag name). It is a separate
+# workflow_dispatch workflow because claude-code-action does not
+# support the `release` event ("Unsupported event type: release").
+#
 # Uses claude-code-action to draft a CHANGELOG.md entry for the release
 # (following the format documented in CLAUDE.md), then commits the
 # result straight to main — no PR, since claude-code-action refuses to
 # push to a branch other than the one it was invoked on.
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag to draft the changelog entry for (e.g. v3.1.0)"
+        required: true
+        type: string
 
 permissions:
-  contents: write
-  id-token: write
+  contents: write       # checkout + push CHANGELOG.md to main; gh release view
+  pull-requests: read   # gh pr view in the drafting prompt
+  id-token: write       # OIDC token exchange for claude-code-action's GitHub App auth
 
 jobs:
   draft-changelog:
@@ -34,26 +42,24 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
-            A new release was just published:
-
-            Tag: ${{ github.event.release.tag_name }}
-            Name: ${{ github.event.release.name }}
-            Body:
-            ${{ github.event.release.body }}
+            A release with tag ${{ inputs.tag_name }} was just published in
+            ${{ github.repository }}.
 
             Do the following:
-            1. Identify the version and the PRs included in this release from
-               the tag, name, and description above.
-            2. For each PR, read its title/description via `gh pr view` and
+            1. Run `gh release view ${{ inputs.tag_name }}` to get the
+               release's name, description, and published date.
+            2. Identify the version and the PRs included in this release from
+               the tag, name, and description.
+            3. For each PR, read its title/description via `gh pr view` and
                skip internal-only PRs (tests, CI, build tooling, comments,
                dead-code removal, dependency bumps, pure refactors).
-            3. For the remaining PRs, read CLAUDE.md in this repo for the
+            4. For the remaining PRs, read CLAUDE.md in this repo for the
                required changelog format and follow it exactly.
-            4. Use the release tag as the version number and the release's
-               published_at date as the entry date.
-            5. Read the existing CHANGELOG.md and prepend the new entry at
+            5. Use the release tag as the version number and the release's
+               published date as the entry date.
+            6. Read the existing CHANGELOG.md and prepend the new entry at
                the top.
-            6. Only edit the file — do not commit, push, or open a PR; a
+            7. Only edit the file — do not commit, push, or open a PR; a
                later workflow step handles that.
           claude_args: |
             --allowedTools "Read,Edit,Write,Bash(gh pr view:*),Bash(gh release view:*)"
@@ -65,5 +71,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add CHANGELOG.md
           git diff --cached --quiet \
-            || git commit -m "docs: draft changelog for ${{ github.event.release.tag_name }} [skip ci]"
+            || git commit -m "docs: draft changelog for ${{ inputs.tag_name }} [skip ci]"
           git push origin main
