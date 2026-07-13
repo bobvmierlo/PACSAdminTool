@@ -19,8 +19,9 @@ on:
         type: string
 
 permissions:
-  contents: write
-  id-token: write
+  contents: write       # checkout + push CHANGELOG.md to main; gh release view
+  pull-requests: read   # gh pr view in the drafting prompt
+  id-token: write       # OIDC token exchange for claude-code-action's GitHub App auth
 
 jobs:
   draft-changelog:
