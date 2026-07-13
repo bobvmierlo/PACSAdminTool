@@ -1,5 +1,23 @@
 # Changelog
 
+## v3.1.0 — 2026-07-13
+
+### New — [#146](https://github.com/bobvmierlo/PACSAdminTool/pull/146)
+
+- **Job tracking for transfers** — retrieve and send operations (C-MOVE, C-GET, C-STORE) now run as tracked jobs whose progress survives page refreshes and dropped connections.
+- **DICOM TLS support** — outgoing connections (echo, query, retrieve, send) and the Storage receiver can now use optional TLS encryption, with configurable client certificates and CA bundles.
+- **Extra Return Tags for C-FIND** — a new field lets you request additional return tags in a query using DICOM keywords or `(gggg,eeee)` notation.
+- **Configurable HL7 acknowledgements** — the HL7 listener can now be set to reply with AA, AE, or AR acknowledgement codes.
+
+### Improved — [#146](https://github.com/bobvmierlo/PACSAdminTool/pull/146)
+
+- **Per-level C-FIND queries** — queries now send only the return keys valid for the chosen level (Patient, Study, Series, or Image), following the DICOM standard.
+- **Persistent HL7 message history** — received HL7 messages are now stored on the server, so history is kept across page refreshes and can be cleared on demand.
+
+### Fixed — [#146](https://github.com/bobvmierlo/PACSAdminTool/pull/146)
+
+- Operation logs and echo-test results are now private to each user, so concurrent users no longer see each other's activity.
+
 ## v3.0.0 (pre-release) — 2026-07-12
 
 Implements the first code improvement from ROADMAP.md: the single ~7,500-line inline <script> block in web/static/index.html is split into 30 per-domain files under web/static/js/.
