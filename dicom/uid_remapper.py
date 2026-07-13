@@ -11,6 +11,8 @@ import zipfile
 
 import pydicom
 
+from . import save_dataset
+
 
 def _new_uid(prefix: str) -> str:
     """Generate a UUID-based DICOM UID (e.g. 2.25.<uuid_int>)."""
@@ -97,10 +99,7 @@ def remap_uids(
                                      "old": old_sop, "new": new_val})
 
             out = io.BytesIO()
-            try:
-                ds.save_as(out, enforce_file_format=True)
-            except TypeError:
-                ds.save_as(out, write_like_original=False)
+            save_dataset(ds, out)
             zf.writestr(name, out.getvalue())
             mapping.append({"file": name, "changes": changes})
 

@@ -169,7 +169,7 @@
   const _FORM_FIELDS_KEY = "pacsadmin_form_fields";
   const _PERSIST_IDS = [
     "cfind-pid","cfind-pname","cfind-acc","cfind-mod",
-    "cfind-date-from","cfind-date-to","cfind-suid",
+    "cfind-date-from","cfind-date-to","cfind-suid","cfind-extra-tags",
     "dmwl-pid","dmwl-pname","dmwl-acc","dmwl-mod","dmwl-aet","dmwl-date",
   ];
   // Restore
@@ -200,5 +200,8 @@
 
   // ── Restore active tab (after auth+settings loaded to respect advanced tabs) ─
   showTab(localStorage.getItem("activeTab") || "dashboard");
+
+  // ── Resume polling any C-MOVE/C-GET/C-STORE jobs left running before a refresh ─
+  resumeTrackedJobs();
 })();
 

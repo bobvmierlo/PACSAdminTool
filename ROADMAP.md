@@ -10,35 +10,37 @@ below are the remaining ideas, roughly in order of value.
    script is now 30 per-domain files under `web/static/js/`, loaded in order as
    plain scripts (shared global scope, `init.js` last). `index.html` keeps only
    the markup and CSS.
-2. **Per-level C-FIND query datasets.** `dicom_find()` always sets study-level
-   return keys (`ModalitiesInStudy`, `StudyDescription`, …) even for SERIES/IMAGE
-   level queries; at SERIES level the correct key is `Modality`, and strict SCPs
-   reject unexpected keys. Build the return-key set per query level, and let the
-   user add arbitrary extra return tags in the query builder.
-3. **Background job registry.** C-MOVE / C-GET / C-STORE run in fire-and-forget
-   threads with results only visible in the SocketIO log stream. Add a small
-   in-memory job table (id, state, message, timestamps) plus `/api/jobs/<id>` so
-   the UI can show real completion state and survive a page refresh mid-transfer.
-4. **Scope SocketIO events to the requesting client.** `_log()` and batch-echo
-   results are emitted globally, so concurrent users see each other's operation
-   logs. Emit to the submitting client's room instead.
-5. **Deduplicate the repeated `save_as(..., enforce_file_format=True)` /
-   `except TypeError` fallback** into one helper (appears ~6 times across routes).
+2. ~~**Per-level C-FIND query datasets.**~~ ✅ Done — `dicom_find()` builds the
+   return-key set per query level (PATIENT/STUDY/SERIES/IMAGE, e.g. `Modality`
+   instead of `ModalitiesInStudy` at SERIES level), and the query builder has
+   an "Extra Return Tags" field accepting keywords or `(gggg,eeee)` tags.
+3. ~~**Background job registry.**~~ ✅ Done — `web/jobs.py` in-memory job table
+   plus `/api/jobs/<id>`; C-MOVE / C-GET / C-STORE return a `job_id` and the UI
+   polls it (persisted in localStorage) so completion state survives a page
+   refresh mid-transfer.
+4. ~~**Scope SocketIO events to the requesting client.**~~ ✅ Done — each
+   browser gets a private Socket.IO room (session cookie); operation logs and
+   batch-echo results are emitted to the submitting client's room only.
+   Listener-driven events (SCP receiver, HL7 inbound) remain broadcast.
+5. ~~**Deduplicate the `save_as` / `except TypeError` fallback.**~~ ✅ Done —
+   one `dicom.save_dataset()` helper replaces all repeated fallbacks.
 
 ## New features
 
 1. **MPPS testing (N-CREATE / N-SET).** The missing piece of the acquisition
    workflow next to DMWL, Storage Commitment, and IOCM — lets admins simulate a
    modality that starts/completes/discontinues a procedure step.
-2. **DICOM TLS for SCU/SCP associations.** pynetdicom supports TLS directly;
-   increasingly required on hospital networks. (Web-UI HTTPS already exists via
-   `webmain.py --cert/--key`.)
+2. ~~**DICOM TLS for SCU/SCP associations.**~~ ✅ Done — global `dicom_tls`
+   config (enabled / cert / key / CA paths, Settings → DICOM TLS card) applied
+   to every SCU association and the Storage SCP listener.
 3. **Scheduled connectivity monitoring.** Optional background C-ECHO of all AE
    presets every N minutes with a short history, so the Dashboard can show
    uptime/latency trends and flapping links.
-4. **CSV export for C-FIND results** (DMWL already has it).
-5. **Persisted HL7 message history + configurable ACK.** Persist the last N
-   received messages to disk; let the listener return AE/AR for negative-ACK
-   testing; echo the incoming message's HL7 version in the ACK instead of the
-   hardcoded `2.3`.
-6. **Docker `HEALTHCHECK`** hitting `/api/health` in the Dockerfile / compose file.
+4. ~~**CSV export for C-FIND results**~~ ✅ Done — Export CSV button on the
+   C-FIND results table (was already implemented; roadmap entry was stale).
+5. ~~**Persisted HL7 message history + configurable ACK.**~~ ✅ Done — the last
+   200 received messages are persisted to disk (`hl7_history.json`, served via
+   `/api/hl7/history`); the listener can return AE/AR for negative-ACK testing
+   (ACK Response dropdown); the ACK echoes the incoming message's HL7 version.
+6. ~~**Docker `HEALTHCHECK`**~~ ✅ Done — `HEALTHCHECK` hitting `/api/health`
+   in the Dockerfile, mirrored in `docker-compose.yml`.

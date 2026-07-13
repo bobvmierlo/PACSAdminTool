@@ -1427,10 +1427,8 @@ class KOSCreatorTab(ttk.Frame):
         def run():
             try:
                 ds = self._create_kos_dataset()
-                try:
-                    ds.save_as(path, enforce_file_format=True)
-                except TypeError:
-                    ds.save_as(path, write_like_original=False)
+                from dicom import save_dataset
+                save_dataset(ds, path)
                 self.log.append(t("kos_creator.saved_ok", path=path), "ok")
             except Exception as e:
                 self.log.append(f"Error: {e}", "err")
@@ -1451,10 +1449,8 @@ class KOSCreatorTab(ttk.Frame):
                 ds = self._create_kos_dataset()
                 with tempfile.NamedTemporaryFile(suffix=".dcm", delete=False) as f:
                     tmp_path = f.name
-                try:
-                    ds.save_as(tmp_path, enforce_file_format=True)
-                except TypeError:
-                    ds.save_as(tmp_path, write_like_original=False)
+                from dicom import save_dataset
+                save_dataset(ds, tmp_path)
                 from dicom.operations import c_store
                 ok, msg = c_store(
                     local["ae_title"],

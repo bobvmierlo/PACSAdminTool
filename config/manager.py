@@ -25,6 +25,15 @@ DEFAULT_CONFIG = {
         "port": 11112
     },
     "remote_aes": [],
+    "dicom_tls": {
+        # When enabled, every outgoing SCU association (C-ECHO, C-FIND,
+        # C-MOVE, C-GET, C-STORE, DMWL, Storage Commitment, IOCM) and the
+        # Storage SCP listener negotiate TLS instead of a plaintext socket.
+        "enabled": False,
+        "cert_file": "",  # this app's identity cert (client + server auth)
+        "key_file": "",   # private key matching cert_file
+        "ca_file": "",    # CA bundle to verify the peer's certificate
+    },
     "dicomweb_presets": [],
     "hl7": {
         "listen_port": 2575,

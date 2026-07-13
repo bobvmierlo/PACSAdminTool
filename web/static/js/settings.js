@@ -53,6 +53,11 @@ async function loadConfig() {
   const lae = appConfig.local_ae || {};
   document.getElementById("set-ae-title").value = lae.ae_title || "PACSADMIN";
   document.getElementById("set-ae-port").value  = lae.port     || 11112;
+  const dtls = appConfig.dicom_tls || {};
+  document.getElementById("set-dicom-tls-enabled").checked = dtls.enabled || false;
+  document.getElementById("set-dicom-tls-cert").value      = dtls.cert_file || "";
+  document.getElementById("set-dicom-tls-key").value       = dtls.key_file  || "";
+  document.getElementById("set-dicom-tls-ca").value        = dtls.ca_file   || "";
   const hl7 = appConfig.hl7 || {};
   document.getElementById("set-hl7-port").value         = hl7.listen_port   || 2575;
   document.getElementById("set-hl7-default-host").value = hl7.default_host  || "127.0.0.1";
@@ -392,11 +397,18 @@ async function saveSettings() {
     ...(appConfig.telemetry || {}),
     enabled: document.getElementById("set-telemetry-enabled").checked,
   };
+  appConfig.dicom_tls = {
+    enabled:   document.getElementById("set-dicom-tls-enabled").checked,
+    cert_file: document.getElementById("set-dicom-tls-cert").value.trim(),
+    key_file:  document.getElementById("set-dicom-tls-key").value.trim(),
+    ca_file:   document.getElementById("set-dicom-tls-ca").value.trim(),
+  };
   const patch = {
     local_ae: appConfig.local_ae,
     hl7:      appConfig.hl7,
     web:      appConfig.web,
     telemetry: appConfig.telemetry,
+    dicom_tls: appConfig.dicom_tls,
   };
   const res = await fetch("/api/config", {
     method:  "POST",

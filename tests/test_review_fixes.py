@@ -180,7 +180,7 @@ class TestCommitPairs:
         captured = {}
         done = threading.Event()
 
-        def fake_commit(local_ae, host, port, ae_title, uid_pairs, callback=None):
+        def fake_commit(local_ae, host, port, ae_title, uid_pairs, callback=None, tls=None):
             captured["pairs"] = uid_pairs
             done.set()
             return True, "ok"

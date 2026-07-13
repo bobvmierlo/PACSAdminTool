@@ -15,6 +15,15 @@ services:
     volumes:
       - pacs_data:/data   # Stores config.json and log files
 
+    # Mirrors the image's HEALTHCHECK so health reporting also works with
+    # images built before the HEALTHCHECK was added to the Dockerfile.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
     environment:
       # PACS_DATA_DIR is already set to /data inside the image.
       # Override here only if you need a custom path.

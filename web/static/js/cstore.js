@@ -36,5 +36,6 @@ async function doCStore() {
   const data = await res.json();
   appendLog("log-cstore", now(), data.message, data.ok ? "ok" : "err");
   // Further progress lines will arrive via WebSocket
+  trackJob(data.job_id, "log-cstore");
 }
 

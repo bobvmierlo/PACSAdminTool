@@ -8,6 +8,7 @@ web.context so there is a single source of truth.
 
 import logging
 import os
+import secrets
 from datetime import datetime, timezone
 
 from flask import jsonify, request, session
@@ -27,15 +28,36 @@ _LEVEL_MAP = {
 }
 
 
-def _log(room: str, message: str, level: str = "info") -> None:
-    """Emit a log line to all connected browsers and mirror it to the file log."""
+def _client_room() -> str:
+    """Return this browser's private Socket.IO room, creating it on first use.
+
+    Persisted in the Flask session cookie so a tab's HTTP requests and its
+    Socket.IO connection (same cookie) land in the same room. Background
+    threads spawned by a request capture this id up front and pass it to
+    ``_log(..., to=...)`` so operation logs only reach the client that
+    started them, instead of every connected browser.
+    """
+    room = session.get("_sio_room")
+    if not room:
+        room = secrets.token_hex(8)
+        session["_sio_room"] = room
+    return room
+
+
+def _log(room: str, message: str, level: str = "info", to: str | None = None) -> None:
+    """Emit a log line and mirror it to the file log.
+
+    *to* scopes the event to a single client's room (see ``_client_room``);
+    omit it to broadcast to every connected browser, which is appropriate
+    for events from long-running background services (SCP/HL7 listeners)
+    that aren't tied to one particular request.
+    """
     ts = datetime.now().strftime("%H:%M:%S")
-    ctx.socketio.emit("log", {
-        "room":    room,
-        "ts":      ts,
-        "message": message,
-        "level":   level,
-    })
+    payload = {"room": room, "ts": ts, "message": message, "level": level}
+    if to:
+        ctx.socketio.emit("log", payload, to=to)
+    else:
+        ctx.socketio.emit("log", payload)
     logger.log(_LEVEL_MAP.get(level, logging.INFO), "[%s] %s", room, message)
 
 
@@ -44,6 +66,16 @@ def _log(room: str, message: str, level: str = "info") -> None:
 def _local_ae() -> str:
     """Return the local AE title from the live config."""
     return ctx.config.get("local_ae", {}).get("ae_title", "PACSADMIN")
+
+
+def _dicom_tls() -> dict | None:
+    """Return the dicom_tls config dict if TLS is enabled, else None.
+
+    Passed as the ``tls`` argument to dicom.operations functions, which
+    treat None as "use a plaintext association".
+    """
+    tls = ctx.config.get("dicom_tls") or {}
+    return tls if tls.get("enabled") else None
 
 
 # ── Request helpers ───────────────────────────────────────────────────────────

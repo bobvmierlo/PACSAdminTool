@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify, make_response, send_from_directory, curren
 
 import web.context as ctx
 from web.auth import require_login
+from web.helpers import _client_room
 from __version__ import __version__ as APP_VERSION
 from config.manager import APP_DIR, LOG_DIR
 
@@ -135,6 +136,10 @@ def apply_update():
 @bp.route("/")
 def index():
     """Serve the single-page web UI."""
+    # Ensure the per-browser Socket.IO room is cookie-persisted before the
+    # page's JS opens its WebSocket connection, so the join_room() call in
+    # the "connect" handler lands in the same room the HTTP routes use.
+    _client_room()
     return send_from_directory(current_app.static_folder, "index.html")
 
 

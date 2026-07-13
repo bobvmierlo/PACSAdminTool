@@ -5,10 +5,13 @@ Covers: C-FIND, C-STORE, C-MOVE, C-GET, DMWL, Storage Commitment, IOCM,
 """
 
 import os
+import ssl
 import threading
 import logging
 from datetime import datetime
 from typing import Callable, Optional
+
+from . import save_dataset
 
 try:
     from pynetdicom import AE, evt, debug_logger
@@ -89,17 +92,52 @@ def _make_ae(ae_title: str) -> "AE":
     return ae
 
 
+def _tls_client_context(tls_cfg: dict) -> ssl.SSLContext:
+    """Build a client-side SSLContext for an outgoing DICOM TLS association.
+
+    Falls back to no peer verification when no CA bundle is configured,
+    since many hospital DICOM TLS deployments use self-signed certs without
+    a shared CA — the point is encrypting the wire, not full PKI trust.
+    """
+    ca_file = tls_cfg.get("ca_file") or None
+    ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_file)
+    if not ca_file:
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+    if tls_cfg.get("cert_file") and tls_cfg.get("key_file"):
+        ctx.load_cert_chain(tls_cfg["cert_file"], tls_cfg["key_file"])
+    return ctx
+
+
+def _tls_server_context(tls_cfg: dict) -> ssl.SSLContext:
+    """Build a server-side SSLContext for the DICOM Storage SCP listener."""
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(tls_cfg["cert_file"], tls_cfg["key_file"])
+    if tls_cfg.get("ca_file"):
+        ctx.load_verify_locations(tls_cfg["ca_file"])
+        ctx.verify_mode = ssl.CERT_REQUIRED
+    return ctx
+
+
+def _associate(ae, host: str, port: int, ae_title: str,
+               tls: Optional[dict] = None, **kwargs):
+    """Establish an association, optionally over TLS (see _tls_client_context)."""
+    if tls:
+        kwargs["tls_args"] = (_tls_client_context(tls), host)
+    return ae.associate(host, port, ae_title=ae_title, **kwargs)
+
+
 # ---------------------------------------------------------------------------
 # C-ECHO (Verification)
 # ---------------------------------------------------------------------------
 
 def c_echo(local_ae_title: str, remote_host: str, remote_port: int,
-           remote_ae_title: str) -> tuple[bool, str]:
+           remote_ae_title: str, tls: Optional[dict] = None) -> tuple[bool, str]:
     """Send a C-ECHO to the remote AE. Returns (success, message)."""
     check_available()
     ae = _make_ae(local_ae_title)
     ae.add_requested_context(Verification)
-    assoc = ae.associate(remote_host, remote_port, ae_title=remote_ae_title)
+    assoc = _associate(ae, remote_host, remote_port, remote_ae_title, tls)
     if assoc.is_established:
         status = assoc.send_c_echo()
         assoc.release()
@@ -115,7 +153,7 @@ def c_echo(local_ae_title: str, remote_host: str, remote_port: int,
 
 def c_find(local_ae_title: str, remote_host: str, remote_port: int,
            remote_ae_title: str, query_dataset: "Dataset",
-           query_model: str = "STUDY") -> tuple[bool, list, str]:
+           query_model: str = "STUDY", tls: Optional[dict] = None) -> tuple[bool, list, str]:
     """
     Perform a C-FIND.
     query_model: 'PATIENT' or 'STUDY'
@@ -130,7 +168,7 @@ def c_find(local_ae_title: str, remote_host: str, remote_port: int,
         sop = StudyRootQueryRetrieveInformationModelFind
 
     ae.add_requested_context(sop)
-    assoc = ae.associate(remote_host, remote_port, ae_title=remote_ae_title)
+    assoc = _associate(ae, remote_host, remote_port, remote_ae_title, tls)
     results = []
     if assoc.is_established:
         responses = assoc.send_c_find(query_dataset, sop)
@@ -155,7 +193,8 @@ def c_find(local_ae_title: str, remote_host: str, remote_port: int,
 def c_move(local_ae_title: str, remote_host: str, remote_port: int,
            remote_ae_title: str, query_dataset: "Dataset",
            move_destination: str, query_model: str = "STUDY",
-           callback: Optional[Callable] = None) -> tuple[bool, str]:
+           callback: Optional[Callable] = None,
+           tls: Optional[dict] = None) -> tuple[bool, str]:
     """
     Perform a C-MOVE. move_destination is the AE title of the destination SCP.
     """
@@ -168,7 +207,7 @@ def c_move(local_ae_title: str, remote_host: str, remote_port: int,
         sop = StudyRootQueryRetrieveInformationModelMove
 
     ae.add_requested_context(sop)
-    assoc = ae.associate(remote_host, remote_port, ae_title=remote_ae_title)
+    assoc = _associate(ae, remote_host, remote_port, remote_ae_title, tls)
     if assoc.is_established:
         responses = assoc.send_c_move(query_dataset, move_destination, sop)
         completed = 0
@@ -215,7 +254,8 @@ def c_move(local_ae_title: str, remote_host: str, remote_port: int,
 def c_get(local_ae_title: str, remote_host: str, remote_port: int,
           remote_ae_title: str, query_dataset: "Dataset",
           storage_dir: str, query_model: str = "STUDY",
-          callback: Optional[Callable] = None) -> tuple[bool, str]:
+          callback: Optional[Callable] = None,
+          tls: Optional[dict] = None) -> tuple[bool, str]:
     """
     Perform a C-GET, pulling files directly to this application.
 
@@ -263,18 +303,14 @@ def c_get(local_ae_title: str, remote_host: str, remote_port: int,
         sop_uid = getattr(ds, "SOPInstanceUID",
                           datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
         fname = os.path.join(storage_dir, f"{sop_uid}.dcm")
-        try:
-            ds.save_as(fname, enforce_file_format=True)
-        except TypeError:
-            ds.save_as(fname, write_like_original=False)
+        save_dataset(ds, fname)
         received.append(fname)
         if callback:
             callback(f"C-GET received: {os.path.basename(fname)}")
         return 0x0000
 
-    assoc = ae.associate(remote_host, remote_port,
-                         ae_title=remote_ae_title,
-                         evt_handlers=[(evt.EVT_C_STORE, handle_store)])
+    assoc = _associate(ae, remote_host, remote_port, remote_ae_title, tls,
+                       evt_handlers=[(evt.EVT_C_STORE, handle_store)])
     if not assoc.is_established:
         return False, "Failed to establish association."
 
@@ -320,7 +356,8 @@ def c_get(local_ae_title: str, remote_host: str, remote_port: int,
 
 def c_store(local_ae_title: str, remote_host: str, remote_port: int,
             remote_ae_title: str, dicom_paths: list[str],
-            callback: Optional[Callable] = None) -> tuple[bool, str]:
+            callback: Optional[Callable] = None,
+            tls: Optional[dict] = None) -> tuple[bool, str]:
     """
     Send one or more DICOM files via C-STORE.
 
@@ -359,7 +396,7 @@ def c_store(local_ae_title: str, remote_host: str, remote_port: int,
         except Exception:
             pass
 
-    assoc = ae.associate(remote_host, remote_port, ae_title=remote_ae_title)
+    assoc = _associate(ae, remote_host, remote_port, remote_ae_title, tls)
     if not assoc.is_established:
         return False, "Failed to establish association."
 
@@ -393,7 +430,7 @@ def c_store(local_ae_title: str, remote_host: str, remote_port: int,
 
 def dmwl_find(local_ae_title: str, remote_host: str, remote_port: int,
               remote_ae_title: str, query_dataset: "Dataset",
-              log_callback=None) -> tuple[bool, list, str]:
+              log_callback=None, tls: Optional[dict] = None) -> tuple[bool, list, str]:
     """
     Query a Modality Worklist (DMWL) via C-FIND on the MWL SOP.
 
@@ -426,7 +463,7 @@ def dmwl_find(local_ae_title: str, remote_host: str, remote_port: int,
 
     ae = _make_ae(local_ae_title)
     ae.add_requested_context(ModalityWorklistInformationFind)
-    assoc = ae.associate(remote_host, remote_port, ae_title=remote_ae_title)
+    assoc = _associate(ae, remote_host, remote_port, remote_ae_title, tls)
 
     if not assoc.is_established:
         msg = "Failed to establish association."
@@ -469,7 +506,8 @@ def dmwl_find(local_ae_title: str, remote_host: str, remote_port: int,
 def storage_commitment_request(local_ae_title: str, remote_host: str,
                                 remote_port: int, remote_ae_title: str,
                                 sop_class_uid_list: list[tuple[str, str]],
-                                callback: Optional[Callable] = None) -> tuple[bool, str]:
+                                callback: Optional[Callable] = None,
+                                tls: Optional[dict] = None) -> tuple[bool, str]:
     """
     Send a Storage Commitment N-ACTION request.
     sop_class_uid_list: list of (SOPClassUID, SOPInstanceUID) tuples
@@ -516,8 +554,8 @@ def storage_commitment_request(local_ae_title: str, remote_host: str,
         return 0x0000, None
 
     handlers = [(evt.EVT_N_EVENT_REPORT, handle_n_event)]
-    assoc = ae.associate(remote_host, remote_port, ae_title=remote_ae_title,
-                         evt_handlers=handlers)
+    assoc = _associate(ae, remote_host, remote_port, remote_ae_title, tls,
+                       evt_handlers=handlers)
     if not assoc.is_established:
         return False, "Failed to establish association."
 
@@ -542,7 +580,8 @@ def storage_commitment_request(local_ae_title: str, remote_host: str,
 def iocm_send_delete_notification(local_ae_title: str, remote_host: str,
                                    remote_port: int, remote_ae_title: str,
                                    study_instance_uid: str,
-                                   sop_instances: list[tuple[str, str]]) -> tuple[bool, str]:
+                                   sop_instances: list[tuple[str, str]],
+                                   tls: Optional[dict] = None) -> tuple[bool, str]:
     """
     Send an IOCM delete notification (Significant Change Reason: Deletion).
     Uses N-ACTION on the Instance Availability Notification SOP or
@@ -574,7 +613,7 @@ def iocm_send_delete_notification(local_ae_title: str, remote_host: str,
 
     ae = _make_ae(local_ae_title)
     ae.add_requested_context(IAN_SOP)
-    assoc = ae.associate(remote_host, remote_port, ae_title=remote_ae_title)
+    assoc = _associate(ae, remote_host, remote_port, remote_ae_title, tls)
     if not assoc.is_established:
         return False, "Failed to establish association."
     try:
@@ -598,9 +637,11 @@ class SCPListener:
     def __init__(self, ae_title: str, port: int,
                  storage_dir: str = None,
                  log_callback: Optional[Callable] = None,
-                 n_event_callback: Optional[Callable] = None):
+                 n_event_callback: Optional[Callable] = None,
+                 tls: Optional[dict] = None):
         self.ae_title = ae_title
         self.port = port
+        self.tls = tls
         self.storage_dir = storage_dir or os.path.normpath(
             os.path.join(os.path.expanduser("~"), "pacs_received")
         )
@@ -724,10 +765,7 @@ class SCPListener:
             os.makedirs(series_dir, exist_ok=True)
             fname = os.path.join(series_dir, f"{sop_uid}.dcm")
             try:
-                ds.save_as(fname, enforce_file_format=True)
-                log_fn(f"Stored: {fname}")
-            except TypeError:
-                ds.save_as(fname, write_like_original=False)
+                save_dataset(ds, fname)
                 log_fn(f"Stored: {fname}")
             except Exception as e:
                 log_fn(f"Store error: {e}")
@@ -791,11 +829,14 @@ class SCPListener:
             (evt.EVT_N_EVENT_REPORT, handle_n_event_report),
         ]
 
+        ssl_context = _tls_server_context(self.tls) if self.tls else None
+
         self._ae = ae
         self._server = ae.start_server(
             ("", self.port),
             block=False,
-            evt_handlers=handlers
+            evt_handlers=handlers,
+            ssl_context=ssl_context,
         )
         self.running = True
         self._log(f"SCP listening on port {self.port} as '{self.ae_title}'")
@@ -811,17 +852,17 @@ class SCPListener:
 #  Alias functions for GUI compatibility
 # ---------------------------------------------------------------------------
 
-def storage_commit(local_ae, host, port, ae_title, uids, callback=None):
+def storage_commit(local_ae, host, port, ae_title, uids, callback=None, tls=None):
     """Alias: maps to storage_commitment_request."""
     return storage_commitment_request(
         local_ae["ae_title"] if isinstance(local_ae, dict) else local_ae,
-        host, port, ae_title, uids, callback=callback)
+        host, port, ae_title, uids, callback=callback, tls=tls)
 
-def iocm_notify(local_ae, host, port, ae_title, params, callback=None):
+def iocm_notify(local_ae, host, port, ae_title, params, callback=None, tls=None):
     """Alias: maps to iocm_send_delete_notification."""
     return iocm_send_delete_notification(
         local_ae["ae_title"] if isinstance(local_ae, dict) else local_ae,
-        host, port, ae_title, params, callback=callback)
+        host, port, ae_title, params, tls=tls)
 
 def run_storage_scp(ae_title, port, save_dir,
                     on_received=None, on_log=None, running_flag=None):

@@ -87,12 +87,10 @@ def _finalize_ds(ds, sop_class: str, sop_inst: str, modality: str,
 
 
 def _save_ds(ds) -> bytes:
-    """Serialize a Dataset to bytes, handling pydicom 2.x / 3.x API differences."""
+    """Serialize a Dataset to bytes."""
+    from . import save_dataset
     buf = io.BytesIO()
-    try:
-        ds.save_as(buf, enforce_file_format=True)
-    except TypeError:
-        ds.save_as(buf, write_like_original=False)
+    save_dataset(ds, buf)
     buf.seek(0)
     return buf.read()
 
