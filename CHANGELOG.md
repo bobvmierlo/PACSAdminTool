@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.2.1 — 2026-07-16
+
+### New — [#150](https://github.com/bobvmierlo/PACSAdminTool/pull/150)
+
+- **Requested Procedure ID in DICOMize** — you can now set a Requested Procedure ID when converting files, entered manually or auto-filled from Modality Worklist, C-FIND, and worklist selections, helping PACS systems match imported objects to the right study or order.
+
 ## v3.2.0 — 2026-07-16
 
 ### New — [#149](https://github.com/bobvmierlo/PACSAdminTool/pull/149)
