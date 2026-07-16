@@ -45,6 +45,7 @@ def _make_file_meta(sop_class: str, sop_inst: str, transfer_syntax: str):
 
 def _apply_patient_study(ds, metadata: dict):
     """Populate patient & study tags from the shared metadata dict."""
+    from pydicom.dataset import Dataset
     from pydicom.uid import generate_uid
 
     # Declare UTF-8 first so pydicom uses it when encoding string tags.
@@ -63,6 +64,19 @@ def _apply_patient_study(ds, metadata: dict):
     ds.InstitutionName   = metadata.get("institution_name",  "") or ""
     ds.ReferringPhysicianName = ""
     ds.StudyID           = ""
+
+    # Requested Procedure ID (0040,1001): PACS matching of imported objects
+    # to the correct study/order typically needs this alongside the
+    # AccessionNumber — both top-level and in the Request Attributes
+    # Sequence (0040,0275) of the General Series module.
+    req_proc_id = (metadata.get("requested_procedure_id") or "").strip()
+    if req_proc_id:
+        ds.RequestedProcedureID = req_proc_id
+        req = Dataset()
+        req.RequestedProcedureID = req_proc_id
+        if ds.AccessionNumber:
+            req.AccessionNumber = ds.AccessionNumber
+        ds.RequestAttributesSequence = [req]
 
 
 def _finalize_ds(ds, sop_class: str, sop_inst: str, modality: str,
@@ -215,7 +229,8 @@ def pdf_to_dicom(pdf_bytes: bytes, metadata: dict,
         pdf_bytes: Raw PDF file content.
         metadata:  Dict with keys: patient_name, patient_id, patient_dob,
                    patient_sex, study_uid, study_date, study_time,
-                   study_description, accession_number, institution_name,
+                   study_description, accession_number,
+                   requested_procedure_id, institution_name,
                    series_description, document_title.
 
     Returns:

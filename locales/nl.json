@@ -677,6 +677,7 @@
     "study_time_hint": "UUMMSS",
     "study_description": "Studiebeschrijving",
     "accession_number": "Accession #",
+    "requested_procedure_id": "Requested Procedure ID",
     "institution_name": "Instelling",
     "series_description": "Seriebeschrijving",
     "study_uid": "Studie Instance UID",

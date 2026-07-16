@@ -677,6 +677,7 @@
     "study_time_hint": "HHMMSS",
     "study_description": "Study Description",
     "accession_number": "Accession #",
+    "requested_procedure_id": "Requested Procedure ID",
     "institution_name": "Institution",
     "series_description": "Series Description",
     "study_uid": "Study Instance UID",

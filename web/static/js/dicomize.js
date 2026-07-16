@@ -43,6 +43,7 @@ function _dzGetMetadata(seriesDescId) {
   fd.append("study_time",  timeToDisom(document.getElementById("dz-study-time")?.value || ""));
   add("study_description", "dz-study-desc");
   add("accession_number",  "dz-accession");
+  add("requested_procedure_id", "dz-req-proc-id");
   add("institution_name",  "dz-institution");
   if (seriesDescId) add("series_description", seriesDescId);
   return fd;
@@ -221,6 +222,7 @@ function _dzSrcDmwlFill(idx) {
   set("dz-patient-dob",  dicomDateToInput(r.PatientBirthDate || ""));
   set("dz-patient-sex",  r.PatientSex);
   set("dz-accession",    r.Accession);
+  set("dz-req-proc-id",  r.RequestedProcedureID);
   set("dz-study-desc",   r.Procedure);
   set("dz-study-date",   dicomDateToInput(r.ScheduledDate || ""));
   if (r.StudyInstanceUID) document.getElementById("dz-study-uid").value = r.StudyInstanceUID;
@@ -271,8 +273,8 @@ async function dzSrcCfindQuery() {
         study_date:   dateToDisom(document.getElementById("dz-src-cfind-date").value || ""),
         modality: "", study_uid: "",
         // Not part of STUDY-level return keys, but many SCPs return them;
-        // used to fill DOB / sex when available.
-        extra_tags: ["PatientBirthDate", "PatientSex"],
+        // used to fill DOB / sex / Requested Procedure ID when available.
+        extra_tags: ["PatientBirthDate", "PatientSex", "RequestedProcedureID"],
       }),
     });
     const data = await res.json();
@@ -307,6 +309,7 @@ function _dzSrcCfindFill(idx) {
   set("dz-patient-dob",  dicomDateToInput(tagVal("PatientBirthDate")));
   set("dz-patient-sex",  tagVal("PatientSex"));
   set("dz-accession",    r.Accession);
+  set("dz-req-proc-id",  tagVal("RequestedProcedureID"));
   set("dz-study-desc",   r.Description);
   set("dz-study-date",   dicomDateToInput(r.StudyDate || ""));
   if (r.StudyUID) document.getElementById("dz-study-uid").value = r.StudyUID;
@@ -449,6 +452,7 @@ function dzShowMetaPreview() {
     ["Study Time",        get("dz-study-time")],
     ["Study Description", get("dz-study-desc")],
     ["Accession #",       get("dz-accession")],
+    ["Requested Procedure ID", get("dz-req-proc-id")],
     ["Institution",       get("dz-institution")],
     ["Study UID",         get("dz-study-uid")],
   ].filter(([,v]) => v);
@@ -461,7 +465,7 @@ function dzShowMetaPreview() {
 
 // Hook form changes to auto-refresh metadata preview
 ["dz-patient-name","dz-patient-id","dz-patient-dob","dz-patient-sex",
- "dz-study-date","dz-study-time","dz-study-desc","dz-accession","dz-institution","dz-study-uid"]
+ "dz-study-date","dz-study-time","dz-study-desc","dz-accession","dz-req-proc-id","dz-institution","dz-study-uid"]
   .forEach(id => {
     document.addEventListener("DOMContentLoaded", () => {
       const el = document.getElementById(id);
@@ -1262,6 +1266,7 @@ function dzWlSelectItem(idx) {
   document.getElementById("dz-study-date").value   = dicomDateToInput(r.ScheduledDate    || "");
   document.getElementById("dz-study-desc").value   = r.Procedure        || "";
   document.getElementById("dz-accession").value    = r.Accession        || "";
+  document.getElementById("dz-req-proc-id").value  = r.RequestedProcedureID || "";
   document.getElementById("dz-institution").value  = r.InstitutionName  || "";
   if (r.StudyInstanceUID) {
     document.getElementById("dz-study-uid").value = r.StudyInstanceUID;
