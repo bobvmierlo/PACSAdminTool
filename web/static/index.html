@@ -2406,6 +2406,27 @@
         Enables Storage Commit, IOCM, KOS Creator, UID Remapper and DICOMweb tabs.
       </p>
 
+      <!-- Change my password -->
+      <h4 style="margin:0 0 8px 0; font-size:14px" data-i18n="settings.change_password">Change Password</h4>
+      <div class="field-grid">
+        <div class="field">
+          <label data-i18n="settings.current_password">Current password</label>
+          <input id="my-pw-current" type="password" autocomplete="current-password">
+        </div>
+        <div class="field">
+          <label data-i18n="settings.new_password">New password</label>
+          <input id="my-pw-new" type="password" autocomplete="new-password" placeholder="min 8 chars">
+        </div>
+        <div class="field">
+          <label data-i18n="settings.confirm_password">Confirm new password</label>
+          <input id="my-pw-confirm" type="password" autocomplete="new-password">
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:8px; margin-bottom:20px">
+        <button class="btn primary" onclick="changeMyPassword()" data-i18n="settings.change_password_btn">Change password</button>
+        <span id="my-pw-status" style="font-size:12px; color:#888"></span>
+      </div>
+
       <!-- My DICOM AE Presets -->
       <h4 style="margin:0 0 8px 0; font-size:14px" data-i18n="settings.my_dicom_presets">My DICOM AE Presets</h4>
       <div class="result-table-wrap">
@@ -2872,6 +2893,9 @@
           <button id="dz-src-btn-dmwl" class="subtab-btn"
                   style="border-radius:0; border:none; border-right:1px solid var(--border); font-size:12px; padding:4px 10px"
                   onclick="dzSetSource('dmwl')" data-i18n="dicomize.src_dmwl">DMWL Worklist</button>
+          <button id="dz-src-btn-cfind" class="subtab-btn"
+                  style="border-radius:0; border:none; border-right:1px solid var(--border); font-size:12px; padding:4px 10px"
+                  onclick="dzSetSource('cfind')" data-i18n="dicomize.src_cfind">C-FIND</button>
           <button id="dz-src-btn-oruian" class="subtab-btn"
                   style="border-radius:0; border:none; font-size:12px; padding:4px 10px"
                   onclick="dzSetSource('oruian')" data-i18n="dicomize.src_oruian">ORU IAN → ORM</button>
@@ -2933,6 +2957,67 @@
                 <th style="padding:4px 8px; text-align:left" data-i18n="dicomize.wl_col_proc">Procedure</th>
               </tr></thead>
               <tbody id="dz-src-dmwl-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ═══ C-FIND inline panel ═══ -->
+        <div id="dz-src-panel-cfind" style="display:none; margin:12px 0 16px; padding-bottom:16px; border-bottom:1px solid var(--border)">
+          <p style="font-size:12px; color:#888; margin:0 0 10px"
+             data-i18n="dicomize.cfind_desc">Query the PACS directly (Study Root C-FIND) — useful when the study is no longer on the DMWL.</p>
+          <div class="ae-selector">
+            <div class="field preset-field">
+              <label data-i18n="dicomize.select_preset">Select a preset…</label>
+              <select id="dz-src-cfind-preset" onchange="dzSrcCfindFillAE()">
+                <option value=""></option>
+              </select>
+            </div>
+            <div class="field">
+              <label data-i18n="dicomize.ae_title">AE Title</label>
+              <input id="dz-src-cfind-aet">
+            </div>
+            <div class="field">
+              <label data-i18n="dicomize.ae_host">Host</label>
+              <input id="dz-src-cfind-host">
+            </div>
+            <div class="field" style="max-width:80px">
+              <label data-i18n="dicomize.ae_port">Port</label>
+              <input id="dz-src-cfind-port" type="number" min="1" max="65535">
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; align-items:flex-end">
+            <div class="field" style="flex:1; min-width:140px">
+              <label data-i18n="dicomize.wl_filter_name">Patient Name (wildcard *)</label>
+              <input id="dz-src-cfind-name" placeholder="*">
+            </div>
+            <div class="field" style="flex:1; min-width:110px">
+              <label data-i18n="dicomize.wl_filter_id">Patient ID</label>
+              <input id="dz-src-cfind-id">
+            </div>
+            <div class="field" style="flex:1; min-width:110px">
+              <label data-i18n="dicomize.cfind_filter_acc">Accession #</label>
+              <input id="dz-src-cfind-acc">
+            </div>
+            <div class="field" style="flex:1; min-width:130px">
+              <label data-i18n="dicomize.cfind_filter_date">Study Date</label>
+              <input type="date" id="dz-src-cfind-date">
+            </div>
+            <div class="field" style="align-self:flex-end">
+              <button class="btn primary" onclick="dzSrcCfindQuery()" data-i18n="dicomize.cfind_query_btn">Query PACS</button>
+            </div>
+          </div>
+          <div id="dz-src-cfind-status" style="font-size:12px; color:#888; margin:6px 0"></div>
+          <div id="dz-src-cfind-results" style="display:none; max-height:220px; overflow-y:auto; margin-top:6px; border:1px solid var(--border); border-radius:4px">
+            <table style="width:100%; border-collapse:collapse; font-size:12px">
+              <thead><tr style="border-bottom:1px solid var(--border); background:var(--bg-alt,#f5f5f5); position:sticky; top:0">
+                <th style="padding:4px 8px; text-align:left" data-i18n="dicomize.wl_col_name">Name</th>
+                <th style="padding:4px 8px; text-align:left" data-i18n="dicomize.wl_col_id">ID</th>
+                <th style="padding:4px 8px; text-align:left" data-i18n="dicomize.wl_col_acc">Accession</th>
+                <th style="padding:4px 8px; text-align:left" data-i18n="dicomize.wl_col_mod">Modality</th>
+                <th style="padding:4px 8px; text-align:left" data-i18n="dicomize.wl_col_date">Date</th>
+                <th style="padding:4px 8px; text-align:left" data-i18n="dicomize.cfind_col_desc">Description</th>
+              </tr></thead>
+              <tbody id="dz-src-cfind-body"></tbody>
             </table>
           </div>
         </div>

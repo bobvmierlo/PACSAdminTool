@@ -108,7 +108,7 @@ function _dzToggleFps(prefix) {
 // ── Source selector (Manual / DMWL / ORU IAN) ────────────────────
 
 function dzSetSource(src) {
-  ["manual", "dmwl", "oruian"].forEach(s => {
+  ["manual", "dmwl", "cfind", "oruian"].forEach(s => {
     const btn   = document.getElementById(`dz-src-btn-${s}`);
     const panel = document.getElementById(`dz-src-panel-${s}`);
     if (btn)   btn.classList.toggle("active", s === src);
@@ -118,7 +118,7 @@ function dzSetSource(src) {
     _dzOruIanPopulateTemplates();
     _dzPopulateHl7Servers();
   }
-  if (src === "dmwl") {
+  if (src === "dmwl" || src === "cfind") {
     dzLoadPresets();
   }
 }
@@ -224,6 +224,92 @@ function _dzSrcDmwlFill(idx) {
   set("dz-study-desc",   r.Procedure);
   set("dz-study-date",   dicomDateToInput(r.ScheduledDate || ""));
   if (r.StudyInstanceUID) document.getElementById("dz-study-uid").value = r.StudyInstanceUID;
+  appendLog("log-dicomize", now(), i18n("dicomize.wl_filled", {name: r.PatientName || "?"}), "ok");
+}
+
+// ── C-FIND inline query (for studies no longer on the DMWL) ──────
+
+function dzSrcCfindFillAE() {
+  const val = document.getElementById("dz-src-cfind-preset").value;
+  if (!val) return;
+  let ae;
+  if (val.startsWith("usr:")) {
+    ae = (userSettings.remote_aes || []).find(a => a.name === val.slice(4));
+  } else {
+    const name = val.startsWith("sys:") ? val.slice(4) : val;
+    ae = (appConfig.remote_aes || []).find(a => a.name === name);
+  }
+  if (!ae) return;
+  document.getElementById("dz-src-cfind-aet").value  = ae.ae_title || "";
+  document.getElementById("dz-src-cfind-host").value = ae.host     || "";
+  document.getElementById("dz-src-cfind-port").value = ae.port     || "";
+}
+
+async function dzSrcCfindQuery() {
+  const aet  = document.getElementById("dz-src-cfind-aet").value.trim();
+  const host = document.getElementById("dz-src-cfind-host").value.trim();
+  const port = document.getElementById("dz-src-cfind-port").value.trim();
+  const statusEl  = document.getElementById("dz-src-cfind-status");
+  const resultsEl = document.getElementById("dz-src-cfind-results");
+  const bodyEl    = document.getElementById("dz-src-cfind-body");
+  if (!aet || !host || !port) {
+    statusEl.textContent = i18n("dicomize.wl_need_ae");
+    return;
+  }
+  statusEl.textContent = i18n("dicomize.wl_querying") || "Querying…";
+  resultsEl.style.display = "none";
+  try {
+    const res  = await fetch("/api/dicom/find", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        host, port: parseInt(port, 10), ae_title: aet,
+        query_level: "STUDY", query_model: "STUDY",
+        patient_name: document.getElementById("dz-src-cfind-name").value.trim() || "*",
+        patient_id:   document.getElementById("dz-src-cfind-id").value.trim()   || "",
+        accession:    document.getElementById("dz-src-cfind-acc").value.trim()  || "",
+        study_date:   dateToDisom(document.getElementById("dz-src-cfind-date").value || ""),
+        modality: "", study_uid: "",
+        // Not part of STUDY-level return keys, but many SCPs return them;
+        // used to fill DOB / sex when available.
+        extra_tags: ["PatientBirthDate", "PatientSex"],
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) { statusEl.textContent = data.message || data.error || "Error"; return; }
+    const rows = data.results || [];
+    statusEl.textContent = i18n("dicomize.wl_found", {n: rows.length}) || `${rows.length} result(s)`;
+    if (!rows.length) return;
+    bodyEl.innerHTML = rows.map((r, idx) => `<tr style="border-bottom:1px solid var(--border); cursor:pointer"
+      onclick="_dzSrcCfindFill(${idx})"
+      title="${escapeHtml(i18n("dicomize.wl_click_fill") || "Click to fill fields")}">
+      <td style="padding:4px 8px">${escapeHtml(r.PatientName || "")}</td>
+      <td style="padding:4px 8px">${escapeHtml(r.PatientID   || "")}</td>
+      <td style="padding:4px 8px">${escapeHtml(r.Accession   || "")}</td>
+      <td style="padding:4px 8px">${escapeHtml(r.Modality    || "")}</td>
+      <td style="padding:4px 8px">${escapeHtml(formatDicomDate(r.StudyDate || ""))}</td>
+      <td style="padding:4px 8px">${escapeHtml(r.Description || "")}</td>
+    </tr>`).join("");
+    resultsEl.style.display = "";
+    window._dzSrcCfindRows = rows;
+  } catch (e) {
+    statusEl.textContent = String(e);
+  }
+}
+
+function _dzSrcCfindFill(idx) {
+  const r = (window._dzSrcCfindRows || [])[idx];
+  if (!r) return;
+  const tagVal = kw => ((r.tags || []).find(t => t.keyword === kw) || {}).value || "";
+  const set = (id, v) => { if (v !== undefined && v !== null) document.getElementById(id).value = v; };
+  set("dz-patient-name", r.PatientName);
+  set("dz-patient-id",   r.PatientID);
+  set("dz-patient-dob",  dicomDateToInput(tagVal("PatientBirthDate")));
+  set("dz-patient-sex",  tagVal("PatientSex"));
+  set("dz-accession",    r.Accession);
+  set("dz-study-desc",   r.Description);
+  set("dz-study-date",   dicomDateToInput(r.StudyDate || ""));
+  if (r.StudyUID) document.getElementById("dz-study-uid").value = r.StudyUID;
   appendLog("log-dicomize", now(), i18n("dicomize.wl_filled", {name: r.PatientName || "?"}), "ok");
 }
 
@@ -465,11 +551,12 @@ function dzLoadPresets() {
     }
     sel.value = prev;
   });
-  // DMWL preset dropdown in source panel
-  const dmwlSel = document.getElementById("dz-src-dmwl-preset");
-  if (dmwlSel) {
-    const prev = dmwlSel.value;
-    dmwlSel.innerHTML = `<option value=""></option>`;
+  // DMWL / C-FIND preset dropdowns in the source panels
+  ["dz-src-dmwl-preset", "dz-src-cfind-preset"].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = `<option value=""></option>`;
     if (sysPresets.length > 0) {
       const grp = document.createElement("optgroup");
       grp.label = i18n("settings.system_presets");
@@ -478,7 +565,7 @@ function dzLoadPresets() {
         opt.value = "sys:" + ae.name; opt.textContent = ae.name;
         grp.appendChild(opt);
       });
-      dmwlSel.appendChild(grp);
+      sel.appendChild(grp);
     }
     if (userPresets.length > 0) {
       const grp = document.createElement("optgroup");
@@ -488,10 +575,10 @@ function dzLoadPresets() {
         opt.value = "usr:" + ae.name; opt.textContent = ae.name;
         grp.appendChild(opt);
       });
-      dmwlSel.appendChild(grp);
+      sel.appendChild(grp);
     }
-    dmwlSel.value = prev;
-  }
+    sel.value = prev;
+  });
 }
 
 // Toggle AE panel visibility

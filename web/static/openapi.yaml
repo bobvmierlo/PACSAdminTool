@@ -265,6 +265,9 @@ paths:
     post:
       tags: [Users]
       summary: Change a user's password (admin can change anyone, user can change own)
+      description: >
+        Changing your own password requires `current_password`.
+        Admins resetting another user's password may omit it.
       parameters:
         - in: path
           name: username
@@ -282,6 +285,9 @@ paths:
                 password:
                   type: string
                   minLength: 8
+                current_password:
+                  type: string
+                  description: Required when changing your own password.
       responses:
         "200":
           $ref: "#/components/responses/Ok"

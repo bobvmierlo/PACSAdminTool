@@ -56,9 +56,14 @@ async function loadUsers() {
   data.users.forEach(u => {
     const tr = document.createElement("tr");
     const created = u.created_at ? u.created_at.slice(0, 10) : "";
+    // Own password is changed via My Preferences (needs current password)
+    const resetBtn = u.username === (_currentUser?.username)
+      ? ""
+      : `<button class="btn" style="padding:2px 8px; font-size:11px; margin-right:6px"
+          onclick="resetUserPassword('${u.username}')">${escapeHtml(i18n("settings.reset_password"))}</button>`;
     tr.innerHTML =
       `<td>${u.username}</td><td>${u.role}</td><td>${created}</td>` +
-      `<td><button class="btn danger" style="padding:2px 8px; font-size:11px"
+      `<td>${resetBtn}<button class="btn danger" style="padding:2px 8px; font-size:11px"
           onclick="deleteUser('${u.username}', this)">Delete</button></td>`;
     tbody.appendChild(tr);
   });
@@ -106,6 +111,60 @@ async function deleteUser(username, btn) {
   } else {
     toast(data.error || "Delete failed.", "err");
     btn.disabled = false;
+  }
+}
+
+// Admin: reset another user's password via a prompt dialog
+async function resetUserPassword(username) {
+  const newPass = await _dialog({
+    title:   i18n("settings.reset_password"),
+    message: i18n("settings.reset_password_prompt", {username}),
+    input:   { defaultValue: "", placeholder: "min 8 chars", type: "password" },
+    buttons: [
+      { text: i18n("common.ok"),     value: "__input__", className: "btn primary" },
+      { text: i18n("common.cancel"), value: null,        className: "btn" },
+    ],
+  });
+  if (newPass === null || newPass === undefined) return;
+  if (newPass.length < 8) { toast(i18n("settings.pw_too_short"), "err"); return; }
+  const res  = await fetch(`/api/users/${encodeURIComponent(username)}/password`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ password: newPass }),
+  });
+  const data = await res.json();
+  if (data.ok) toast(i18n("settings.pw_reset_ok", {username}), "ok");
+  else         toast(data.error || "Failed.", "err");
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Change my own password (My Preferences card)
+// ─────────────────────────────────────────────────────────────────
+
+async function changeMyPassword() {
+  const current = document.getElementById("my-pw-current").value;
+  const newPass = document.getElementById("my-pw-new").value;
+  const confirm = document.getElementById("my-pw-confirm").value;
+  const status  = document.getElementById("my-pw-status");
+  const fail = msg => { status.textContent = msg; status.style.color = "#dc2626"; };
+  if (!_currentUser)          { fail("Not signed in."); return; }
+  if (!current)               { fail(i18n("settings.pw_current_required")); return; }
+  if (newPass.length < 8)     { fail(i18n("settings.pw_too_short")); return; }
+  if (newPass !== confirm)    { fail(i18n("settings.pw_mismatch")); return; }
+  const res  = await fetch(`/api/users/${encodeURIComponent(_currentUser.username)}/password`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ password: newPass, current_password: current }),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    status.textContent = i18n("settings.pw_changed");
+    status.style.color = "#16a34a";
+    ["my-pw-current", "my-pw-new", "my-pw-confirm"].forEach(id => {
+      document.getElementById(id).value = "";
+    });
+  } else {
+    fail(data.error || "Failed.");
   }
 }
 
