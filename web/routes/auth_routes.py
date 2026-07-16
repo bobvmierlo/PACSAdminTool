@@ -169,6 +169,14 @@ def users_change_password(username):
     new_password = d.get("password") or ""
     if len(new_password) < 8:
         return jsonify({"ok": False, "error": "Password must be at least 8 characters."}), 400
+    # Self-service changes must confirm the current password; admins
+    # resetting another user's password don't need it.
+    if username == session.get("username"):
+        if not verify_password(username, d.get("current_password") or ""):
+            _audit("user.change_password", ip=_req_ip(), user=_req_user(),
+                   detail={"username": username}, result="error",
+                   error="Current password incorrect")
+            return jsonify({"ok": False, "error": "Current password is incorrect."}), 403
     if not change_password(username, new_password):
         return jsonify({"ok": False, "error": f"User '{username}' not found."}), 404
     _audit("user.change_password", ip=_req_ip(), user=_req_user(),

@@ -365,12 +365,54 @@ class TestUserManagement:
     def test_change_own_password(self, authed_client):
         resp = authed_client.post(
             "/api/users/admin/password",
-            data=json.dumps({"password": "newpassword1"}),
+            data=json.dumps({"password": "newpassword1",
+                             "current_password": "testpass1"}),
             content_type="application/json",
         )
         assert resp.status_code == 200
         data = json.loads(resp.data)
         assert data["ok"]
+
+    def test_change_own_password_requires_current(self, authed_client):
+        # Missing current password
+        resp = authed_client.post(
+            "/api/users/admin/password",
+            data=json.dumps({"password": "newpassword1"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 403
+        # Wrong current password
+        resp = authed_client.post(
+            "/api/users/admin/password",
+            data=json.dumps({"password": "newpassword1",
+                             "current_password": "wrongpass1"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 403
+
+    def test_admin_resets_other_user_password(self, authed_client):
+        authed_client.post(
+            "/api/users",
+            data=json.dumps({"username": "carol", "password": "carolpass1",
+                             "role": "user"}),
+            content_type="application/json",
+        )
+        # Admin does not need the user's current password
+        resp = authed_client.post(
+            "/api/users/carol/password",
+            data=json.dumps({"password": "carolnewpass1"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        assert json.loads(resp.data)["ok"]
+        # New password works
+        user_client = authed_client.application.test_client()
+        resp = user_client.post(
+            "/login",
+            data=json.dumps({"username": "carol", "password": "carolnewpass1"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
 
 
 # ---------------------------------------------------------------------------

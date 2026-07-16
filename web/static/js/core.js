@@ -170,6 +170,7 @@ function _dialog({ title, message = "", buttons, input }) {
 
     const inputEl = document.getElementById("confirm-modal-input");
     if (input) {
+      inputEl.type        = input.type         || "text";
       inputEl.value       = input.defaultValue || "";
       inputEl.placeholder = input.placeholder  || "";
       inputEl.style.display = "";
@@ -183,6 +184,7 @@ function _dialog({ title, message = "", buttons, input }) {
       };
       requestAnimationFrame(() => inputEl.focus());
     } else {
+      inputEl.type = "text";
       inputEl.style.display = "none";
       inputEl.onkeydown = null;
     }
