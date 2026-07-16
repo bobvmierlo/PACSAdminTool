@@ -1,5 +1,13 @@
 # Changelog
 
+## v3.2.0 — 2026-07-16
+
+### New — [#149](https://github.com/bobvmierlo/PACSAdminTool/pull/149)
+
+- **C-FIND source in DICOMize** — a new C-FIND tab lets you query a PACS directly for studies (by patient name, ID, accession, or study date) and click a result to auto-fill the study details, useful for studies no longer on the worklist.
+- **Change your own password** — a Change Password card in My Preferences lets you update your password after confirming your current one.
+- **Admin password reset** — administrators can reset another user's password from the Users table without needing that user's current password.
+
 ## v3.1.0 — 2026-07-13
 
 ### New — [#146](https://github.com/bobvmierlo/PACSAdminTool/pull/146)
