@@ -33,6 +33,7 @@ def _get_metadata() -> dict:
         "study_time":        request.form.get("study_time",        "").strip(),
         "study_description": request.form.get("study_description", "").strip(),
         "accession_number":  request.form.get("accession_number",  "").strip(),
+        "requested_procedure_id": request.form.get("requested_procedure_id", "").strip(),
         "institution_name":  request.form.get("institution_name",  "").strip(),
         "series_description":request.form.get("series_description","").strip(),
         "document_title":    request.form.get("document_title",    "").strip(),
