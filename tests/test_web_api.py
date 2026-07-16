@@ -775,3 +775,153 @@ class TestHL7ListenerAndHistory:
         # Newest entry is first
         assert messages[0]["message"] == str(hl7_routes._HISTORY_MAX + 24)
 
+
+
+class TestDockerUpdate:
+    """POST /api/apply-docker-update and GET /api/docker-update-state."""
+
+    def test_requires_auth(self, authed_client):
+        fresh = authed_client.application.test_client()
+        resp = fresh.post("/api/apply-docker-update")
+        assert resp.status_code == 401
+
+    def test_requires_admin(self, authed_client):
+        # Create a non-admin user and log in with a fresh client
+        authed_client.post(
+            "/api/users",
+            data=json.dumps({"username": "plain", "password": "plainpass1",
+                             "role": "user"}),
+            content_type="application/json",
+        )
+        user_client = authed_client.application.test_client()
+        resp = user_client.post(
+            "/login",
+            data=json.dumps({"username": "plain", "password": "plainpass1"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        resp = user_client.post("/api/apply-docker-update")
+        assert resp.status_code == 403
+
+    def test_no_update_available(self, authed_client, monkeypatch):
+        import web.updater as updater
+        monkeypatch.setattr(updater, "check_for_update",
+                            lambda force=False: {"has_update": False})
+        resp = authed_client.post("/api/apply-docker-update")
+        assert resp.status_code == 400
+        assert "No update available" in json.loads(resp.data)["error"]
+
+    def test_capability_missing(self, authed_client, monkeypatch):
+        import web.updater as updater
+        import web.docker_updater as docker_updater
+        monkeypatch.setattr(updater, "check_for_update",
+                            lambda force=False: {"has_update": True,
+                                                 "latest_version": "9.9.9"})
+        monkeypatch.setattr(docker_updater, "get_capability",
+                            lambda force=False: {"available": False,
+                                                 "reason": "socket_not_mounted"})
+        resp = authed_client.post("/api/apply-docker-update")
+        assert resp.status_code == 400
+        assert "socket_not_mounted" in json.loads(resp.data)["error"]
+
+    def test_trigger_success(self, authed_client, monkeypatch):
+        import web.updater as updater
+        import web.docker_updater as docker_updater
+        monkeypatch.setattr(updater, "check_for_update",
+                            lambda force=False: {"has_update": True,
+                                                 "latest_version": "9.9.9"})
+        launched = {}
+        def fake_trigger():
+            launched["yes"] = True
+        monkeypatch.setattr(docker_updater, "trigger_update_async", fake_trigger)
+        resp = authed_client.post("/api/apply-docker-update")
+        assert resp.status_code == 200
+        assert json.loads(resp.data)["ok"]
+        assert launched.get("yes")
+
+    def test_state_endpoint(self, authed_client):
+        resp = authed_client.get("/api/docker-update-state")
+        assert resp.status_code == 200
+        assert json.loads(resp.data)["status"] in (
+            "idle", "preparing", "launched", "error")
+
+    def test_check_update_reports_capability(self, authed_client, monkeypatch):
+        import web.updater as updater
+        import web.docker_updater as docker_updater
+        monkeypatch.setattr(updater, "check_for_update",
+                            lambda force=False: {"has_update": True,
+                                                 "deployment": "docker"})
+        monkeypatch.setattr(docker_updater, "get_capability",
+                            lambda force=False: {"available": True})
+        resp = authed_client.get("/api/check-update")
+        assert resp.status_code == 200
+        assert json.loads(resp.data)["can_docker_update"] is True
+
+
+class TestDockerUpdaterModule:
+    """Unit tests for web/docker_updater.py internals (no Docker needed)."""
+
+    def test_capability_without_socket(self, monkeypatch):
+        import web.docker_updater as du
+        monkeypatch.setattr(du.os.path, "exists", lambda p: False)
+        monkeypatch.setattr(du, "_cap_cache", None)
+        cap = du.get_capability(force=True)
+        assert cap == {"available": False, "reason": "socket_not_mounted"}
+
+    def test_capability_not_compose(self, monkeypatch):
+        import web.docker_updater as du
+        monkeypatch.setattr(du.os.path, "exists", lambda p: True)
+        monkeypatch.setattr(du, "_own_container_id", lambda: "abc123")
+        monkeypatch.setattr(du, "_api_json",
+                            lambda *a, **k: (200, {"Config": {"Labels": {}}}))
+        cap = du.get_capability(force=True)
+        assert cap["available"] is False
+        assert cap["reason"] == "not_compose"
+
+    def test_capability_compose_labels(self, monkeypatch):
+        import web.docker_updater as du
+        labels = {
+            "com.docker.compose.project": "myproj",
+            "com.docker.compose.project.working_dir": "/srv/pacs",
+            "com.docker.compose.project.config_files": "/srv/pacs/docker-compose.yml",
+        }
+        monkeypatch.setattr(du.os.path, "exists", lambda p: True)
+        monkeypatch.setattr(du, "_own_container_id", lambda: "abc123")
+        monkeypatch.setattr(du, "_api_json",
+                            lambda *a, **k: (200, {"Config": {"Labels": labels}}))
+        cap = du.get_capability(force=True)
+        assert cap["available"] is True
+        assert cap["project"] == "myproj"
+        assert cap["working_dir"] == "/srv/pacs"
+
+    def test_launch_helper_builds_expected_request(self, monkeypatch):
+        import web.docker_updater as du
+        calls = []
+        def fake_api_json(method, path, body=None, timeout=10.0):
+            calls.append((method, path, body))
+            if "/containers/create" in path:
+                return 201, {"Id": "helper123"}
+            return 204, {}
+        monkeypatch.setattr(du, "_api_json", fake_api_json)
+        cap = {"available": True, "project": "myproj",
+               "working_dir": "/srv/pacs",
+               "config_files": "/srv/pacs/docker-compose.yml,/etc/pacs/override.yml"}
+        helper_id = du._launch_helper(cap)
+        assert helper_id == "helper123"
+
+        create = next(c for c in calls if "/containers/create" in c[1])
+        body = create[2]
+        assert body["Image"] == du.HELPER_IMAGE
+        assert body["Cmd"] == ["sh", "-c", "docker compose pull && docker compose up -d"]
+        assert body["WorkingDir"] == "/srv/pacs"
+        binds = body["HostConfig"]["Binds"]
+        assert f"{du.DOCKER_SOCK}:{du.DOCKER_SOCK}" in binds
+        assert "/srv/pacs:/srv/pacs" in binds
+        # Config file outside the working dir gets its parent mounted too
+        assert "/etc/pacs:/etc/pacs" in binds
+        assert "COMPOSE_PROJECT_NAME=myproj" in body["Env"]
+        assert body["HostConfig"]["AutoRemove"] is True
+
+        start = next(c for c in calls if c[1].endswith("/start"))
+        assert start[0] == "POST"
+        assert "helper123" in start[1]

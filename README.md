@@ -53,7 +53,8 @@ Both the desktop GUI and the web UI check GitHub Releases on startup and show a 
 - Works for frozen PyInstaller executables (`PacsAdminTool.exe`, `PacsAdminToolWeb.exe`)
 - Windows: a detached batch script performs the swap after the process exits, then relaunches
 - Linux/macOS: the binary is replaced in-place and `os.execv()` restarts the process
-- Docker and source-code installs: only the "View Release ↗" link is shown (no auto-update)
+- Docker: with the Docker socket mounted (opt-in, see the Docker section), admins get an **"Update & Restart"** button that runs `docker compose pull && docker compose up -d` on the host via a helper container; without the socket, manual pull instructions are shown
+- Source-code installs: only the "View Release ↗" link is shown (no auto-update)
 - Uses only Python standard-library modules (`urllib`, `json`, `threading`) — **no extra packages required**
 - Results are cached for 1 hour; GitHub is never contacted more than once per hour
 
@@ -178,6 +179,27 @@ docker compose pull
 docker compose up -d
 ```
 
+**One-click updates from the web UI (optional):** mount the Docker socket into
+the container by uncommenting this line in `docker-compose.yml`:
+
+```yaml
+    volumes:
+      - pacs_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+```
+
+When an update is available, admins then see an **"Update & Restart"** button in
+the update banner and the About tab. Clicking it launches a temporary helper
+container (`docker:cli`) that runs `docker compose pull && docker compose up -d`
+on this compose project — the container is replaced with the new image and the
+page reloads automatically.
+
+> ⚠️ **Security note:** mounting the Docker socket gives the container full
+> control over the Docker daemon on the host (root-equivalent). Only enable
+> this on hosts you trust, and keep the web UI behind authentication and,
+> ideally, a reverse proxy with TLS. The update action is restricted to admin
+> users and written to the audit log.
+
 ---
 
 ### docker-compose.yml options explained
@@ -204,6 +226,10 @@ services:
                           # Replace with a bind-mount if you prefer a specific path
                           # on the host, e.g.: - /opt/pacsadmin:/data
 
+      # Optional: enables the one-click "Update & Restart" button in the web UI
+      # (admins only). See the security note above before enabling.
+      #- /var/run/docker.sock:/var/run/docker.sock
+
     environment:
       # PACS_DATA_DIR is already set to /data inside the image.
       # Only override this if you change the volume mount point above.
@@ -222,6 +248,7 @@ volumes:
 | `"2575:2575"` | Required if you want to receive HL7 messages from external systems. Must match the HL7 listener port in Settings. |
 | `pacs_data:/data` | Named volume for persistent storage. Swap for a bind-mount (e.g. `/opt/pacsadmin:/data`) if you need direct host-filesystem access to your config or logs. |
 | `restart: unless-stopped` | The container restarts automatically after a reboot or crash. Use `no` to disable, or `always` to restart even after a manual `docker stop`. |
+| `/var/run/docker.sock:...` | Optional. Enables one-click updates from the web UI. Grants the container control over the host's Docker daemon — enable only on trusted hosts. |
 
 ---
 

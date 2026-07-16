@@ -14,6 +14,13 @@ services:
 
     volumes:
       - pacs_data:/data   # Stores config.json and log files
+      # Uncomment to enable one-click updates from the web UI (About tab,
+      # admins only). When an update is triggered the app launches a helper
+      # container that runs `docker compose pull && docker compose up -d`
+      # on this compose project.
+      # WARNING: mounting the Docker socket gives this container full control
+      # over the Docker daemon on the host — only enable it on hosts you trust.
+      #- /var/run/docker.sock:/var/run/docker.sock
 
     # Mirrors the image's HEALTHCHECK so health reporting also works with
     # images built before the HEALTHCHECK was added to the Dockerfile.
