@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.3.0 — 2026-07-17
+
+### New — [#151](https://github.com/bobvmierlo/PACSAdminTool/pull/151)
+
+- **One-click Docker update** — when running as a Docker Compose service with the host's Docker socket mounted, administrators get an "Update & Restart" button in the update banner and About tab that pulls the new image and restarts the app automatically, with the page reloading once the restart completes. Manual instructions remain available as a fallback.
+
 ## v3.2.1 — 2026-07-16
 
 ### New — [#150](https://github.com/bobvmierlo/PACSAdminTool/pull/150)
