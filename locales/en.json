@@ -593,6 +593,7 @@
     "reconnecting": "Reconnecting…",
     "install_title": "Installing update…",
     "install_body": "The server is restarting with the new version. The page will reload automatically.",
+    "docker_body": "The new container image is being pulled and the container will restart. This can take a few minutes; the page will reload automatically.",
     "timeout_body": "Restart is taking longer than expected. Please refresh the page manually."
   },
   "update": {
@@ -605,7 +606,11 @@
     "headline": "Update available — v{version}",
     "subline_running": "You are running v{version}",
     "subline_docker": "Pull the new container image to update",
+    "subline_docker_auto": "Update the container with one click",
+    "docker_manual": "To update, pull the new image and restart the container:",
+    "docker_manual_alt": "Or update manually from the host:",
     "btn_install": "Install & Restart",
+    "btn_docker_update": "Update & Restart",
     "btn_download": "Download Update",
     "btn_release": "View Release",
     "btn_release_notes": "View Release Notes ↗",

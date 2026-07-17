@@ -7,7 +7,7 @@ import sys
 from flask import Blueprint, jsonify, make_response, send_from_directory, current_app
 
 import web.context as ctx
-from web.auth import require_login
+from web.auth import require_login, require_admin
 from web.helpers import _client_room
 from __version__ import __version__ as APP_VERSION
 from config.manager import APP_DIR, LOG_DIR
@@ -67,7 +67,11 @@ def check_update():
     from flask import request as flask_request
     from web.updater import check_for_update
     force = flask_request.args.get("force", "0") == "1"
-    return jsonify(check_for_update(force=force))
+    info = check_for_update(force=force)
+    if info.get("deployment") == "docker":
+        from web.docker_updater import get_capability
+        info = {**info, "can_docker_update": get_capability().get("available", False)}
+    return jsonify(info)
 
 
 @bp.route("/api/apply-update", methods=["POST"])
@@ -131,6 +135,51 @@ def apply_update():
         return jsonify({"ok": False, "error": str(exc)}), 400
 
     return jsonify({"ok": True, "state": get_update_state()})
+
+
+@bp.route("/api/apply-docker-update", methods=["POST"])
+@require_admin
+def apply_docker_update():
+    """
+    Trigger a one-click Docker Compose update (admin only).
+
+    Launches a helper container that runs
+    ``docker compose pull && docker compose up -d`` on the host's compose
+    project, replacing this container with the new image. Requires the
+    Docker socket to be mounted (see docker-compose.yml).
+
+    Response (JSON)
+    ---------------
+    { "ok": true, "state": { "status": "preparing"|"launched"|"error", ... } }
+    """
+    from web.audit import log as _audit
+    from web.helpers import _req_ip, _req_user
+    from web.updater import check_for_update
+    from web import docker_updater
+
+    info = check_for_update()
+    if not info.get("has_update"):
+        return jsonify({"ok": False, "error": "No update available."}), 400
+
+    try:
+        docker_updater.trigger_update_async()
+    except RuntimeError as exc:
+        _audit("system.docker_update", ip=_req_ip(), user=_req_user(),
+               detail={"latest_version": info.get("latest_version")},
+               result="error", error=str(exc))
+        return jsonify({"ok": False, "error": str(exc)}), 400
+
+    _audit("system.docker_update", ip=_req_ip(), user=_req_user(),
+           detail={"latest_version": info.get("latest_version")})
+    return jsonify({"ok": True, "state": docker_updater.get_update_state()})
+
+
+@bp.route("/api/docker-update-state", methods=["GET"])
+@require_login
+def docker_update_state():
+    """Return the state of an in-flight Docker update trigger."""
+    from web import docker_updater
+    return jsonify(docker_updater.get_update_state())
 
 
 @bp.route("/")

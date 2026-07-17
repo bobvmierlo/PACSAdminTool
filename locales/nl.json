@@ -593,6 +593,7 @@
     "reconnecting": "Opnieuw verbinden…",
     "install_title": "Update installeren…",
     "install_body": "De server herstart met de nieuwe versie. De pagina laadt automatisch opnieuw.",
+    "docker_body": "De nieuwe containerimage wordt opgehaald en de container herstart. Dit kan enkele minuten duren; de pagina laadt automatisch opnieuw.",
     "timeout_body": "Het herstarten duurt langer dan verwacht. Vernieuw de pagina handmatig."
   },
   "update": {
@@ -605,7 +606,11 @@
     "headline": "Update beschikbaar — v{version}",
     "subline_running": "U gebruikt versie v{version}",
     "subline_docker": "Haal de nieuwe containerafbeelding op om te updaten",
+    "subline_docker_auto": "Update de container met één klik",
+    "docker_manual": "Om te updaten, haal de nieuwe image op en herstart de container:",
+    "docker_manual_alt": "Of update handmatig vanaf de host:",
     "btn_install": "Installeren & herstarten",
+    "btn_docker_update": "Updaten & herstarten",
     "btn_download": "Update downloaden",
     "btn_release": "Release bekijken",
     "btn_release_notes": "Release-opmerkingen bekijken ↗",

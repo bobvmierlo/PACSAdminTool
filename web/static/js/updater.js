@@ -67,7 +67,13 @@ function _showUpdateBanner(info) {
 
   if (info.deployment === "docker") {
     document.getElementById("upd-subline").textContent =
-      i18n("update.subline_docker");
+      i18n(info.can_docker_update ? "update.subline_docker_auto"
+                                  : "update.subline_docker");
+    if (info.can_docker_update) {
+      // One-click update: the server launches a helper container that runs
+      // `docker compose pull && docker compose up -d` on the host.
+      document.getElementById("upd-btn-docker").style.display = "";
+    }
     // Replace the "View Release" button with a docker-specific one
     const releaseBtn = document.getElementById("upd-btn-release");
     releaseBtn.textContent = i18n("update.btn_docker_how");
@@ -95,11 +101,18 @@ function _showUpdateAboutCard(info) {
   }
 
   if (info.deployment === "docker") {
-    // Replace button row with Docker pull instructions
+    // Replace button row with Docker pull instructions (and a one-click
+    // update button when the server can launch the update itself).
     const btns = card.querySelector(".auc-btns");
+    const oneClickBtn = info.can_docker_update
+      ? `<button id="auc-btn-docker" class="auc-btn auc-btn-primary"
+                 onclick="updDockerUpdate()">${i18n("update.btn_docker_update")}</button>`
+      : "";
     btns.innerHTML =
-      `<div style="font-size:12px; color:#374151; line-height:1.6">
-        <strong>To update, pull the new image and restart the container:</strong><br>
+      `${oneClickBtn}
+      <div style="font-size:12px; color:#374151; line-height:1.6">
+        <strong>${i18n(info.can_docker_update ? "update.docker_manual_alt"
+                                              : "update.docker_manual")}</strong><br>
         <code style="display:inline-block; margin-top:6px; padding:6px 10px;
                      background:#1e293b; color:#e2e8f0; border-radius:4px;
                      font-size:11px; letter-spacing:0.02em; user-select:all"
@@ -202,7 +215,69 @@ async function updInstall() {
   } catch (_) { /* expected – server exits mid-request */ }
 }
 
-function _pollUntilRestart() {
+async function updDockerUpdate() {
+  // One-click Docker update: the server launches a helper container that
+  // runs `docker compose pull && docker compose up -d` on the host, which
+  // replaces this container with the new image.
+  _updInstalling = true;
+  const bannerBtn = document.getElementById("upd-btn-docker");
+  const cardBtn   = document.getElementById("auc-btn-docker");
+  if (bannerBtn) bannerBtn.disabled = true;
+  if (cardBtn)   cardBtn.disabled   = true;
+
+  // Show the overlay up front — the pull + recreate takes a while and the
+  // page will lose its connection when the container is replaced.
+  document.getElementById("offline-title").textContent = i18n("offline.install_title");
+  document.getElementById("offline-body").textContent  = i18n("offline.docker_body");
+  document.getElementById("offline-overlay").classList.add("visible");
+
+  const fail = (msg) => {
+    _updInstalling = false;
+    if (bannerBtn) bannerBtn.disabled = false;
+    if (cardBtn)   cardBtn.disabled   = false;
+    document.getElementById("offline-overlay").classList.remove("visible");
+    _updShowError(msg);
+  };
+
+  try {
+    const res  = await fetch("/api/apply-docker-update", { method: "POST" });
+    const data = await res.json();
+    if (!data.ok) { fail(data.error || "Update failed."); return; }
+  } catch (e) {
+    fail("Network error: " + e.message);
+    return;
+  }
+
+  // Poll the trigger state until the helper container has been launched,
+  // then wait for the server to go down and come back up.
+  const started = Date.now();
+  const timer = setInterval(async () => {
+    if (Date.now() - started > 600000) {
+      clearInterval(timer);
+      fail(i18n("offline.timeout_body"));
+      return;
+    }
+    try {
+      const res   = await fetch("/api/docker-update-state", { cache: "no-store" });
+      const state = await res.json();
+      if (state.status === "launched") {
+        clearInterval(timer);
+        _pollUntilRestart(600000);   // image pull can take several minutes
+      } else if (state.status === "error") {
+        clearInterval(timer);
+        fail(state.error || "Update failed.");
+      }
+      // "preparing" → keep waiting (helper image may still be downloading)
+    } catch (_) {
+      // Server unreachable already? The restart may have raced us — fall
+      // back to the restart poller.
+      clearInterval(timer);
+      _pollUntilRestart(600000);
+    }
+  }, 1500);
+}
+
+function _pollUntilRestart(maxWaitMs) {
   // Two-phase: wait until the server goes DOWN, then reload when it comes back.
   // This prevents a premature reload if the server hasn't shut down yet when
   // the first poll fires (which would reload onto the still-running old version).
@@ -210,7 +285,7 @@ function _pollUntilRestart() {
   // The socket.on("connect") handler is the primary reload trigger; this poll
   // is a fallback for cases where the WebSocket doesn't reconnect on its own.
   const INTERVAL_MS = 2000;
-  const MAX_WAIT_MS = 120000;
+  const MAX_WAIT_MS = maxWaitMs || 120000;
   const started       = Date.now();
   let   serverWasDown = false;
 
