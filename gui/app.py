@@ -195,6 +195,8 @@ def _setup_client_logging():
     root.addHandler(fh)
     logging.getLogger(__name__).info("Client log file opened: %s",
                                      os.path.join(log_dir, "pacs_admin_client.log"))
+    logging.getLogger(__name__).info("PACS Admin Tool v%s (Desktop) starting",
+                                     _APP_VERSION)
 
 FONT      = ("Segoe UI", 9)
 FONT_BOLD = ("Segoe UI", 9, "bold")
