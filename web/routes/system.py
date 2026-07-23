@@ -70,7 +70,15 @@ def check_update():
     info = check_for_update(force=force)
     if info.get("deployment") == "docker":
         from web.docker_updater import get_capability
-        info = {**info, "can_docker_update": get_capability().get("available", False)}
+        cap = get_capability()
+        info = {
+            **info,
+            "can_docker_update":    cap.get("available", False),
+            # Surface *why* one-click updates aren't available so the UI can
+            # tell the user how to enable them (e.g. mount the Docker socket)
+            # instead of silently falling back to the manual instructions.
+            "docker_update_reason": None if cap.get("available") else cap.get("reason"),
+        }
     return jsonify(info)
 
 
