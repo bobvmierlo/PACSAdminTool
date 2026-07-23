@@ -33,6 +33,9 @@ sys.path.insert(0, BASE_DIR)
 # ── Import our Flask app and the SocketIO instance from server.py
 from web.server import app, socketio
 
+# ── Single source of truth for the version number (see __version__.py)
+from __version__ import __version__ as APP_VERSION
+
 logger = logging.getLogger(__name__)
 
 
@@ -86,7 +89,7 @@ if __name__ == "__main__":
     display_host = "localhost" if args.host in ("0.0.0.0", "::") else args.host
     url = f"{scheme}://{args.host}:{args.port}"
     display_url = f"{scheme}://{display_host}:{args.port}"
-    logger.info("PACS Admin Tool Web Server starting on %s", url)
+    logger.info("PACS Admin Tool v%s (Web) starting on %s", APP_VERSION, url)
 
     print(f"""
   +--------------------------------------------------+
