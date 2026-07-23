@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.3.2 — 2026-07-23
+
+### Improved — [#154](https://github.com/bobvmierlo/PACSAdminTool/pull/154)
+
+- **Docker update hints** — when one-click updates aren't available, the update card now explains why (for example, the Docker socket isn't mounted or the app isn't running under Docker Compose) instead of silently showing only the manual instructions.
+
+### Improved — [#155](https://github.com/bobvmierlo/PACSAdminTool/pull/155)
+
+- The running version number now appears in the startup log messages for both the web server and desktop client, making it easier to confirm which version is running.
+
 ## v3.3.1 — 2026-07-23
 
 Internal change — no release note (dependency updates only).
