@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.3.1 — 2026-07-23
+
+Internal change — no release note (dependency updates only).
+
 ## v3.3.0 — 2026-07-17
 
 ### New — [#151](https://github.com/bobvmierlo/PACSAdminTool/pull/151)
