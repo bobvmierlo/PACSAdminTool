@@ -855,7 +855,27 @@ class TestDockerUpdate:
                             lambda force=False: {"available": True})
         resp = authed_client.get("/api/check-update")
         assert resp.status_code == 200
-        assert json.loads(resp.data)["can_docker_update"] is True
+        body = json.loads(resp.data)
+        assert body["can_docker_update"] is True
+        assert body["docker_update_reason"] is None
+
+    def test_check_update_reports_capability_reason(self, authed_client, monkeypatch):
+        """When one-click updates aren't available, the reason is surfaced so
+        the UI can explain how to enable them instead of silently showing only
+        the manual commands."""
+        import web.updater as updater
+        import web.docker_updater as docker_updater
+        monkeypatch.setattr(updater, "check_for_update",
+                            lambda force=False: {"has_update": True,
+                                                 "deployment": "docker"})
+        monkeypatch.setattr(docker_updater, "get_capability",
+                            lambda force=False: {"available": False,
+                                                 "reason": "socket_not_mounted"})
+        resp = authed_client.get("/api/check-update")
+        assert resp.status_code == 200
+        body = json.loads(resp.data)
+        assert body["can_docker_update"] is False
+        assert body["docker_update_reason"] == "socket_not_mounted"
 
 
 class TestDockerUpdaterModule:

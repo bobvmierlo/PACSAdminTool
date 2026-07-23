@@ -59,6 +59,15 @@ function _updateDockerCmd() {
   return "docker compose pull && docker compose up -d";
 }
 
+function _dockerUpdateHint(reason) {
+  // Explain why the one-click "Update & Restart" button isn't available, so
+  // the manual commands don't look like the only (silent) option.
+  const key = reason === "not_compose"    ? "update.docker_hint_not_compose"
+            : reason === "inspect_failed"  ? "update.docker_hint_failed"
+            : "update.docker_hint_socket"; // socket_not_mounted / unknown
+  return i18n(key);
+}
+
 function _showUpdateBanner(info) {
   const banner = document.getElementById("update-banner");
   if (!banner) return;
@@ -108,8 +117,18 @@ function _showUpdateAboutCard(info) {
       ? `<button id="auc-btn-docker" class="auc-btn auc-btn-primary"
                  onclick="updDockerUpdate()">${i18n("update.btn_docker_update")}</button>`
       : "";
+    // When one-click isn't available, explain why (and how to enable it)
+    // above the manual fallback commands.
+    const hint = info.can_docker_update
+      ? ""
+      : `<div style="font-size:12px; color:#92400e; background:#fffbeb;
+                     border:1px solid #fde68a; border-radius:4px;
+                     padding:8px 10px; line-height:1.5">
+           ⚙️ ${_dockerUpdateHint(info.docker_update_reason)}
+         </div>`;
     btns.innerHTML =
       `${oneClickBtn}
+      ${hint}
       <div style="font-size:12px; color:#374151; line-height:1.6">
         <strong>${i18n(info.can_docker_update ? "update.docker_manual_alt"
                                               : "update.docker_manual")}</strong><br>
