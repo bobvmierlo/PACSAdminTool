@@ -1,0 +1,4 @@
+# Build-time only — NOT required to run the application.
+# Used by generate_hl7_reference.py to regenerate web/static/hl7ref/*.json.
+# The generated JSON is committed, so end users never install this.
+hl7apy>=1.3.5

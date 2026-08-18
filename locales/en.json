@@ -235,7 +235,20 @@
     "messages_count": "{n} messages",
     "invalid_port": "Invalid port number.",
     "inspect_btn": "Inspect",
-    "inspector_title": "HL7 Inspector"
+    "inspector_title": "HL7 Inspector",
+    "inspect_tab": "Inspect Message",
+    "inspect_paste": "Paste an HL7 message",
+    "inspect_hint": "Drill into every segment, field, repetition, component and sub-component. Each node is named from the HL7 v2 standard and addressed by position (e.g. PID-5.1). Escape sequences are decoded.",
+    "inspect_parse": "Inspect",
+    "inspect_from_send": "Load from Send tab",
+    "inspect_sample": "Load sample",
+    "inspect_summary": "Message Summary",
+    "inspect_structure": "Message Structure",
+    "inspect_search": "Filter (position, name or value)…",
+    "inspect_expand": "Expand all",
+    "inspect_collapse": "Collapse all",
+    "inspect_details": "Node Details",
+    "inspect_analysis": "Analysis"
   },
   "scp": {
     "listener_config": "Listener Configuration",
