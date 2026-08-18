@@ -31,7 +31,7 @@ Can also be run locally with Python and pip, or deployed as a Docker container.
 | **UID Remapper** | Generate fresh Study / Series / Instance UIDs for a batch of DICOM files while preserving internal referential integrity; preview the old→new UID mapping before downloading as ZIP |
 | **DICOMDIR** | Read a DICOMDIR file and browse the Patient → Study → Series → Instance hierarchy; or generate a standards-compliant DICOMDIR from uploaded files/folder and download as ZIP |
 | **DICOMweb** | QIDO-RS study/series/instance queries, STOW-RS multi-file upload, WADO-RS retrieve (packaged as ZIP); preset-based server configuration with Basic Auth and Bearer Token support |
-| **HL7** | Send/receive HL7 v2 messages over MLLP; built-in templates for ORM, ORU, ADT, SIU, OML, QBP |
+| **HL7** | Send/receive HL7 v2 messages over MLLP; built-in templates for ORM, ORU, ADT, SIU, OML, QBP; deep **message inspector** with a hierarchical Segment → Field → Component → Sub-component tree, per-position HL7 definitions (v2.1–2.8.1) and structural analysis |
 | **Settings** | Manage local AE title/port, remote AE presets, HL7 defaults, language, log level |
 | **Logs** | Live view of application logs from `~/.pacs_admin_tool/logs/` |
 

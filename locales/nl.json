@@ -235,7 +235,20 @@
     "messages_count": "{n} berichten",
     "invalid_port": "Ongeldig poortnummer.",
     "inspect_btn": "Inspecteren",
-    "inspector_title": "HL7 Inspector"
+    "inspector_title": "HL7 Inspector",
+    "inspect_tab": "Bericht inspecteren",
+    "inspect_paste": "Plak een HL7-bericht",
+    "inspect_hint": "Zoom in op elk segment, veld, herhaling, component en subcomponent. Elk knooppunt is benoemd volgens de HL7 v2-standaard en aangeduid met zijn positie (bijv. PID-5.1). Escape-tekens worden gedecodeerd.",
+    "inspect_parse": "Inspecteer",
+    "inspect_from_send": "Laden uit Verzenden-tab",
+    "inspect_sample": "Voorbeeld laden",
+    "inspect_summary": "Berichtsamenvatting",
+    "inspect_structure": "Berichtstructuur",
+    "inspect_search": "Filter (positie, naam of waarde)…",
+    "inspect_expand": "Alles uitklappen",
+    "inspect_collapse": "Alles inklappen",
+    "inspect_details": "Knooppuntdetails",
+    "inspect_analysis": "Analyse"
   },
   "scp": {
     "listener_config": "Listener-configuratie",

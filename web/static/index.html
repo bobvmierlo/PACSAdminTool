@@ -1236,6 +1236,7 @@
     <div style="border-bottom:1px solid #e0e0e0; margin-bottom:16px; display:flex; gap:0">
       <button class="tab-btn active" id="hl7-send-btn" onclick="showHL7Tab('send')" data-i18n="hl7.send_tab">Send HL7</button>
       <button class="tab-btn"        id="hl7-recv-btn" onclick="showHL7Tab('recv')" data-i18n="hl7.recv_tab">Receive HL7</button>
+      <button class="tab-btn"        id="hl7-inspect-btn" onclick="showHL7Tab('inspect')" data-i18n="hl7.inspect_tab">Inspect Message</button>
     </div>
 
     <div id="hl7-send-panel">
@@ -1406,6 +1407,65 @@
                   onclick="clearHL7InHistory()">Clear history</button>
         </div>
         <div id="hl7-in-history-list" style="display:flex; flex-direction:column; gap:6px"></div>
+      </div>
+    </div>
+
+    <!-- ── HL7 Inspect (deep tree inspector) ─────────────────────────── -->
+    <div id="hl7-inspect-panel" style="display:none">
+      <div class="card">
+        <h3 data-i18n="hl7.inspect_paste">Paste an HL7 message</h3>
+        <p style="font-size:12px; color:#888; margin:2px 0 8px" data-i18n="hl7.inspect_hint">
+          Drill into every segment, field, repetition, component and sub-component. Each node is named
+          from the HL7 v2 standard and addressed by position (e.g. PID-5.1). Escape sequences are decoded.
+        </p>
+        <textarea id="hl7insp-input" rows="8" spellcheck="false"
+                  style="font-family:Consolas,monospace; font-size:12px"
+                  placeholder="MSH|^~\&|SEND|FAC|RECV|FAC|20240101120000||ADT^A04|MSG001|P|2.5.1&#10;PID|1||12345^^^HOSP^MR||DOE^JOHN..."></textarea>
+        <div class="btn-row" style="margin-top:10px; flex-wrap:wrap; gap:8px">
+          <button class="btn primary" onclick="hl7DeepInspect()" data-i18n="hl7.inspect_parse">Inspect</button>
+          <button class="btn" onclick="hl7InspLoadFromSend()" data-i18n="hl7.inspect_from_send">Load from Send tab</button>
+          <button class="btn" onclick="hl7InspLoadSample()" data-i18n="hl7.inspect_sample">Load sample</button>
+          <button class="btn" onclick="hl7InspClear()" data-i18n="common.clear">Clear</button>
+        </div>
+      </div>
+
+      <div id="hl7insp-results" style="display:none">
+        <!-- Message summary -->
+        <div class="card">
+          <h3 style="margin-bottom:8px" data-i18n="hl7.inspect_summary">Message Summary</h3>
+          <div id="hl7insp-summary"></div>
+        </div>
+
+        <!-- Tree + detail, side by side -->
+        <div class="card">
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px">
+            <h3 style="margin:0" data-i18n="hl7.inspect_structure">Message Structure</h3>
+            <input id="hl7insp-search" oninput="hl7InspFilter()" data-i18n-placeholder="hl7.inspect_search"
+                   placeholder="Filter (position, name or value)…"
+                   style="flex:1; min-width:180px; max-width:360px; font-size:12px; padding:4px 8px;
+                          border:1px solid #cbd5e0; border-radius:4px">
+            <button class="btn" style="font-size:12px; padding:3px 10px" onclick="hl7InspExpandAll()"
+                    data-i18n="hl7.inspect_expand">Expand all</button>
+            <button class="btn" style="font-size:12px; padding:3px 10px" onclick="hl7InspCollapseAll()"
+                    data-i18n="hl7.inspect_collapse">Collapse all</button>
+          </div>
+          <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap">
+            <div id="hl7insp-tree" style="flex:1 1 460px; min-width:300px; max-height:560px; overflow:auto;
+                                          font-size:12px"></div>
+            <div style="flex:0 0 320px; min-width:260px; background:#f8fafc; border:1px solid #e2e8f0;
+                        border-radius:6px; padding:12px; max-height:560px; overflow:auto">
+              <div style="font-size:11px; font-weight:600; color:#2b6cb0; margin-bottom:8px"
+                   data-i18n="hl7.inspect_details">Node Details</div>
+              <div id="hl7insp-detail-content"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Structural analysis -->
+        <div class="card">
+          <h3 style="margin-bottom:8px" data-i18n="hl7.inspect_analysis">Analysis</h3>
+          <div id="hl7insp-validation"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -3846,6 +3906,7 @@
 <script src="/static/js/hl7-templates.js"></script>
 <script src="/static/js/updater.js"></script>
 <script src="/static/js/hl7-tools.js"></script>
+<script src="/static/js/hl7-inspector.js"></script>
 <script src="/static/js/scp-receiver.js"></script>
 <script src="/static/js/tag-modal.js"></script>
 <script src="/static/js/help.js"></script>

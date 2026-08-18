@@ -82,9 +82,11 @@ function toggleMobileNav() {
 }
 
 function showHL7Tab(sub) {
-  document.getElementById("hl7-send-panel").style.display = sub === "send" ? "block" : "none";
-  document.getElementById("hl7-recv-panel").style.display = sub === "recv" ? "block" : "none";
-  document.getElementById("hl7-send-btn").classList.toggle("active", sub === "send");
-  document.getElementById("hl7-recv-btn").classList.toggle("active", sub === "recv");
+  document.getElementById("hl7-send-panel").style.display    = sub === "send"    ? "block" : "none";
+  document.getElementById("hl7-recv-panel").style.display    = sub === "recv"    ? "block" : "none";
+  document.getElementById("hl7-inspect-panel").style.display = sub === "inspect" ? "block" : "none";
+  document.getElementById("hl7-send-btn").classList.toggle("active",    sub === "send");
+  document.getElementById("hl7-recv-btn").classList.toggle("active",    sub === "recv");
+  document.getElementById("hl7-inspect-btn").classList.toggle("active", sub === "inspect");
 }
 
