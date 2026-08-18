@@ -105,12 +105,15 @@ def _datatypes(mod):
         if not m:
             continue
         base, idx = m.group(1), int(m.group(2))
-        name, dt, _table = _rec(rec)
-        grouped.setdefault(base, []).append((idx, name, dt))
+        name, dt, table = _rec(rec)
+        grouped.setdefault(base, []).append((idx, name, dt, table))
     out = {}
     for base, items in grouped.items():
         items.sort(key=lambda t: t[0])
-        out[base] = [[name, dt] for _idx, name, dt in items]
+        # [name, datatype] normally; [name, datatype, table] when the component
+        # is bound to an HL7 value table (so coded sub-fields can be decoded).
+        out[base] = [([name, dt, table] if table else [name, dt])
+                     for _idx, name, dt, table in items]
     return out
 
 

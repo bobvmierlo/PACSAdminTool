@@ -1,0 +1,11 @@
+{
+  "name": "pacsadmintool-hl7ref-tools",
+  "private": true,
+  "description": "Build-time only tooling to (re)generate web/static/hl7ref/tables.json. Not required to run the app.",
+  "scripts": {
+    "gen-tables": "node generate_hl7_tables.js"
+  },
+  "dependencies": {
+    "hl7-dictionary": "^1.0.1"
+  }
+}

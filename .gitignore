@@ -34,3 +34,5 @@ desktop.ini
 .vscode/
 .idea/
 *.swp
+# Build-time HL7 table generator deps (tools/)
+tools/node_modules/
