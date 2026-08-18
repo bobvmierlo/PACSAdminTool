@@ -1,5 +1,12 @@
 # Changelog
 
+## v3.4.1 — 2026-08-18
+
+### Improved — [#161](https://github.com/bobvmierlo/PACSAdminTool/pull/161)
+
+- **Coded values explained in the HL7 inspector** — coded fields and components now show what their code actually means right next to the value, so an order status of `SC` reads as "In process, scheduled" instead of leaving you to look it up.
+- **Full value list in the detail pane** — selecting a coded element names the HL7 value table it belongs to, highlights the current code in the table's complete list of codes, and flags a value that isn't a valid code for that table. Around 5,000 codes across 394 tables are bundled with the app, so decoding works entirely offline.
+
 ## v3.4.0 — 2026-08-18
 
 ### New — [#160](https://github.com/bobvmierlo/PACSAdminTool/pull/160)
