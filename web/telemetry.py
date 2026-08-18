@@ -36,11 +36,17 @@ import logging
 import os
 import sys
 import threading
+import time
 import uuid
 
 import web.context as ctx
 
 logger = logging.getLogger(__name__)
+
+# Interval between recurring `app_heartbeat` events. The heartbeat lets us
+# measure active installs (DAU/WAU) and retention — the startup ping alone
+# only tells us when a server booted, not that it is still in use.
+_HEARTBEAT_INTERVAL_SECONDS = 24 * 60 * 60
 
 # ── PostHog project settings ─────────────────────────────────────────────────
 # Replace the placeholder with your PostHog EU project API key, or set the
@@ -56,6 +62,7 @@ _client         = None   # posthog.Posthog instance, set by init()
 _anonymous_id: str | None = None
 _enabled        = True
 _lock           = threading.Lock()
+_heartbeat_started = False
 
 
 # ── Internal helpers ─────────────────────────────────────────────────────────
@@ -77,6 +84,30 @@ def _get_platform() -> str:
     if p == "darwin":
         return "macos"
     return "linux"
+
+
+def _common_props() -> dict:
+    """
+    Environment context attached to every event (version, deployment, OS,
+    language). Lets feature and error events be broken down by version or
+    platform directly, without relying only on Person ($set) properties.
+
+    Fully defensive: any failure returns an empty dict so telemetry never
+    breaks a request.
+    """
+    props: dict = {}
+    try:
+        from __version__ import __version__
+        props["app_version"] = __version__
+    except Exception:
+        pass
+    try:
+        props["deployment_type"] = _get_deployment()
+        props["os_platform"]     = _get_platform()
+        props["language"]        = ctx.config.get("language", "en")
+    except Exception:
+        pass
+    return props
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -150,10 +181,14 @@ def capture(event: str, properties: dict | None = None) -> None:
         )
         return
     try:
+        # Attach environment context (version/deployment/platform/language) to
+        # every event. Explicit properties passed by the caller win over the
+        # common defaults, so an event can still override any of them.
+        merged = {**_common_props(), **(properties or {})}
         # posthog ≥7.x swapped the argument order:
         #   old (≤6.x):  capture(distinct_id, event, properties)
         #   new (≥7.x):  capture(event, distinct_id=..., properties=...)
-        _client.capture(event, distinct_id=_anonymous_id, properties=properties or {})
+        _client.capture(event, distinct_id=_anonymous_id, properties=merged)
         logger.debug(
             "Telemetry event sent: %s | props: %s",
             event,
@@ -161,6 +196,23 @@ def capture(event: str, properties: dict | None = None) -> None:
         )
     except Exception as exc:
         logger.debug("Telemetry capture error (%s): %s", event, exc)
+
+
+def capture_error(feature: str, error: BaseException, extra: dict | None = None) -> None:
+    """
+    Capture a `feature_error` event so we can see what is failing in the field.
+
+    Privacy-safe: only the feature name and the exception *class* name are
+    recorded — never the exception message, which can contain hostnames,
+    AE titles, file paths, or other endpoint-specific data.
+    """
+    props = {
+        "feature":    feature,
+        "error_type": type(error).__name__,
+    }
+    if extra:
+        props.update(extra)
+    capture("feature_error", props)
 
 
 def send_startup() -> None:
@@ -195,3 +247,27 @@ def send_startup() -> None:
         })
 
     threading.Thread(target=_send, daemon=True, name="telemetry-startup").start()
+
+
+def start_heartbeat(interval_seconds: int = _HEARTBEAT_INTERVAL_SECONDS) -> None:
+    """
+    Start a background daemon that emits an `app_heartbeat` event roughly once
+    per `interval_seconds` for as long as the server is running.
+
+    Combined with `app_startup`, this measures active installs and retention:
+    startup only fires on boot, so a long-running admin server would otherwise
+    look inactive after its first ping. Idempotent — only one loop is started
+    per process, and each tick no-ops when telemetry is disabled.
+    """
+    global _heartbeat_started
+    with _lock:
+        if _heartbeat_started:
+            return
+        _heartbeat_started = True
+
+    def _loop():
+        while True:
+            time.sleep(interval_seconds)
+            capture("app_heartbeat")
+
+    threading.Thread(target=_loop, daemon=True, name="telemetry-heartbeat").start()

@@ -144,9 +144,14 @@ _apply_log_level(ctx.config.get("log_level", "INFO"))
 set_language(ctx.config.get("language", "en"))
 
 # Initialise telemetry and send the startup ping (non-blocking background thread)
-from web.telemetry import init as _telemetry_init, send_startup as _telemetry_startup
+from web.telemetry import (
+    init as _telemetry_init,
+    send_startup as _telemetry_startup,
+    start_heartbeat as _telemetry_heartbeat,
+)
 _telemetry_init(ctx.config)
 _telemetry_startup()
+_telemetry_heartbeat()
 
 # ===========================================================================
 # Middleware

@@ -36,11 +36,19 @@ jobs:
           # ── PostHog helper ────────────────────────────────────────────────
 
           def capture(distinct_id, event, properties):
+              # These are server-side aggregate metrics, not real users. Setting
+              # $process_person_profile to False stops PostHog from creating a
+              # person profile per synthetic distinct_id (stats:github:*, etc.),
+              # which otherwise pollutes person analytics and inflates billing.
               payload = json.dumps({
                   "api_key":     POSTHOG_KEY,
                   "distinct_id": distinct_id,
                   "event":       event,
-                  "properties":  {"$geoip_disable": True, **properties},
+                  "properties":  {
+                      "$geoip_disable":         True,
+                      "$process_person_profile": False,
+                      **properties,
+                  },
               }).encode()
               req = urllib.request.Request(
                   f"{POSTHOG_HOST}/capture/",
@@ -82,11 +90,6 @@ jobs:
                           "asset":          asset["name"],
                           "download_count": count,
                           "date":           TODAY,
-                          "$set": {
-                              "download_count": count,
-                              "version":        version,
-                              "asset":          asset["name"],
-                          },
                       },
                   )
                   print(f"  GitHub  {version}  {asset['name']:35s}  {count:>6} downloads")
@@ -98,7 +101,6 @@ jobs:
                   "source":         "github",
                   "download_count": total_github_downloads,
                   "date":           TODAY,
-                  "$set": {"download_count": total_github_downloads},
               },
           )
           print(f"  GitHub  TOTAL  {total_github_downloads} downloads")
@@ -165,7 +167,6 @@ jobs:
                           "tag":        tag,
                           "pull_count": v_count,
                           "date":       TODAY,
-                          "$set": {"pull_count": v_count, "tag": tag},
                       },
                   )
                   print(f"  GHCR  {tag:30s}  {v_count:>6} pulls")
@@ -177,7 +178,6 @@ jobs:
                   "source":     "ghcr",
                   "pull_count": ghcr_total,
                   "date":       TODAY,
-                  "$set": {"pull_count": ghcr_total},
               },
           )
           print(f"  GHCR  TOTAL  {ghcr_total} pulls")
@@ -198,7 +198,6 @@ jobs:
                   "source":     "dockerhub",
                   "pull_count": dh_pulls,
                   "date":       TODAY,
-                  "$set": {"pull_count": dh_pulls},
               },
           )
           print(f"  Docker Hub  TOTAL  {dh_pulls} pulls")

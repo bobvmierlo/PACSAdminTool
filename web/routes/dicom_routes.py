@@ -18,7 +18,7 @@ from dicom import save_dataset
 import web.context as ctx
 from web.audit import log as _audit
 from web.auth import require_login
-from web.telemetry import capture as _capture
+from web.telemetry import capture as _capture, capture_error as _capture_error
 from web.helpers import (
     _bad_request,
     _client_room,
@@ -183,6 +183,7 @@ def dicom_echo():
         return jsonify({"ok": ok, "message": msg})
     except Exception as e:
         logger.exception("C-ECHO exception")
+        _capture_error("dicom_echo", e)
         _audit("dicom.c_echo", ip=_req_ip(), user=_req_user(),
                detail={"ae_title": d.get("ae_title"), "host": d.get("host"), "port": d.get("port")},
                result="error", error=str(e))
@@ -329,6 +330,7 @@ def dicom_find():
         return jsonify({"ok": ok, "message": msg, "results": rows})
     except Exception as e:
         logger.exception("C-FIND error")
+        _capture_error("dicom_find", e)
         _audit("dicom.c_find", ip=_req_ip(), user=_req_user(),
                detail={"ae_title": d.get("ae_title"), "host": d.get("host"), "port": d.get("port")},
                result="error", error=str(e))
@@ -373,6 +375,7 @@ def dicom_move():
         return jsonify({"ok": True, "message": "C-MOVE started", "job_id": job_id})
     except Exception as e:
         logger.exception("C-MOVE setup error")
+        _capture_error("dicom_move", e)
         return jsonify({"ok": False, "message": str(e)}), 500
 
 
@@ -463,6 +466,7 @@ def dicom_store():
             update_job(job_id, state="completed" if ok else "error", message=msg)
         except Exception as e:
             logger.exception("C-STORE background error")
+            _capture_error("dicom_store", e)
             _log("cstore", f"Error: {e}", "err", to=to)
             update_job(job_id, state="error", message=str(e))
         finally:
@@ -547,6 +551,7 @@ def dicom_dmwl():
         return jsonify({"ok": ok, "message": msg, "results": rows})
     except Exception as e:
         logger.exception("DMWL error")
+        _capture_error("dicom_dmwl", e)
         return jsonify({"ok": False, "message": str(e), "results": []}), 500
 
 
