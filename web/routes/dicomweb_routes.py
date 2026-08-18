@@ -21,7 +21,7 @@ from flask import Blueprint, jsonify, request, send_file
 
 from web.audit import log as _audit
 from web.helpers import _req_ip, _req_user
-from web.telemetry import capture as _capture
+from web.telemetry import capture as _capture, capture_error as _capture_error
 
 logger = logging.getLogger(__name__)
 bp = Blueprint("dicomweb", __name__)
@@ -183,6 +183,7 @@ def dicomweb_qido():
         status = getattr(getattr(exc, "response", None), "status_code", None)
         msg    = f"HTTP {status}: {exc}" if status else str(exc)
         logger.exception("QIDO-RS request failed: %s", url)
+        _capture_error("dicomweb_qido", exc)
         _audit("dicomweb.qido", ip=_req_ip(), user=_req_user(),
                detail={"url": url}, result="error", error=msg)
         return jsonify({"ok": False, "error": msg}), 500
@@ -246,6 +247,7 @@ def dicomweb_stow():
         status = getattr(getattr(exc, "response", None), "status_code", None)
         msg    = f"HTTP {status}: {exc}" if status else str(exc)
         logger.exception("STOW-RS request failed: %s", url)
+        _capture_error("dicomweb_stow", exc)
         _audit("dicomweb.stow", ip=_req_ip(), user=_req_user(),
                detail={"url": url}, result="error", error=msg)
         return jsonify({"ok": False, "error": msg}), 500
@@ -313,6 +315,7 @@ def dicomweb_wado():
         status = getattr(getattr(exc, "response", None), "status_code", None)
         msg    = f"HTTP {status}: {exc}" if status else str(exc)
         logger.exception("WADO-RS request failed: %s", url)
+        _capture_error("dicomweb_wado", exc)
         _audit("dicomweb.wado", ip=_req_ip(), user=_req_user(),
                detail={"url": url}, result="error", error=msg)
         return jsonify({"ok": False, "error": msg}), 500
