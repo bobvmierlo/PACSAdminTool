@@ -1,5 +1,19 @@
 # Changelog
 
+## v3.4.0 — 2026-08-18
+
+### New — [#160](https://github.com/bobvmierlo/PACSAdminTool/pull/160)
+
+- **HL7 message inspector** — a new Inspect Message tab in the HL7 section breaks any pasted message down into a browsable tree of segments, fields, repetitions, components and sub-components, with standard HL7 addressing such as PID-5.1. Paste a message, pull one in from the Send tab, or load the built-in sample.
+- **Field definitions while you inspect** — clicking any part of the message shows its official name, data type, cardinality, and both the raw and decoded value, with escape sequences translated for you. Definitions are bundled for HL7 versions 2.1 through 2.8.1 and are picked automatically from the message itself; unrecognised custom or Z-segments are still shown and clearly marked as unknown.
+- **Structure check** — an analysis panel lists structural errors, warnings and notes found in the message, and the tree can be searched, expanded, or collapsed in one click. Everything runs offline, with no lookups outside the app.
+
+### Improved — [#159](https://github.com/bobvmierlo/PACSAdminTool/pull/159)
+
+- **Clearer anonymous usage signals** — when telemetry is enabled, the app now sends a periodic heartbeat (once a day) instead of only reporting at startup, so active installs and long-running servers are counted properly. Telemetry stays off entirely when you have disabled it.
+- **Anonymous error reporting** — failures in DICOM, DICOMweb, HL7, storage-receiver and validation operations are now reported as counts by feature and error type only. Error messages are never sent, so hostnames, file paths and patient data cannot leak, and a telemetry problem can never interrupt the operation you were running.
+- Usage events now include basic environment details (app version, deployment type, operating system, and language) to help prioritise fixes for the setups people actually use.
+
 ## v3.3.2 — 2026-07-23
 
 ### Improved — [#154](https://github.com/bobvmierlo/PACSAdminTool/pull/154)
