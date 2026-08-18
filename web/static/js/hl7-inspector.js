@@ -117,6 +117,38 @@ async function _hl7LoadVersion(version) {
   return data;
 }
 
+// HL7 value tables (code → meaning), shared across versions. Loaded once.
+async function _hl7LoadTables() {
+  if (_hl7Ref.tables) return _hl7Ref.tables;
+  let data = {};
+  try {
+    const res = await fetch("/static/hl7ref/tables.json");
+    if (res.ok) data = await res.json();
+  } catch { /* offline / missing — codes simply won't be decoded */ }
+  _hl7Ref.tables = data;
+  return data;
+}
+
+// Normalise a field's table id ("HL70038", "0038") to the tables.json key ("38").
+function _hl7TableId(raw) {
+  if (!raw) return null;
+  const digits = String(raw).replace(/^HL7/i, "").replace(/^0+/, "");
+  return digits || "0";
+}
+
+// Look up a table by a field/component table id. Returns { desc, values } or null.
+function _hl7Table(model, tableRef) {
+  const id = _hl7TableId(tableRef);
+  return (id && model.tables && model.tables[id]) || null;
+}
+
+// Decode a single coded value against its table. Returns the meaning or null.
+function _hl7DecodeCode(model, tableRef, value) {
+  const t = _hl7Table(model, tableRef);
+  if (!t || value == null || value === "") return null;
+  return Object.prototype.hasOwnProperty.call(t.values, value) ? t.values[value] : null;
+}
+
 // Human-readable trigger-event descriptions, keyed by "CODE^EVENT".
 const _HL7_MSG_TYPES = {
   "ADT^A01": "Admit / Visit Notification",
@@ -274,7 +306,7 @@ function _hl7CompDef(model, dataType, compNum) {
   const base = dataType && dataType.replace(/_SIMPLE$/, "");
   const dt = model.ref && base && model.ref.datatypes[base];
   const c = dt && dt[compNum - 1];
-  return c ? { name: c[0], dt: c[1] } : null;
+  return c ? { name: c[0], dt: c[1], table: c[2] || null } : null;
 }
 
 function _hl7CompName(model, dataType, compNum) {
@@ -310,6 +342,7 @@ async function hl7DeepInspect() {
   model.versionRequested = mshVer;
   model.version = _hl7ResolveVersion(mshVer, index);
   model.ref = await _hl7LoadVersion(model.version);
+  model.tables = await _hl7LoadTables();
 
   _hl7DeepModel = model;
   _hl7DeepSelected = null;
@@ -406,11 +439,12 @@ function _hl7Block(headerRow, caret, childrenEl, startOpen) {
 }
 
 // Generic row (leaf or expandable header). Returns { el, caret }.
-function _hl7Row({ pos, name, dt, value, required, empty, caret, onSelect, muted }) {
+// `hint` — an optional decoded code meaning shown after the value.
+function _hl7Row({ pos, name, dt, value, required, empty, caret, onSelect, muted, hint }) {
   const el = document.createElement("div");
   el.className = "hl7insp-node hl7insp-leaf";
   el.dataset.pos = pos;
-  el.dataset.search = (pos + " " + name + " " + (value || "")).toLowerCase();
+  el.dataset.search = (pos + " " + name + " " + (value || "") + " " + (hint || "")).toLowerCase();
   el.style.cssText = "display:flex;align-items:center;gap:6px;padding:3px 6px;cursor:pointer;border-radius:4px;font-size:12px";
 
   const car = _hl7Caret();
@@ -434,6 +468,14 @@ function _hl7Row({ pos, name, dt, value, required, empty, caret, onSelect, muted
     (empty ? "#cbd5e1" : "#111827") + ";background:" + (empty ? "transparent" : "#f8fafc"));
   val.title = value || "";
   el.appendChild(val);
+
+  if (hint) {
+    const h = _hl7Span(hint,
+      "flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" +
+      "font-style:italic;color:#0f766e;font-size:11px");
+    h.title = hint;
+    el.appendChild(h);
+  }
 
   el.addEventListener("click", ev => {
     ev.stopPropagation();       // don't toggle ancestor blocks
@@ -479,10 +521,14 @@ function _hl7AppendField(container, seg, fieldNum, field, model) {
     field.reps.some(rep => rep.length > 1 || rep.some(c => c.length > 1))
   );
 
+  // Decode a primitive coded field (e.g. ORC-5 → table 0038) inline.
+  const meaning = (!expandable && def && def.table)
+    ? _hl7DecodeCode(model, def.table, field.raw) : null;
+
   const row = _hl7Row({
     pos, name: label, dt: dataType, value: field.raw,
     required: !!(def && def.opt === "R"), empty: field.raw === "",
-    caret: expandable,
+    caret: expandable, hint: meaning,
     onSelect: () => _hl7SelectField(seg, fieldNum, field, def, model),
   });
   if (!expandable) { container.appendChild(row.el); return; }
@@ -522,9 +568,11 @@ function _hl7AppendComponents(container, seg, fieldNum, comps, dataType, model, 
     const raw = subs.join(model.enc.sub);
     const pos = `${seg.id}-${fieldNum}${repTag}.${compNum}`;
     const hasSubs = subs.length > 1;
+    const compTable = compDef ? compDef.table : null;
+    const meaning = (!hasSubs && compTable) ? _hl7DecodeCode(model, compTable, raw) : null;
     const row = _hl7Row({
-      pos, name, dt: (hasSubs ? compDt : null), value: raw, empty: raw === "", caret: hasSubs,
-      onSelect: () => _hl7SelectValue(pos, compDt, raw, model, name),
+      pos, name, dt: (hasSubs ? compDt : null), value: raw, empty: raw === "", caret: hasSubs, hint: meaning,
+      onSelect: () => _hl7SelectValue(pos, compDt, raw, model, name, compTable),
     });
     if (!hasSubs) { container.appendChild(row.el); return; }
     const kids = document.createElement("div");
@@ -608,13 +656,18 @@ function _hl7SelectField(seg, fieldNum, field, def, model) {
       <tr><td style="color:#94a3b8;padding:2px 0">Repeatable</td><td>${REP[def.rep] || def.rep}</td></tr>
       <tr><td style="color:#94a3b8;padding:2px 0">Cardinality</td><td style="font-family:Consolas">${_hl7Card(def.min, def.max)}</td></tr>
       <tr><td style="color:#94a3b8;padding:2px 0">Repetitions</td><td>${field.reps.length}</td></tr>` +
-      (def.table ? `<tr><td style="color:#94a3b8;padding:2px 0">Value table</td><td style="font-family:Consolas">${escapeHtml(def.table)}</td></tr>` : "") +
+      (def.table ? `<tr><td style="color:#94a3b8;padding:2px 0">Value table</td><td style="font-family:Consolas">${escapeHtml(def.table)}${_hl7Table(model, def.table) ? ` — ${escapeHtml(_hl7Table(model, def.table).desc)}` : ""}</td></tr>` : "") +
     `</table>`;
   } else {
     html += `<div style="color:#c2410c;font-size:12px;margin-bottom:8px">No reference definition for this field (custom segment) — parsed positionally.</div>`;
   }
   html += _hl7ValueBox("Raw value", field.raw);
   if (showDecoded) html += _hl7ValueBox("Decoded", decoded);
+  // Coded value: show the meaning and the full value set for a primitive field.
+  if (def && def.table && !field.atomic && field.reps.length === 1 &&
+      (field.reps[0] || []).length === 1 && (field.reps[0][0] || []).length === 1) {
+    html += _hl7TableBox(model, def.table, field.raw);
+  }
 
   // Component breakdown for the first repetition, using the datatype's components.
   if (comps && comps.length && !field.atomic) {
@@ -635,7 +688,7 @@ function _hl7SelectField(seg, fieldNum, field, def, model) {
   el.innerHTML = html;
 }
 
-function _hl7SelectValue(pos, dataType, value, model, name) {
+function _hl7SelectValue(pos, dataType, value, model, name, tableRef) {
   const el = document.getElementById("hl7insp-detail-content");
   if (!el) return;
   const decoded = _hl7DecodeEscapes(value, model.enc);
@@ -646,6 +699,7 @@ function _hl7SelectValue(pos, dataType, value, model, name) {
   if (dataType) html += `<div style="font-size:11px;color:#64748b;margin-bottom:8px">${escapeHtml(dataType)}${dtFriendly && dtFriendly !== dataType ? ` — ${escapeHtml(dtFriendly)}` : ""}</div>`;
   html += _hl7ValueBox("Value", value);
   if (decoded !== value) html += _hl7ValueBox("Decoded", decoded);
+  if (tableRef) html += _hl7TableBox(model, tableRef, value);
   if (!value) html += `<div style="color:#94a3b8;font-size:12px;margin-top:6px">This element is empty.</div>`;
   el.innerHTML = html;
 }
@@ -659,6 +713,37 @@ function _hl7DtComps(model, dataType) {
 function _hl7ValueBox(label, value) {
   return `<div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.03em;margin:8px 0 2px">${label}</div>` +
     `<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:4px;padding:5px 7px;font-family:Consolas,monospace;font-size:12px;color:#0c4a6e;word-break:break-all;white-space:pre-wrap">${value ? escapeHtml(value) : '<span style="color:#94a3b8">∅ (empty)</span>'}</div>`;
+}
+
+// Render an HL7 value table: the current code's meaning plus the full value set,
+// with the current value highlighted. Falls back to a codes-only note if the
+// table has no descriptions bundled.
+function _hl7TableBox(model, tableRef, value) {
+  const t = _hl7Table(model, tableRef);
+  const id = _hl7TableId(tableRef);
+  if (!t) {
+    return `<div style="font-size:11px;color:#94a3b8;margin-top:10px">Value table ${escapeHtml(String(tableRef))} not bundled.</div>`;
+  }
+  const meaning = value && Object.prototype.hasOwnProperty.call(t.values, value) ? t.values[value] : null;
+  let html = `<div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.03em;margin:10px 0 2px">Code meaning — table ${escapeHtml(id)} (${escapeHtml(t.desc)})</div>`;
+  if (value && meaning) {
+    html += `<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:4px;padding:5px 7px;font-size:12px;color:#065f46">` +
+      `<span style="font-family:Consolas,monospace;font-weight:700">${escapeHtml(value)}</span> — ${escapeHtml(meaning)}</div>`;
+  } else if (value) {
+    html += `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:4px;padding:5px 7px;font-size:12px;color:#991b1b">` +
+      `<span style="font-family:Consolas,monospace;font-weight:700">${escapeHtml(value)}</span> is not a valid code in this table.</div>`;
+  }
+  // Full value set (scrollable), current code highlighted.
+  html += `<div style="max-height:180px;overflow:auto;border:1px solid #e2e8f0;border-radius:4px;margin-top:4px">` +
+    `<table style="width:100%;border-collapse:collapse;font-size:11px">`;
+  for (const [code, desc] of Object.entries(t.values)) {
+    const hit = code === value;
+    html += `<tr style="border-bottom:1px solid #eef2f6;background:${hit ? '#ecfdf5' : ''}">` +
+      `<td style="padding:2px 6px;font-family:Consolas;color:#0f766e;white-space:nowrap;${hit ? 'font-weight:700' : ''}">${escapeHtml(code)}</td>` +
+      `<td style="padding:2px 6px;color:#334155">${escapeHtml(desc)}</td></tr>`;
+  }
+  html += `</table></div>`;
+  return html;
 }
 
 // ── Validation / analysis pane ───────────────────────────────────────────────
@@ -811,7 +896,7 @@ function hl7InspLoadSample() {
     "MSH|^~\\&|RIS|HOSPITAL|PACS|HOSPITAL|20240607123045||ORM^O01|MSG00001|P|2.5.1\r" +
     "PID|1||1234567^^^HOSP^MR~9876543^^^HOSP^PI||DOE^JOHN^A^^MR^^L||19800115|M|||123 MAIN ST^APT 4B^METROPOLIS^NY^10001^USA^H|||||||ACC-0001\r" +
     "PV1|1|O|RADIOLOGY^CT^01||||1234^SMITH^JANE^^^DR|||RAD||||||||VISIT-0001\r" +
-    "ORC|NW|PLACER-001|FILLER-001|||||||||1234^SMITH^JANE^^^DR\r" +
+    "ORC|NW|PLACER-001|FILLER-001||SC|||||||1234^SMITH^JANE^^^DR\r" +
     "OBR|1|PLACER-001|FILLER-001|CTHEAD^CT HEAD W/O CONTRAST^L||20240607|20240607123000||||||||CT|1234^SMITH^JANE^^^DR\r" +
     "ZDS|1.2.840.113619.2.55.3.604688.1.20240607";
   hl7DeepInspect();
