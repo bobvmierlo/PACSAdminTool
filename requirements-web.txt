@@ -24,4 +24,4 @@ simple-websocket~=1.1
 requests~=2.34
 
 # Telemetry (anonymous usage statistics — PostHog EU)
-posthog~=7.42
+posthog~=7.44
