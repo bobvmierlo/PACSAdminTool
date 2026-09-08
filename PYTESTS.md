@@ -30,6 +30,7 @@ pytest tests/ -v
 pytest tests/test_config.py
 pytest tests/test_mllp.py
 pytest tests/test_validation.py
+pytest tests/test_video_dicom.py
 pytest tests/test_web_api.py
 ```
 
@@ -84,15 +85,32 @@ Full integration tests for the Flask web server using an isolated temporary data
 | `TestUserManagement` | 6 | List users, create and delete a user, reject duplicate usernames (409), prevent self-deletion (400), block non-admin users from listing users (403), and allow changing own password. |
 | `TestSCPFiles` | 1 | `GET /api/scp/files` returns 200 with an empty `files` list when the SCP receive directory is empty. |
 
+### `test_video_dicom.py` - DICOM Video Support
+
+Tests for encapsulated video (MPEG-2, MPEG-4 AVC/H.264, HEVC/H.265) in `dicom/dicomize.py` and `dicom/operations.py`. The C-STORE tests start the built-in Storage SCP on a free loopback port and send to it, so they need no external PACS.
+
+| Class | Tests | What it covers |
+|-------|-------|----------------|
+| `TestMp4Parser` | 4 | `_parse_mp4_info()` reads width, height, frame count and the codec fourcc out of the MP4/MOV box structure, and returns zeros instead of raising on garbage or truncated input. |
+| `TestCodecTransferSyntax` | 10 | The codec → transfer syntax mapping: `avc1`/`avc3`/`h264` → MPEG-4 AVC, `hvc1`/`hev1` → HEVC, `mp4v` → MPEG-2, case-insensitive matching, and the MPEG-4 AVC fallback for unknown or missing codecs. |
+| `TestVideoToDicom` | 9 | `video_to_dicom()` emits a Video Photographic Image Storage object, picks the transfer syntax and `LossyImageCompressionMethod` from the codec, carries the dimensions and frame count across, never declares zero frames, and stores the bitstream verbatim. |
+| `TestVideoContextLists` | 7 | `VIDEO_TRANSFER_SYNTAXES` covers the MPEG-2 / MPEG-4 AVC / HEVC syntaxes and holds only valid UIDs, `VIDEO_STORAGE_SOPS` covers the three Video Image Storage classes, and the proposed-context budget matches the DICOM limit of 128. |
+| `TestIsEncapsulatedSyntax` | 8 | `is_encapsulated_syntax()` classifies compressed and video syntaxes as encapsulated and uncompressed ones as not, including empty input. |
+| `TestVideoStoreRoundTrip` | 5 | The regression itself: video is accepted by the SCP for each codec instead of being refused with "No presentation context … has been accepted by the peer", the bitstream survives the transfer byte-for-byte, and adding the video contexts does not crowd out ordinary uncompressed instances in a mixed batch. |
+| `TestVideoRetrieve` | 1 | C-GET against a minimal Query/Retrieve SCP returns the video instance intact — the storage sub-operations need SCP/SCU role selection, without which every retrieve failed. |
+
 ## Test Count Summary
 
 | File | Tests |
 |------|-------|
 | `test_config.py` | 11 |
-| `test_mllp.py` | 13 |
+| `test_dicom_validator.py` | 47 |
+| `test_mllp.py` | 20 |
+| `test_review_fixes.py` | 14 |
 | `test_validation.py` | 4 |
-| `test_web_api.py` | 29 |
-| **Total** | **57** |
+| `test_video_dicom.py` | 43 |
+| `test_web_api.py` | 68 |
+| **Total** | **207** |
 
 ## Adding New Tests
 
