@@ -3,8 +3,8 @@ DICOM conversion utilities: PDF, image, and video to DICOM.
 
 PDF  → Encapsulated PDF Storage (1.2.840.10008.5.1.4.1.1.104.1)
 Image → Secondary Capture Image Storage (1.2.840.10008.5.1.4.1.1.7)
-Video → Video Photographic Image Storage (1.2.840.10008.5.1.4.1.1.77.1.2.1)
-        with MPEG-4 AVC/H.264 encapsulation (Supplement 218 / encapsulated video)
+Video → Video Photographic Image Storage (1.2.840.10008.5.1.4.1.1.77.1.4.1)
+        with MPEG-4 AVC/H.264 or HEVC/H.265 encapsulation
      OR Multi-frame True Color Secondary Capture (1.2.840.10008.5.1.4.1.1.7.4)
         with JPEG Baseline per-frame encoding (requires ffmpeg on PATH)
 """
@@ -115,13 +115,14 @@ def _save_ds(ds) -> bytes:
 
 def _parse_mp4_info(data: bytes) -> tuple:
     """
-    Extract (width, height, frame_count) from an MP4/MOV byte stream.
+    Extract (width, height, frame_count, codec) from an MP4/MOV byte stream.
 
     Parses the QuickTime/ISOBMFF box structure to locate:
       - 'tkhd' (track header) for width/height
       - 'stts' (sample-to-time) for frame count
+      - 'stsd' (sample description) for the codec fourcc, e.g. 'avc1' or 'hvc1'
 
-    Returns (0, 0, 0) if parsing fails.
+    Returns (0, 0, 0, "") if parsing fails.
     """
     def _iter_boxes(buf, start=0, end=None):
         if end is None:
@@ -184,11 +185,59 @@ def _parse_mp4_info(data: bytes) -> tuple:
                         break
                     n_frames += struct.unpack_from(">I", stts, off)[0]
 
-        return int(width), int(height), int(n_frames)
+        # ── Codec fourcc from the sample description ───────────────────────
+        # 'stsd' is a full box: 4 bytes version/flags, 4 bytes entry count,
+        # then each entry starts with its own 4-byte size followed by the
+        # 4-character codec identifier.
+        _, ds_, de_ = _find_box(
+            data, [b"moov", b"trak", b"mdia", b"minf", b"stbl", b"stsd"]
+        )
+        codec = ""
+        if ds_ is not None:
+            stsd = data[ds_:de_]
+            if len(stsd) >= 16:
+                codec = stsd[12:16].decode("ascii", errors="replace").strip("\x00 ")
+
+        return int(width), int(height), int(n_frames), codec
 
     except Exception as exc:
         logger.debug("MP4 parse failed: %s", exc)
-        return 0, 0, 0
+        return 0, 0, 0, ""
+
+
+# Video codec (from the MP4 sample description) → DICOM transfer syntax.
+# The bitstream is stored verbatim, so the transfer syntax has to name the
+# codec that is actually in the file: announcing H.264 for an HEVC stream makes
+# the receiving PACS reject or mis-decode it.
+_CODEC_TRANSFER_SYNTAXES = {
+    "avc1": "1.2.840.10008.1.2.4.102",  # MPEG-4 AVC/H.264 High Profile / Level 4.1
+    "avc3": "1.2.840.10008.1.2.4.102",
+    "h264": "1.2.840.10008.1.2.4.102",
+    "hvc1": "1.2.840.10008.1.2.4.107",  # HEVC/H.265 Main Profile / Level 5.1
+    "hev1": "1.2.840.10008.1.2.4.107",
+    "hvc2": "1.2.840.10008.1.2.4.107",
+    "mp4v": "1.2.840.10008.1.2.4.100",  # MPEG2 Main Profile / Main Level
+    "mp2v": "1.2.840.10008.1.2.4.100",
+    "m2v1": "1.2.840.10008.1.2.4.100",
+}
+
+# Fallback when the codec cannot be determined: MPEG-4 AVC/H.264 High Profile /
+# Level 4.1, by far the most widely supported video syntax in PACS systems.
+DEFAULT_VIDEO_TRANSFER_SYNTAX = "1.2.840.10008.1.2.4.102"
+
+# Value for (0028,2114) Lossy Image Compression Method, per transfer syntax.
+_COMPRESSION_METHODS = {
+    "1.2.840.10008.1.2.4.100": "ISO_13818_2",   # MPEG-2
+    "1.2.840.10008.1.2.4.102": "ISO_14496_10",  # MPEG-4 AVC/H.264
+    "1.2.840.10008.1.2.4.107": "ISO_23008_2",   # HEVC/H.265
+}
+
+
+def _video_transfer_syntax(codec: str) -> str:
+    """Map a sample-description codec fourcc to its DICOM transfer syntax."""
+    return _CODEC_TRANSFER_SYNTAXES.get(
+        (codec or "").lower(), DEFAULT_VIDEO_TRANSFER_SYNTAX
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -345,10 +394,11 @@ def video_to_dicom(video_bytes: bytes, filename: str, metadata: dict,
     """
     Wrap a video file as an encapsulated Video Photographic Image DICOM object.
 
-    The video bitstream is stored verbatim in PixelData using the MPEG-4
-    AVC/H.264 transfer syntax (1.2.840.10008.1.2.4.102).  Basic metadata
-    (width, height, frame count) is extracted from the MP4/MOV box structure
-    without any external dependencies.
+    The video bitstream is stored verbatim in PixelData.  The transfer syntax
+    follows the codec found in the file — MPEG-4 AVC/H.264, HEVC/H.265 or
+    MPEG-2 — falling back to MPEG-4 AVC/H.264 High Profile / Level 4.1 when the
+    codec cannot be determined.  Basic metadata (width, height, frame count) is
+    extracted from the MP4/MOV box structure without any external dependencies.
 
     Args:
         video_bytes: Raw video file bytes (MP4, MOV, AVI, …).
@@ -362,17 +412,17 @@ def video_to_dicom(video_bytes: bytes, filename: str, metadata: dict,
     from pydicom.uid import generate_uid
 
     # Video Photographic Image Storage
-    SOP_CLASS       = "1.2.840.10008.5.1.4.1.1.77.1.2.1"
-    # MPEG-4 AVC/H.264 High Profile / Level 4.1 Unlimited
-    TRANSFER_SYNTAX = "1.2.840.10008.1.2.4.102"
+    SOP_CLASS = "1.2.840.10008.5.1.4.1.1.77.1.4.1"
 
     ext = os.path.splitext(filename.lower())[1]
-    width, height, n_frames = (0, 0, 0)
+    width, height, n_frames, codec = (0, 0, 0, "")
     if ext in (".mp4", ".m4v", ".mov"):
-        width, height, n_frames = _parse_mp4_info(video_bytes)
+        width, height, n_frames, codec = _parse_mp4_info(video_bytes)
         logger.debug(
-            "Video '%s': %dx%d, %d frames", filename, width, height, n_frames
+            "Video '%s': %dx%d, %d frames, codec '%s'",
+            filename, width, height, n_frames, codec
         )
+    TRANSFER_SYNTAX = _video_transfer_syntax(codec)
 
     sop_inst   = generate_uid()
     series_uid = series_uid or generate_uid()
@@ -396,7 +446,10 @@ def video_to_dicom(video_bytes: bytes, filename: str, metadata: dict,
     # Image / video attributes
     ds.Rows                      = height or 0
     ds.Columns                   = width  or 0
-    ds.NumberOfFrames            = n_frames or 0
+    # NumberOfFrames is type 1 for a video object and must be at least 1, so a
+    # file whose frame count could not be parsed is still announced as 1 frame
+    # rather than 0 — which many PACS reject outright.
+    ds.NumberOfFrames            = n_frames or 1
     ds.SamplesPerPixel           = 3
     ds.PhotometricInterpretation = "YBR_PARTIAL_420"
     ds.BitsAllocated             = 8
@@ -404,7 +457,9 @@ def video_to_dicom(video_bytes: bytes, filename: str, metadata: dict,
     ds.HighBit                   = 7
     ds.PixelRepresentation       = 0
     ds.LossyImageCompression     = "01"
-    ds.LossyImageCompressionMethod = "ISO_14496_10"
+    ds.LossyImageCompressionMethod = _COMPRESSION_METHODS.get(
+        TRANSFER_SYNTAX, "ISO_14496_10"
+    )
 
     # Encapsulate the video bitstream in a DICOM sequence of fragments
     try:

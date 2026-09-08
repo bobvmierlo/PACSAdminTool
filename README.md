@@ -17,7 +17,7 @@ Can also be run locally with Python and pip, or deployed as a Docker container.
 |-----|--------------|
 | **Dashboard** | AE connectivity health check (batch C-ECHO all presets at once), service status, recent audit activity |
 | **C-FIND / Q-R** | Patient/Study/Series/Image level C-FIND with query builder; multi-select results with checkboxes; bulk C-MOVE or C-GET retrieve |
-| **C-STORE** | Send single files or entire folder trees to any Storage SCP |
+| **C-STORE** | Send single files or entire folder trees to any Storage SCP; presentation contexts are negotiated from the files, so compressed and video (MPEG-2 / MPEG-4 AVC / HEVC) instances are sent in their own transfer syntax |
 | **DICOM Receiver** | Embedded DICOM SCP — receive C-STORE and C-ECHO; auto-saves files; inspect tags or delete files per-row; auto-purges files older than 24 h |
 | **DMWL** | Full Modality Worklist query with export to CSV |
 | **Storage Commit** | Send N-ACTION storage commitment requests; receive async N-EVENT-REPORT responses with committed/failed breakdown |
@@ -350,6 +350,7 @@ The UI supports English and Dutch. Switch languages in the **Settings** tab.
 ### DICOM Receiver (SCP Listener)
 - Runs a DICOM SCP in the background
 - Accepts C-STORE (all common modalities), C-ECHO, and Storage Commitment N-EVENT-REPORT callbacks
+- Accepts uncompressed, JPEG, JPEG-LS, JPEG 2000 and RLE pixel data, plus encapsulated video (MPEG-2, MPEG-4 AVC/H.264, HEVC/H.265) for the Video Endoscopic / Microscopic / Photographic SOP classes
 - Saves received files to a configurable directory
 - Per-file Inspect (full tag browser) and Delete actions in the Files on Disk table
 - **Auto-purge**: files older than 24 hours are deleted on startup and nightly at 01:00 to prevent patient data from lingering
@@ -482,7 +483,7 @@ Converts non-DICOM files into valid DICOM objects using only the libraries alrea
 |---------|-------|------------------------|-------|
 | PDF | Any PDF file | Encapsulated PDF Storage (`1.2.840.10008.5.1.4.1.1.104.1`) | PDF bytes stored verbatim |
 | Images | JPEG, PNG, BMP, TIFF, WebP, JFIF … | Secondary Capture Image Storage (`1.2.840.10008.5.1.4.1.1.7`) | Converted to 8-bit RGB; one `.dcm` per image |
-| Video | MP4, MOV … | Video Photographic Image Storage (`1.2.840.10008.5.1.4.1.1.77.1.2.1`) | MPEG-4 AVC/H.264 transfer syntax; video stored verbatim |
+| Video | MP4, MOV … | Video Photographic Image Storage (`1.2.840.10008.5.1.4.1.1.77.1.4.1`) | Transfer syntax follows the codec in the file — MPEG-4 AVC/H.264, HEVC/H.265 or MPEG-2; video stored verbatim |
 
 **Shared patient & study data card** sits above the sub-tabs and is shared across all three. Fill it in once per session. Click the header to collapse it after filling.
 

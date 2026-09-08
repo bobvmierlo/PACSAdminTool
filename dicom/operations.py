@@ -64,6 +64,66 @@ STORAGE_SOPS = [
     EncapsulatedPDFStorage,
 ] if PYNETDICOM_AVAILABLE else []
 
+# DICOM PS3.8 allows at most 128 presentation contexts per association
+# request. pynetdicom raises once that many have been added, so anything we
+# propose beyond the limit is silently lost — we budget for it explicitly.
+MAX_REQUESTED_CONTEXTS = 128
+
+# Encapsulated video transfer syntaxes (MPEG-2, MPEG-4 AVC/H.264, HEVC/H.265)
+# including the fragmentable variants added in later editions of the standard.
+# A video object carries its bitstream verbatim in PixelData, so it can only
+# ever travel over one of these — it cannot be re-encoded to Explicit VR
+# Little Endian the way uncompressed pixel data can. If the syntax the file
+# actually uses is not negotiated, the transfer fails with
+# "No presentation context ... has been accepted by the peer".
+VIDEO_TRANSFER_SYNTAXES = [
+    "1.2.840.10008.1.2.4.100",    # MPEG2 Main Profile / Main Level
+    "1.2.840.10008.1.2.4.100.1",  # ... fragmentable
+    "1.2.840.10008.1.2.4.101",    # MPEG2 Main Profile / High Level
+    "1.2.840.10008.1.2.4.101.1",  # ... fragmentable
+    "1.2.840.10008.1.2.4.102",    # MPEG-4 AVC/H.264 High Profile / Level 4.1
+    "1.2.840.10008.1.2.4.102.1",  # ... fragmentable
+    "1.2.840.10008.1.2.4.103",    # MPEG-4 AVC/H.264 BD-compatible High Profile / Level 4.1
+    "1.2.840.10008.1.2.4.103.1",  # ... fragmentable
+    "1.2.840.10008.1.2.4.104",    # MPEG-4 AVC/H.264 High Profile / Level 4.2 for 2D video
+    "1.2.840.10008.1.2.4.104.1",  # ... fragmentable
+    "1.2.840.10008.1.2.4.105",    # MPEG-4 AVC/H.264 High Profile / Level 4.2 for 3D video
+    "1.2.840.10008.1.2.4.105.1",  # ... fragmentable
+    "1.2.840.10008.1.2.4.106",    # MPEG-4 AVC/H.264 Stereo High Profile / Level 4.2
+    "1.2.840.10008.1.2.4.106.1",  # ... fragmentable
+    "1.2.840.10008.1.2.4.107",    # HEVC/H.265 Main Profile / Level 5.1
+    "1.2.840.10008.1.2.4.108",    # HEVC/H.265 Main 10 Profile / Level 5.1
+]
+
+# Storage SOP classes whose instances are normally videos or cine loops.
+VIDEO_STORAGE_SOPS = [
+    "1.2.840.10008.5.1.4.1.1.77.1.1.1",  # Video Endoscopic Image Storage
+    "1.2.840.10008.5.1.4.1.1.77.1.2.1",  # Video Microscopic Image Storage
+    "1.2.840.10008.5.1.4.1.1.77.1.4.1",  # Video Photographic Image Storage
+    "1.2.840.10008.5.1.4.1.1.3.1",       # Ultrasound Multi-frame Image Storage
+    "1.2.840.10008.5.1.4.1.1.6.2",       # Enhanced US Volume Storage
+    "1.2.840.10008.5.1.4.1.1.7.4",       # Multi-frame True Color Secondary Capture
+]
+
+
+def is_encapsulated_syntax(ts_uid: str) -> bool:
+    """True if the transfer syntax stores pixel data as an encapsulated stream.
+
+    Encapsulated data (JPEG, JPEG 2000, MPEG-2/4, HEVC, RLE) is passed through
+    byte-for-byte, so the sender cannot fall back to an uncompressed transfer
+    syntax if the peer refuses the native one.
+    """
+    ts_uid = str(ts_uid or "").strip()
+    if not ts_uid:
+        return False
+    try:
+        from pydicom.uid import UID
+        return bool(UID(ts_uid).is_encapsulated)
+    except Exception:
+        # Every encapsulated standard syntax lives under the 1.2.840.10008.1.2.4
+        # (compressed) or 1.2.840.10008.1.2.5 (RLE) roots.
+        return ts_uid.startswith("1.2.840.10008.1.2.4.") or ts_uid == "1.2.840.10008.1.2.5"
+
 
 def check_available():
     if not PYNETDICOM_AVAILABLE:
@@ -282,18 +342,57 @@ def c_get(local_ae_title: str, remote_host: str, remote_port: int,
     ae = _make_ae(local_ae_title)
     ae.add_requested_context(get_sop)
 
-    # Negotiate storage contexts so the SCP can push files back to us.
-    for sop in STORAGE_SOPS:
-        ae.add_requested_context(sop)
+    # Negotiate storage contexts so the SCP can push files back to us. Only
+    # 128 contexts fit in an association request while the full storage list is
+    # larger than that, so propose one context per SOP class (carrying several
+    # transfer syntaxes) and take the SOP classes we care about first —
+    # otherwise video and the other tail entries fall off the end silently.
+    try:
+        from pynetdicom.presentation import DEFAULT_TRANSFER_SYNTAXES
+        default_ts = list(DEFAULT_TRANSFER_SYNTAXES)
+    except ImportError:
+        default_ts = ["1.2.840.10008.1.2.1", "1.2.840.10008.1.2"]
+    # Video instances carry their bitstream verbatim, so the SCP can only hand
+    # one over on a context offering its own encapsulated syntax.
+    video_ts = default_ts + VIDEO_TRANSFER_SYNTAXES
+
+    storage_sops: list[str] = [str(sop) for sop in STORAGE_SOPS]
+    storage_sops += [uid for uid in VIDEO_STORAGE_SOPS if uid not in storage_sops]
     try:
         from pynetdicom.presentation import AllStoragePresentationContexts
-        for cx in AllStoragePresentationContexts:
-            try:
-                ae.add_requested_context(cx.abstract_syntax)
-            except Exception:
-                pass
+        storage_sops += [cx.abstract_syntax for cx in AllStoragePresentationContexts
+                         if cx.abstract_syntax not in storage_sops]
     except ImportError:
         pass
+
+    # C-GET delivers the instances over this same association, which makes us
+    # the Storage SCP on those contexts. That has to be negotiated explicitly
+    # with SCP/SCU Role Selection (PS3.7 D.3.3.4) — without it the peer has no
+    # role it may use and every sub-operation fails with "No presentation
+    # context ... has been accepted by the peer ... for the SCU role".
+    try:
+        from pynetdicom import build_role
+    except ImportError:
+        build_role = None
+
+    proposed = 1   # the C-GET context added above
+    roles = []
+    for uid in storage_sops:
+        if proposed >= MAX_REQUESTED_CONTEXTS:
+            logger.debug("C-GET: presentation context limit reached, "
+                         "%s and later SOP classes not proposed", uid)
+            break
+        try:
+            ae.add_requested_context(
+                uid, video_ts if uid in VIDEO_STORAGE_SOPS else default_ts)
+            proposed += 1
+        except Exception:
+            continue
+        if build_role is not None:
+            # Propose both roles: the peer picks which one it wants us to take,
+            # and proposing SCP alone is rejected outright by a peer that keeps
+            # the default acceptor roles.
+            roles.append(build_role(uid, scu_role=True, scp_role=True))
 
     received: list[str] = []
 
@@ -310,7 +409,8 @@ def c_get(local_ae_title: str, remote_host: str, remote_port: int,
         return 0x0000
 
     assoc = _associate(ae, remote_host, remote_port, remote_ae_title, tls,
-                       evt_handlers=[(evt.EVT_C_STORE, handle_store)])
+                       evt_handlers=[(evt.EVT_C_STORE, handle_store)],
+                       ext_neg=roles or None)
     if not assoc.is_established:
         return False, "Failed to establish association."
 
@@ -364,37 +464,76 @@ def c_store(local_ae_title: str, remote_host: str, remote_port: int,
     Presentation contexts are negotiated dynamically from the files so that
     non-standard SOP classes (e.g. Multi-frame True Color Secondary Capture,
     Video Photographic Image Storage) and compressed transfer syntaxes
-    (JPEG Baseline, MPEG-4, …) are accepted by the peer.
+    (JPEG Baseline, MPEG-4/H.264, HEVC, …) are accepted by the peer.
     """
     check_available()
     ae = _make_ae(local_ae_title)
 
-    # Start with the standard storage SOPs (Explicit VR LE)
-    for sop in STORAGE_SOPS:
-        ae.add_requested_context(sop)
-
-    # Extend with the actual SOP class + transfer syntax from each file so
-    # that any SOP class or compressed syntax is explicitly proposed.
-    _seen: set = set()
     EXPLICIT_LE = "1.2.840.10008.1.2.1"
+
+    # Work out the contexts to propose before touching the AE. Only 128 fit in
+    # an association request, so the SOP class / transfer syntax pairs read
+    # from the files being sent get the budget first — they are the ones that
+    # actually have to be accepted — and the generic storage SOPs fill up
+    # whatever is left.
+    file_contexts: list[tuple[str, str]] = []
+    seen: set = set()
     for path in dicom_paths:
         try:
             ds = pydicom.dcmread(path, stop_before_pixels=True)
-            sop_class = str(getattr(ds, "SOPClassUID", "")).strip()
-            fm = getattr(ds, "file_meta", None)
-            ts = str(getattr(fm, "TransferSyntaxUID", EXPLICIT_LE)).strip()
-            if not sop_class:
-                continue
-            for syntax in {ts, EXPLICIT_LE}:   # propose both the native TS and Explicit LE
-                key = (sop_class, syntax)
-                if key not in _seen:
-                    _seen.add(key)
-                    try:
-                        ae.add_requested_context(sop_class, syntax)
-                    except Exception:
-                        pass
+        except Exception as exc:
+            logger.warning("Could not read '%s' for context negotiation: %s", path, exc)
+            continue
+        sop_class = str(getattr(ds, "SOPClassUID", "")).strip()
+        if not sop_class:
+            continue
+        fm = getattr(ds, "file_meta", None)
+        ts = str(getattr(fm, "TransferSyntaxUID", "") or EXPLICIT_LE).strip() or EXPLICIT_LE
+        # The file's own transfer syntax always goes first: an encapsulated
+        # object (MPEG-4/H.264 video, JPEG, …) travels verbatim, so if the peer
+        # does not accept a context carrying that exact syntax the file cannot
+        # be sent at all. Explicit VR LE is only worth proposing as a companion
+        # for uncompressed data, which can be re-encoded on the fly.
+        syntaxes = [ts]
+        if not is_encapsulated_syntax(ts) and ts != EXPLICIT_LE:
+            syntaxes.append(EXPLICIT_LE)
+        for syntax in syntaxes:
+            key = (sop_class, syntax)
+            if key not in seen:
+                seen.add(key)
+                file_contexts.append(key)
+
+    file_sop_classes = {sop for sop, _ in file_contexts}
+    proposed = 0
+    for sop_class, syntax in file_contexts:
+        if proposed >= MAX_REQUESTED_CONTEXTS:
+            break
+        try:
+            ae.add_requested_context(sop_class, syntax)
+            proposed += 1
+        except Exception as exc:
+            logger.warning("Could not propose %s / %s: %s", sop_class, syntax, exc)
+
+    # Fall back to the standard storage SOPs (default transfer syntaxes) for
+    # anything not already covered — e.g. files that could not be pre-read.
+    for sop in STORAGE_SOPS:
+        if proposed >= MAX_REQUESTED_CONTEXTS:
+            break
+        if str(sop) in file_sop_classes:
+            continue
+        try:
+            ae.add_requested_context(sop)
+            proposed += 1
         except Exception:
             pass
+
+    if proposed >= MAX_REQUESTED_CONTEXTS and len(file_contexts) > MAX_REQUESTED_CONTEXTS:
+        msg = (f"{len(file_contexts)} presentation contexts needed but only "
+               f"{MAX_REQUESTED_CONTEXTS} can be proposed per association; "
+               f"send the files in smaller batches.")
+        logger.warning(msg)
+        if callback:
+            callback(f"WARNING: {msg}")
 
     assoc = _associate(ae, remote_host, remote_port, remote_ae_title, tls)
     if not assoc.is_established:
@@ -416,9 +555,15 @@ def c_store(local_ae_title: str, remote_host: str, remote_port: int,
                     callback(f"FAILED: {os.path.basename(path)} status=0x{status.Status:04X}" if status else f"FAILED: {path}")
         except Exception as e:
             failed += 1
-            logger.error(f"C-STORE error for {path}: {e}")
+            detail = str(e)
+            if "presentation context" in detail.lower():
+                detail += (f" — '{remote_ae_title}' refused this SOP class / "
+                           f"transfer syntax combination, so it has to be "
+                           f"enabled on the receiving system before this file "
+                           f"can be sent.")
+            logger.error(f"C-STORE error for {path}: {detail}")
             if callback:
-                callback(f"ERROR: {path}: {e}")
+                callback(f"ERROR: {path}: {detail}")
 
     assoc.release()
     return True, f"C-STORE done. Success: {succeeded}, Failed: {failed}"
@@ -688,7 +833,8 @@ class SCPListener:
             "1.2.840.10008.1.2.4.92",   # JPEG 2000 Part 2 MC Lossless
             "1.2.840.10008.1.2.4.93",   # JPEG 2000 Part 2 MC
             "1.2.840.10008.1.2.5",      # RLE Lossless
-        ]
+            "1.2.840.10008.1.2.1.99",   # Deflated Explicit VR Little Endian
+        ] + VIDEO_TRANSFER_SYNTAXES     # MPEG-2 / MPEG-4 AVC / HEVC video
 
         # DICOM allows max 128 presentation contexts per association.
         # We prioritise the SOP classes most commonly sent by PACS systems,
@@ -721,7 +867,10 @@ class SCPListener:
             "1.2.840.10008.5.1.4.1.1.128",    # PET
             "1.2.840.10008.5.1.4.1.1.20",     # NM
             "1.2.840.10008.5.1.4.1.1.104.1",  # Encapsulated PDF
-        ]
+            # Video / cine loops — encapsulated MPEG-2, MPEG-4 AVC/H.264 or
+            # HEVC. Listed here so they are registered even if a pynetdicom
+            # build's AllStoragePresentationContexts is missing them.
+        ] + VIDEO_STORAGE_SOPS
         for uid in PRIORITY_SOPS:
             try:
                 ae.add_supported_context(uid, _TS)
