@@ -1,5 +1,16 @@
 # Changelog
 
+## v3.5.0 — 2026-09-08
+
+### Fixed — [#166](https://github.com/bobvmierlo/PACSAdminTool/pull/166)
+
+- Sending video objects to a PACS no longer fails with "No presentation context has been accepted by the peer". Video formats are now offered during connection setup, and when a send is refused the message explains that the receiving system doesn't accept that format.
+
+### New — [#166](https://github.com/bobvmierlo/PACSAdminTool/pull/166)
+
+- **Video support in DICOMize** — MP4 and MOV files are converted to proper DICOM video objects, with the codec (MPEG-2, MPEG-4 AVC/H.264 or HEVC/H.265) detected from the file and recorded correctly along with dimensions and frame count.
+- **Retrieving video studies** — video instances can now be pulled back from a PACS, and the built-in storage receiver accepts all supported video formats.
+
 ## v3.4.1 — 2026-08-18
 
 ### Improved — [#161](https://github.com/bobvmierlo/PACSAdminTool/pull/161)
