@@ -1,5 +1,19 @@
 # Changelog
 
+## v3.5.1 — 2026-09-09
+
+### Fixed — [#167](https://github.com/bobvmierlo/PACSAdminTool/pull/167)
+
+- Opening a video study no longer fails with an "unsupported transfer syntax" error. Video instances now play instead of being handed to the image renderer.
+- The still-image preview no longer shows a confusing decoding error for a video; it tells you the instance is a video that needs playing.
+- When your browser can't play a clip, the message now says so and names the codec involved, instead of failing without explanation.
+
+### New — [#167](https://github.com/bobvmierlo/PACSAdminTool/pull/167)
+
+- **Video playback in the viewer** — video studies play in a built-in player, with previous and next controls when a series contains several clips, and you can seek and start watching before the whole clip has downloaded.
+- **Video in the file preview** — the preview window plays video in place of the still image, and stops playback when you close it.
+- **Broader format support** — MP4 and WebM play directly, while H.264, H.265 and MPEG-2 streams are converted for playback when ffmpeg is installed; if it isn't, the error tells you that's what's missing.
+
 ## v3.5.0 — 2026-09-08
 
 ### Fixed — [#166](https://github.com/bobvmierlo/PACSAdminTool/pull/166)
