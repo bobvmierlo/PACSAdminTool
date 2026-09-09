@@ -353,6 +353,7 @@ The UI supports English and Dutch. Switch languages in the **Settings** tab.
 - Accepts uncompressed, JPEG, JPEG-LS, JPEG 2000 and RLE pixel data, plus encapsulated video (MPEG-2, MPEG-4 AVC/H.264, HEVC/H.265) for the Video Endoscopic / Microscopic / Photographic SOP classes
 - Saves received files to a configurable directory
 - Per-file Inspect (full tag browser) and Delete actions in the Files on Disk table
+- **Video playback**: encapsulated video instances play in a built-in player instead of going through the image viewer, which has no MPEG decoder. Streams already wrapped in MP4 play as-is; a raw MPEG-2 or Annex B bitstream is converted on the fly when `ffmpeg` is on the server's PATH
 - **Auto-purge**: files older than 24 hours are deleted on startup and nightly at 01:00 to prevent patient data from lingering
 
 ### Inspector & Editor

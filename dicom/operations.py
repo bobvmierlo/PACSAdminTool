@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Callable, Optional
 
 from . import save_dataset
+from .video import VIDEO_TRANSFER_SYNTAXES
 
 try:
     from pynetdicom import AE, evt, debug_logger
@@ -68,32 +69,6 @@ STORAGE_SOPS = [
 # request. pynetdicom raises once that many have been added, so anything we
 # propose beyond the limit is silently lost — we budget for it explicitly.
 MAX_REQUESTED_CONTEXTS = 128
-
-# Encapsulated video transfer syntaxes (MPEG-2, MPEG-4 AVC/H.264, HEVC/H.265)
-# including the fragmentable variants added in later editions of the standard.
-# A video object carries its bitstream verbatim in PixelData, so it can only
-# ever travel over one of these — it cannot be re-encoded to Explicit VR
-# Little Endian the way uncompressed pixel data can. If the syntax the file
-# actually uses is not negotiated, the transfer fails with
-# "No presentation context ... has been accepted by the peer".
-VIDEO_TRANSFER_SYNTAXES = [
-    "1.2.840.10008.1.2.4.100",    # MPEG2 Main Profile / Main Level
-    "1.2.840.10008.1.2.4.100.1",  # ... fragmentable
-    "1.2.840.10008.1.2.4.101",    # MPEG2 Main Profile / High Level
-    "1.2.840.10008.1.2.4.101.1",  # ... fragmentable
-    "1.2.840.10008.1.2.4.102",    # MPEG-4 AVC/H.264 High Profile / Level 4.1
-    "1.2.840.10008.1.2.4.102.1",  # ... fragmentable
-    "1.2.840.10008.1.2.4.103",    # MPEG-4 AVC/H.264 BD-compatible High Profile / Level 4.1
-    "1.2.840.10008.1.2.4.103.1",  # ... fragmentable
-    "1.2.840.10008.1.2.4.104",    # MPEG-4 AVC/H.264 High Profile / Level 4.2 for 2D video
-    "1.2.840.10008.1.2.4.104.1",  # ... fragmentable
-    "1.2.840.10008.1.2.4.105",    # MPEG-4 AVC/H.264 High Profile / Level 4.2 for 3D video
-    "1.2.840.10008.1.2.4.105.1",  # ... fragmentable
-    "1.2.840.10008.1.2.4.106",    # MPEG-4 AVC/H.264 Stereo High Profile / Level 4.2
-    "1.2.840.10008.1.2.4.106.1",  # ... fragmentable
-    "1.2.840.10008.1.2.4.107",    # HEVC/H.265 Main Profile / Level 5.1
-    "1.2.840.10008.1.2.4.108",    # HEVC/H.265 Main 10 Profile / Level 5.1
-]
 
 # Storage SOP classes whose instances are normally videos or cine loops.
 VIDEO_STORAGE_SOPS = [

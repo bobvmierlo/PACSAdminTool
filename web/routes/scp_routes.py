@@ -2,12 +2,14 @@
 
 import logging
 import os
+import threading
 from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request
 import pydicom
 
 import web.context as ctx
+from dicom.video import is_video_transfer_syntax, video_for_playback
 from web.audit import log as _audit
 from web.auth import require_login
 from web.telemetry import capture as _capture, capture_error as _capture_error
@@ -147,6 +149,12 @@ def _render_frame(fpath: str, frame: int = 0):
     ds  = pydicom.dcmread(fpath)
     if not hasattr(ds, "PixelData"):
         raise ValueError("No pixel data in this file.")
+
+    # A video instance holds a compressed bitstream that no still-image
+    # renderer can decode; it is played through /api/scp/files/video instead.
+    if is_video_transfer_syntax(getattr(ds.file_meta, "TransferSyntaxUID", "")):
+        raise ValueError("This is a video instance — play it instead of "
+                         "rendering it as a still image.")
 
     arr = ds.pixel_array.astype(float)
 
@@ -467,8 +475,11 @@ def scp_files_preview():
             nf     = int(getattr(ds, "NumberOfFrames", 1) or 1)
             wc     = float(getattr(ds, "WindowCenter", 0) or 0)
             ww     = float(getattr(ds, "WindowWidth",  0) or 0)
+            video  = is_video_transfer_syntax(
+                getattr(ds.file_meta, "TransferSyntaxUID", ""))
             return jsonify({
                 "ok":       True,
+                "video":    video,
                 "frames":   nf,
                 "modality": str(getattr(ds, "Modality", "") or ""),
                 "wc": wc, "ww": ww,
@@ -509,6 +520,95 @@ def scp_files_raw():
                  download_name=os.path.basename(fpath))
 
 
+# A player seeking through a clip issues a Range request per jump, and each one
+# would otherwise re-read the DICOM file and re-extract (or re-convert) the whole
+# bitstream. Holding the most recent result covers that pattern — one viewer
+# watching one clip — without keeping every clip ever opened in memory.
+_video_cache: dict = {}
+_video_cache_lock = threading.Lock()
+_VIDEO_CACHE_MAX_BYTES = 256 * 1024 * 1024
+
+
+class _NotVideo(Exception):
+    """The requested instance does not hold an encapsulated video."""
+
+
+def _cached_playback(fpath: str):
+    """Return ``(data, mimetype)`` for *fpath*, reusing the last result if it
+    is for the same file and the file has not changed since."""
+    stat = os.stat(fpath)
+    key = (fpath, stat.st_mtime_ns, stat.st_size)
+
+    with _video_cache_lock:
+        if _video_cache.get("key") == key:
+            return _video_cache["value"]
+
+    ds = pydicom.dcmread(fpath)
+    ts = str(getattr(ds.file_meta, "TransferSyntaxUID", "") or "")
+    if not is_video_transfer_syntax(ts):
+        raise _NotVideo()
+    value = video_for_playback(ds)
+
+    if len(value[0]) <= _VIDEO_CACHE_MAX_BYTES:
+        with _video_cache_lock:
+            _video_cache["key"] = key
+            _video_cache["value"] = value
+    return value
+
+
+def _is_video_file(fpath: str) -> bool:
+    """True if *fpath* is a DICOM instance carrying an encapsulated video."""
+    try:
+        ds = pydicom.dcmread(fpath, stop_before_pixels=True)
+        return is_video_transfer_syntax(
+            getattr(ds.file_meta, "TransferSyntaxUID", ""))
+    except Exception:
+        return False
+
+
+@bp.route("/api/scp/files/video", methods=["GET"])
+@require_login
+def scp_files_video():
+    """Serve the playable video bitstream held inside a DICOM instance.
+
+    Video instances store their MPEG-2 / MPEG-4 AVC / HEVC stream verbatim in
+    PixelData, which neither the still-image renderer nor the browser-side DICOM
+    viewer can decode. This pulls the stream back out so an HTML5 <video>
+    element can play it, converting with ffmpeg when it is not already in a
+    container the browser understands.
+
+    Query params:
+      name/path – relative path within storage_dir
+    """
+    from flask import send_file as _send
+
+    rel = (request.args.get("path") or request.args.get("name") or "").strip()
+    storage_dir = _scp_storage_dir()
+    if not storage_dir:
+        return jsonify({"ok": False, "error": "SCP storage directory not found."}), 404
+    fpath = _resolve_scp_path(storage_dir, rel)
+    if not fpath or not os.path.isfile(fpath):
+        return jsonify({"ok": False, "error": "File not found."}), 404
+
+    try:
+        data, mimetype = _cached_playback(fpath)
+    except _NotVideo:
+        return jsonify({"ok": False,
+                        "error": "This instance is not an encapsulated video."}), 400
+    except (ValueError, RuntimeError) as e:
+        return jsonify({"ok": False, "error": str(e)}), 501
+    except Exception as e:
+        logger.exception("scp/files/video error")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    # conditional=True makes Flask honour Range requests, which is what lets the
+    # player seek and start before the whole stream has been fetched.
+    import io as _io
+    return _send(_io.BytesIO(data), mimetype=mimetype,
+                 as_attachment=False, conditional=True,
+                 download_name=os.path.splitext(os.path.basename(fpath))[0] + ".mp4")
+
+
 @bp.route("/api/scp/series/list", methods=["GET"])
 @require_login
 def scp_series_list():
@@ -536,11 +636,23 @@ def scp_series_list():
     except OSError as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-    urls = [
-        f"/api/scp/files/raw?path={study}/{series}/{f}"
-        for f in files
-    ]
-    return jsonify({"ok": True, "urls": urls, "count": len(urls)})
+    # A video series cannot go through the browser-side DICOM viewer — it has
+    # no MPEG decoder — so flag it and hand back player URLs instead.
+    is_video = bool(files) and _is_video_file(
+        os.path.join(series_path, files[0]))
+
+    if is_video:
+        urls = [
+            f"/api/scp/files/video?path={study}/{series}/{f}"
+            for f in files
+        ]
+    else:
+        urls = [
+            f"/api/scp/files/raw?path={study}/{series}/{f}"
+            for f in files
+        ]
+    return jsonify({"ok": True, "urls": urls, "count": len(urls),
+                    "video": is_video})
 
 
 @bp.route("/api/scp/files/delete", methods=["POST"])
