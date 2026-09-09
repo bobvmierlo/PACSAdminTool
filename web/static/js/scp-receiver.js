@@ -213,11 +213,12 @@ let _previewFilePath    = null;   // relative path     (file mode)
 let _previewFrameIdx    = 0;      // current frame / instance index
 let _previewTotalFrames = 1;      // total frames / instances
 let _previewLoading     = false;  // guard: prevent concurrent loads
+let _previewIsVideo     = false;  // encapsulated video → <video>, not <img>
 
 function _previewReset() {
   _previewMode = null; _previewStudy = null; _previewSeries = null;
   _previewFilePath = null; _previewFrameIdx = 0; _previewTotalFrames = 1;
-  _previewLoading = false;
+  _previewLoading = false; _previewIsVideo = false;
 }
 
 function _previewOpenModal(title) {
@@ -226,9 +227,14 @@ function _previewOpenModal(title) {
   const imgEl  = document.getElementById("preview-modal-img");
   const msgEl  = document.getElementById("preview-modal-msg");
   const metaEl = document.getElementById("preview-modal-meta");
+  const vidEl  = document.getElementById("preview-modal-video");
   titleEl.textContent   = title;
   imgEl.style.display   = "none";
   imgEl.src             = "";
+  vidEl.style.display   = "none";
+  vidEl.pause();
+  vidEl.removeAttribute("src");
+  vidEl.load();                    // drop the previous clip's buffered data
   msgEl.style.display   = "block";
   msgEl.textContent     = "Loading…";
   metaEl.textContent    = "";
@@ -237,6 +243,49 @@ function _previewOpenModal(title) {
   document.getElementById("preview-contrast").value   = 100;
   applyPreviewFilter();
   document.getElementById("preview-frame-nav").style.display = "none";
+}
+
+// Encapsulated video (MPEG-2 / MPEG-4 AVC / HEVC) has no still frame to
+// render — the server extracts the bitstream and we hand it to the player.
+function _previewShowVideo(url) {
+  const vidEl = document.getElementById("preview-modal-video");
+  const imgEl = document.getElementById("preview-modal-img");
+  const msgEl = document.getElementById("preview-modal-msg");
+
+  imgEl.style.display = "none";
+  msgEl.style.display = "block";
+  msgEl.textContent   = "Loading video…";
+
+  vidEl.onloadeddata = () => {
+    vidEl.style.display = "block";
+    msgEl.style.display = "none";
+    _previewLoading     = false;
+  };
+  vidEl.onerror = async () => {
+    // The server answers with JSON when it cannot produce a playable stream at
+    // all (a raw bitstream with no ffmpeg installed to convert it, say). If it
+    // did send a video, the browser is the one refusing it — most often a
+    // build with no H.264 decoder.
+    let detail = "Cannot play this video.";
+    try {
+      const r  = await fetch(url);
+      const ct = r.headers.get("content-type") || "";
+      if (ct.includes("json")) {
+        const d = await r.json().catch(() => ({}));
+        if (d.error) detail = "Cannot play this video: " + d.error;
+      } else if (ct.startsWith("video/")) {
+        detail = "This browser cannot decode this video (the server sent it as "
+               + ct + "). Chrome, Edge and Safari play MPEG-4 AVC/H.264; some "
+               + "Linux Firefox and Chromium builds ship without an H.264 decoder.";
+      }
+    } catch { /* keep the generic message */ }
+    vidEl.style.display = "none";
+    msgEl.style.display = "block";
+    msgEl.textContent   = detail;
+    _previewLoading     = false;
+  };
+  vidEl.src = url;
+  vidEl.load();
 }
 
 function _previewShowFrame(url, idx, total) {
@@ -317,6 +366,11 @@ async function scpFilePreview(name) {
       _previewTotalFrames = d.frames || 1;
       const metaEl = document.getElementById("preview-modal-meta");
       metaEl.textContent = [d.patient, d.modality, d.study_date].filter(Boolean).join("  ·  ");
+      if (d.video) {
+        _previewIsVideo = true;
+        _previewShowVideo(`/api/scp/files/video?path=${encodeURIComponent(name)}`);
+        return;
+      }
     }
   } catch { /* non-critical */ }
 
@@ -341,7 +395,7 @@ function closeDwvViewer() {
 
 // Mouse-wheel scrolls through frames inside the viewer
 document.getElementById("preview-modal").addEventListener("wheel", e => {
-  if (_previewMode === null) return;
+  if (_previewMode === null || _previewIsVideo) return;
   e.preventDefault();
   const dir = e.deltaY > 0 ? 1 : -1;
   previewGotoFrame(_previewFrameIdx + dir);
@@ -350,7 +404,7 @@ document.getElementById("preview-modal").addEventListener("wheel", e => {
 // Keyboard arrow keys for frame navigation when modal is open
 document.addEventListener("keydown", e => {
   if (document.getElementById("preview-modal").style.display === "none") return;
-  if (_previewMode === null) return;
+  if (_previewMode === null || _previewIsVideo) return;
   if (e.key === "ArrowRight" || e.key === "ArrowDown") {
     e.preventDefault(); previewGotoFrame(_previewFrameIdx + 1);
   } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
@@ -364,7 +418,10 @@ function applyPreviewFilter() {
   const ctrEl  = document.getElementById("preview-contrast");
   const brt    = brtEl?.value ?? 100;
   const ctr    = ctrEl?.value ?? 100;
-  img.style.filter = `brightness(${brt}%) contrast(${ctr}%)`;
+  const filter = `brightness(${brt}%) contrast(${ctr}%)`;
+  img.style.filter = filter;
+  const vid = document.getElementById("preview-modal-video");
+  if (vid) vid.style.filter = filter;
   const bv = document.getElementById("preview-brt-val");
   const cv = document.getElementById("preview-ctr-val");
   if (bv) bv.textContent = brt;
@@ -374,6 +431,12 @@ function applyPreviewFilter() {
 function closePreviewModal() {
   document.getElementById("preview-modal").style.display = "none";
   document.getElementById("preview-modal-img").src = "";
+  const vidEl = document.getElementById("preview-modal-video");
+  if (vidEl) {
+    vidEl.pause();
+    vidEl.removeAttribute("src");
+    vidEl.load();
+  }
   _previewReset();
 }
 

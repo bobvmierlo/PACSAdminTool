@@ -31,6 +31,7 @@ pytest tests/test_config.py
 pytest tests/test_mllp.py
 pytest tests/test_validation.py
 pytest tests/test_video_dicom.py
+pytest tests/test_video_viewing.py
 pytest tests/test_web_api.py
 ```
 
@@ -99,6 +100,19 @@ Tests for encapsulated video (MPEG-2, MPEG-4 AVC/H.264, HEVC/H.265) in `dicom/di
 | `TestVideoStoreRoundTrip` | 5 | The regression itself: video is accepted by the SCP for each codec instead of being refused with "No presentation context … has been accepted by the peer", the bitstream survives the transfer byte-for-byte, and adding the video contexts does not crowd out ordinary uncompressed instances in a mixed batch. |
 | `TestVideoRetrieve` | 1 | C-GET against a minimal Query/Retrieve SCP returns the video instance intact — the storage sub-operations need SCP/SCU role selection, without which every retrieve failed. |
 
+### `test_video_viewing.py` - DICOM Video Playback
+
+Tests for playing encapsulated video in the web UI (`dicom/video.py` and the SCP routes). The browser-side DICOM viewer has no MPEG decoder, so video instances are played by extracting their bitstream instead of rendering them.
+
+| Class | Tests | What it covers |
+|-------|-------|----------------|
+| `TestDetectContainer` | 8 | Container sniffing from the leading bytes: MP4/ISO BMFF, WebM, MPEG-2 program and transport streams, H.264/H.265 Annex B in both start-code forms, and unrecognised or empty input. |
+| `TestIsVideoTransferSyntax` | 8 | Which transfer syntaxes count as encapsulated video, including the fragmentable variants, and that still-image syntaxes do not. |
+| `TestExtractBitstream` | 4 | Pulling the bitstream back out of PixelData: single and multi-fragment encapsulation, keeping the basic offset table out of the stream, and rejecting an instance with no pixel data. |
+| `TestVideoForPlayback` | 2 | An MP4-wrapped stream is served untouched, and a raw bitstream with no ffmpeg available raises an error that names ffmpeg. |
+| `TestVideoEndpoint` | 6 | `/api/scp/files/video` serves the stream as `video/mp4`, honours Range requests so the player can seek, reuses the extracted stream across repeat requests instead of re-reading the file, rejects non-video instances and paths outside the storage root, and requires login. |
+| `TestVideoFlags` | 3 | The `video` flags on `/api/scp/series/list` and `/api/scp/files/preview?info=1` that tell the front end to use a player, and the clear refusal when a video is sent to the still-frame renderer. |
+
 ## Test Count Summary
 
 | File | Tests |
@@ -109,8 +123,9 @@ Tests for encapsulated video (MPEG-2, MPEG-4 AVC/H.264, HEVC/H.265) in `dicom/di
 | `test_review_fixes.py` | 14 |
 | `test_validation.py` | 4 |
 | `test_video_dicom.py` | 43 |
+| `test_video_viewing.py` | 31 |
 | `test_web_api.py` | 68 |
-| **Total** | **207** |
+| **Total** | **238** |
 
 ## Adding New Tests
 

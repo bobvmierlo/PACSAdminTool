@@ -3803,6 +3803,10 @@
     <div style="overflow:hidden; display:flex; align-items:center; justify-content:center;
                 flex:1; min-height:0; background:#000; border-radius:4px">
       <img id="preview-modal-img" style="width:100%; height:100%; object-fit:contain; display:none; border-radius:2px; image-rendering:pixelated">
+      <!-- Encapsulated video (MPEG-2 / MPEG-4 AVC / HEVC) plays here instead;
+           its bitstream cannot be rendered as a still image. -->
+      <video id="preview-modal-video" controls playsinline
+             style="width:100%; height:100%; object-fit:contain; display:none; border-radius:2px"></video>
     </div>
     <div id="preview-modal-msg" style="color:#9ca3af; font-size:12px; text-align:center; padding:20px 0"></div>
 

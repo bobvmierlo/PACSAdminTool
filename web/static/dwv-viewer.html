@@ -109,6 +109,34 @@
       overflow: hidden;
     }
 
+    /* ── Video pane (encapsulated MPEG-2 / MPEG-4 AVC / HEVC) ────── */
+    #video-pane {
+      display: none;           /* shown only for a video series */
+      flex: 1;
+      min-height: 0;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: #000;
+      padding: 10px;
+    }
+    #video-pane.visible { display: flex; }
+    #video-player {
+      max-width: 100%;
+      min-height: 0;
+      flex: 1;
+      background: #000;
+    }
+    #video-nav {
+      display: none;           /* only when the series holds several clips */
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    #video-nav.visible { display: flex; }
+    #video-label { color: #9ca3af; font-size: 12px; min-width: 54px; text-align: center; }
+
     /* ── Loading overlay ─────────────────────────────────────────── */
     #loading-overlay {
       position: absolute;
@@ -172,6 +200,16 @@
 
 <!-- Viewer -->
 <div id="layout">
+  <!-- Encapsulated video series: dwv has no MPEG decoder, so these play in a
+       native <video> element instead of going through the DICOM renderer. -->
+  <div id="video-pane">
+    <video id="video-player" controls playsinline></video>
+    <div id="video-nav">
+      <button class="tool-btn" onclick="videoGoto(_videoIdx - 1)">‹ Previous</button>
+      <span id="video-label">1 / 1</span>
+      <button class="tool-btn" onclick="videoGoto(_videoIdx + 1)">Next ›</button>
+    </div>
+  </div>
   <div id="layerGroup0">
     <div id="loading-overlay">
       <div id="loading-msg">Fetching DICOM files…</div>
@@ -335,11 +373,76 @@ async function loadSeries() {
     _total = data.count;
     document.getElementById('loading-count').textContent =
       `0 / ${_total} instance(s)`;
+
+    // An encapsulated video series carries an MPEG-2 / MPEG-4 AVC / HEVC
+    // bitstream that dwv cannot decode — it fails with "Unsupported DICOM
+    // transfer syntax". Play those in the browser's own player instead.
+    if (data.video) {
+      showVideoSeries(data.urls);
+      return;
+    }
+
     app.loadURLs(data.urls);
   } catch (e) {
     document.getElementById('loading-msg').textContent =
       'Network error: ' + e.message;
   }
+}
+
+// ── Video series playback ─────────────────────────────────────
+// Work out why a clip would not play. The server answers with JSON when it
+// cannot produce a playable stream at all (a raw bitstream with no ffmpeg
+// installed to convert it, say); if it did hand back a video, the browser is
+// the one refusing it — most often a build without an H.264 decoder.
+async function videoErrorMessage(url) {
+  try {
+    const r  = await fetch(url);
+    const ct = r.headers.get('content-type') || '';
+    if (ct.includes('json')) {
+      const d = await r.json().catch(() => ({}));
+      if (d.error) return 'Cannot play this video: ' + d.error;
+    } else if (ct.startsWith('video/')) {
+      return 'This browser cannot decode this video (the server sent it as '
+           + ct + '). Chrome, Edge and Safari play MPEG-4 AVC/H.264; some '
+           + 'Linux Firefox and Chromium builds ship without an H.264 decoder.';
+    }
+  } catch { /* fall through */ }
+  return 'Cannot play this video.';
+}
+
+let _videoUrls = [];
+let _videoIdx  = 0;
+
+function showVideoSeries(urls) {
+  _videoUrls = urls;
+  // The image tools act on a dwv layer that is never created for video.
+  document.getElementById('toolbar').style.display = 'none';
+  document.getElementById('layerGroup0').style.display = 'none';
+  document.getElementById('video-pane').classList.add('visible');
+  if (urls.length > 1)
+    document.getElementById('video-nav').classList.add('visible');
+  document.getElementById('topbar-status').textContent =
+    `${urls.length} video clip(s)`;
+  videoGoto(0);
+}
+
+function videoGoto(idx) {
+  if (!_videoUrls.length) return;
+  _videoIdx = Math.max(0, Math.min(idx, _videoUrls.length - 1));
+  document.getElementById('video-label').textContent =
+    `${_videoIdx + 1} / ${_videoUrls.length}`;
+
+  const player = document.getElementById('video-player');
+  player.onerror = async () => {
+    const msg = await videoErrorMessage(_videoUrls[_videoIdx]);
+    document.getElementById('video-pane').classList.remove('visible');
+    document.getElementById('layerGroup0').style.display = 'block';
+    document.getElementById('loading-overlay').classList.remove('hidden');
+    document.getElementById('loading-msg').textContent = msg;
+    document.getElementById('loading-bar').style.background = '#dc2626';
+  };
+  player.src = _videoUrls[_videoIdx];
+  player.load();
 }
 
 loadSeries();
