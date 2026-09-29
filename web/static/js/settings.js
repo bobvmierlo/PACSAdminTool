@@ -92,7 +92,7 @@ function renderPresetTable() {
   (appConfig.remote_aes || []).forEach((ae, i) => {
     const tr = document.createElement("tr");
     tr.innerHTML =
-      `<td>${ae.name}</td><td>${ae.ae_title}</td><td>${ae.host}</td><td>${ae.port}</td>` +
+      `<td>${escapeHtml(ae.name)}</td><td>${escapeHtml(ae.ae_title)}</td><td>${escapeHtml(ae.host)}</td><td>${escapeHtml(ae.port)}</td>` +
       `<td style="white-space:nowrap">` +
       `<button class="btn" style="padding:2px 8px; font-size:11px; margin-right:4px"
           onclick="testPreset(${i}, this)">Test</button>` +
@@ -208,7 +208,7 @@ function renderMyPreferences() {
     (userSettings.remote_aes || []).forEach((ae, i) => {
       const tr = document.createElement("tr");
       tr.innerHTML =
-        `<td>${ae.name}</td><td>${ae.ae_title}</td><td>${ae.host}</td><td>${ae.port}</td>` +
+        `<td>${escapeHtml(ae.name)}</td><td>${escapeHtml(ae.ae_title)}</td><td>${escapeHtml(ae.host)}</td><td>${escapeHtml(ae.port)}</td>` +
         `<td><button class="btn danger" style="padding:2px 8px; font-size:11px"
             onclick="deleteMyAEPreset(${i})">Delete</button></td>`;
       aeBody.appendChild(tr);
@@ -222,7 +222,7 @@ function renderMyPreferences() {
     (userSettings.dicomweb_presets || []).forEach((p, i) => {
       const tr = document.createElement("tr");
       tr.innerHTML =
-        `<td>${p.name}</td><td style="word-break:break-all;font-size:12px">${p.base_url || ""}</td>` +
+        `<td>${escapeHtml(p.name)}</td><td style="word-break:break-all;font-size:12px">${escapeHtml(p.base_url || "")}</td>` +
         `<td><button class="btn danger" style="padding:2px 8px; font-size:11px"
             onclick="deleteMyDWPreset(${i})">Delete</button></td>`;
       dwBody.appendChild(tr);
@@ -311,9 +311,9 @@ function renderSysDWPresetsTable() {
   (appConfig.dicomweb_presets || []).forEach((p, i) => {
     const tr = document.createElement("tr");
     tr.innerHTML =
-      `<td>${p.name}</td>` +
-      `<td style="word-break:break-all;font-size:12px">${p.base_url || ""}</td>` +
-      `<td>${p.auth_type || "none"}</td>` +
+      `<td>${escapeHtml(p.name)}</td>` +
+      `<td style="word-break:break-all;font-size:12px">${escapeHtml(p.base_url || "")}</td>` +
+      `<td>${escapeHtml(p.auth_type || "none")}</td>` +
       `<td><button class="btn danger" style="padding:2px 8px; font-size:11px"
           onclick="deleteSysDWPreset(${i})">Delete</button></td>`;
     tbody.appendChild(tr);

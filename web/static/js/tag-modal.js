@@ -57,9 +57,9 @@ function filterTags() {
 // Build the HTML for a single non-sequence tag row at a given indent depth
 function _tagRowHTML(r, depth) {
   const pad = depth * 16;
-  return `<td style="font-family:Consolas;font-size:11px;padding-left:${pad}px">${r.tag}</td>` +
+  return `<td style="font-family:Consolas;font-size:11px;padding-left:${pad}px">${escapeHtml(r.tag)}</td>` +
     `<td>${escapeHtml(r.keyword)}</td>` +
-    `<td>${r.vr}</td>` +
+    `<td>${escapeHtml(r.vr)}</td>` +
     `<td style="max-width:400px;white-space:normal;word-break:break-all">${escapeHtml(r.value)}</td>`;
 }
 
@@ -72,9 +72,9 @@ function renderTagTree(rows, tbody, depth) {
       const hdr = document.createElement("tr");
       hdr.className = "seq-hdr";
       hdr.innerHTML =
-        `<td style="font-family:Consolas;font-size:11px;padding-left:${pad}px">${r.tag}</td>` +
+        `<td style="font-family:Consolas;font-size:11px;padding-left:${pad}px">${escapeHtml(r.tag)}</td>` +
         `<td><span class="seq-arrow">▶</span> ${escapeHtml(r.keyword)}</td>` +
-        `<td>${r.vr}</td>` +
+        `<td>${escapeHtml(r.vr)}</td>` +
         `<td style="color:#666">${escapeHtml(r.value)}</td>`;
       tbody.appendChild(hdr);
 

@@ -47,7 +47,7 @@ async function doInspect() {
       const div = document.createElement("div");
       div.className = "field";
       div.innerHTML = `<label style="color:#888;font-size:11px">${label}</label>
-                       <span style="font-size:13px">${val}</span>`;
+                       <span style="font-size:13px">${escapeHtml(val)}</span>`;
       grid.appendChild(div);
     });
     document.getElementById("inspector-meta-card").style.display = "";
@@ -137,11 +137,12 @@ function renderEditTagTable() {
     const tr = document.createElement("tr");
     if (edited) tr.style.background = "#fffbeb";
     tr.innerHTML =
-      `<td style="font-family:Consolas;font-size:11px">${r.tag}</td>` +
+      `<td style="font-family:Consolas;font-size:11px">${escapeHtml(r.tag)}</td>` +
       `<td style="font-size:12px">${escapeHtml(r.keyword)}</td>` +
-      `<td style="font-size:11px;color:#6b7280">${r.vr}</td>` +
-      `<td id="tev-${r.tag}" style="max-width:320px;word-break:break-all;font-size:12px">${escapeHtml(dispValue)}</td>` +
-      `<td><button class="btn" style="font-size:10px;padding:1px 7px" onclick="editTagInline('${r.tag}','${r.vr}')">${i18n("tag_editor.edit_btn")}</button></td>`;
+      `<td style="font-size:11px;color:#6b7280">${escapeHtml(r.vr)}</td>` +
+      `<td id="tev-${escapeHtml(r.tag)}" style="max-width:320px;word-break:break-all;font-size:12px">${escapeHtml(dispValue)}</td>` +
+      `<td><button class="btn" style="font-size:10px;padding:1px 7px">${i18n("tag_editor.edit_btn")}</button></td>`;
+    tr.querySelector("button").addEventListener("click", () => editTagInline(r.tag, r.vr));
     tbody.appendChild(tr);
   });
 
@@ -299,12 +300,12 @@ function _renderDiffResults() {
       const tr = document.createElement("tr");
       tr.style.background = colours[r.status] || "";
       tr.innerHTML =
-        `<td style="font-family:Consolas;font-size:11px">${r.tag}</td>` +
+        `<td style="font-family:Consolas;font-size:11px">${escapeHtml(r.tag)}</td>` +
         `<td style="font-size:12px">${escapeHtml(r.keyword)}</td>` +
-        `<td style="font-size:11px;color:#6b7280">${r.vr}</td>` +
+        `<td style="font-size:11px;color:#6b7280">${escapeHtml(r.vr)}</td>` +
         `<td style="font-size:12px;max-width:260px;word-break:break-all">${escapeHtml(r.value_a)}</td>` +
         `<td style="font-size:12px;max-width:260px;word-break:break-all">${escapeHtml(r.value_b)}</td>` +
-        `<td style="font-size:11px;white-space:nowrap">${labels[r.status]?.() || r.status}</td>`;
+        `<td style="font-size:11px;white-space:nowrap">${escapeHtml(labels[r.status]?.() || r.status)}</td>`;
       tbody.appendChild(tr);
     });
   }

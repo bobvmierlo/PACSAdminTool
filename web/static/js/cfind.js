@@ -229,8 +229,8 @@ function renderCFindHistory() {
     const li = document.createElement("li");
     li.style.cssText = "display:flex; align-items:center; padding:4px 0; border-bottom:1px solid #f0f0f0; gap:8px";
     li.innerHTML =
-      `<span style="flex:1; cursor:pointer; color:#2b6cb0" onclick="loadCFindHistory(${i})">${label}</span>` +
-      `<span style="color:#aaa; font-size:11px; white-space:nowrap">${ts}</span>`;
+      `<span style="flex:1; cursor:pointer; color:#2b6cb0" onclick="loadCFindHistory(${i})">${escapeHtml(label)}</span>` +
+      `<span style="color:#aaa; font-size:11px; white-space:nowrap">${escapeHtml(ts)}</span>`;
     ul.appendChild(li);
   });
 }

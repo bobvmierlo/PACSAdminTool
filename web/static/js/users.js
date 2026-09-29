@@ -24,12 +24,15 @@ function now() {
   return new Date().toTimeString().slice(0, 8);
 }
 
-// Escape HTML special characters to prevent XSS when inserting user/server data
+// Escape HTML special characters to prevent XSS when inserting user/server data.
+// Quotes are escaped too, so the result is also safe inside quoted attributes.
 function escapeHtml(str) {
-  return String(str)
+  return String(str ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 // Trigger a browser download of a text string as a file
@@ -57,14 +60,16 @@ async function loadUsers() {
     const tr = document.createElement("tr");
     const created = u.created_at ? u.created_at.slice(0, 10) : "";
     // Own password is changed via My Preferences (needs current password)
-    const resetBtn = u.username === (_currentUser?.username)
-      ? ""
-      : `<button class="btn" style="padding:2px 8px; font-size:11px; margin-right:6px"
-          onclick="resetUserPassword('${u.username}')">${escapeHtml(i18n("settings.reset_password"))}</button>`;
+    const isSelf = u.username === (_currentUser?.username);
     tr.innerHTML =
-      `<td>${u.username}</td><td>${u.role}</td><td>${created}</td>` +
-      `<td>${resetBtn}<button class="btn danger" style="padding:2px 8px; font-size:11px"
-          onclick="deleteUser('${u.username}', this)">Delete</button></td>`;
+      `<td>${escapeHtml(u.username)}</td><td>${escapeHtml(u.role)}</td><td>${escapeHtml(created)}</td>` +
+      `<td>${isSelf ? "" : `<button class="btn" data-action="reset" style="padding:2px 8px; font-size:11px; margin-right:6px">${escapeHtml(i18n("settings.reset_password"))}</button>`}` +
+      `<button class="btn danger" data-action="delete" style="padding:2px 8px; font-size:11px">Delete</button></td>`;
+    // Bind handlers in JS so the username never has to be embedded in markup.
+    const resetBtn = tr.querySelector('[data-action="reset"]');
+    if (resetBtn) resetBtn.addEventListener("click", () => resetUserPassword(u.username));
+    const delBtn = tr.querySelector('[data-action="delete"]');
+    delBtn.addEventListener("click", () => deleteUser(u.username, delBtn));
     tbody.appendChild(tr);
   });
 }

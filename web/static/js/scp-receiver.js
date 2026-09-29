@@ -65,7 +65,9 @@ socket.on("log", data => {
     scpFileCount++;
     document.getElementById("scp-count").textContent = `${scpFileCount} file(s)`;
     const list = document.getElementById("scp-filelist");
-    list.innerHTML += data.message.replace("Stored:", "").trim() + "<br>";
+    // The stored path is built from sender-supplied UIDs — never parse it as HTML.
+    list.appendChild(document.createTextNode(data.message.replace("Stored:", "").trim()));
+    list.appendChild(document.createElement("br"));
     list.scrollTop = list.scrollHeight;
     // Debounce studies-tree refresh (1.5 s after last store) so rapid series
     // arrivals don't hammer the server with repeated list requests.
@@ -490,7 +492,7 @@ async function loadSCPStudies() {
     const name = m.PatientName ? `<strong>${escapeHtml(m.PatientName)}</strong>` : "<em style='color:#888'>Unknown Patient</em>";
     const pid  = m.PatientID ? ` [${escapeHtml(m.PatientID)}]` : "";
     const desc = m.StudyDescription ? ` — ${escapeHtml(m.StudyDescription)}` : "";
-    const date = m.StudyDate ? ` <span style='color:#888'>${_fmtDicomDate(m.StudyDate)}</span>` : "";
+    const date = m.StudyDate ? ` <span style='color:#888'>${escapeHtml(_fmtDicomDate(m.StudyDate))}</span>` : "";
     info.innerHTML = name + pid + desc + date;
 
     // Delete-study button
