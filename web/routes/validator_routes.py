@@ -15,7 +15,6 @@ from flask import Blueprint, jsonify, request
 
 from web.audit import log as _audit
 from web.helpers import _req_ip, _req_user
-from web.telemetry import capture as _capture, capture_error as _capture_error
 
 logger = logging.getLogger(__name__)
 bp = Blueprint("validator", __name__)
@@ -40,7 +39,6 @@ def validate_dicom_file():
         report = validate_dicom(dcm_bytes)
     except Exception as exc:
         logger.exception("DICOM validation failed for '%s'", f.filename)
-        _capture_error("dicom_validator", exc)
         return jsonify({"ok": False, "error": str(exc)}), 500
 
     summary = report.get("summary", {})
@@ -56,9 +54,4 @@ def validate_dicom_file():
         },
         result="ok",
     )
-    _capture("feature_used", {
-        "feature":   "dicom_validator",
-        "errors":    summary.get("errors",   0),
-        "warnings":  summary.get("warnings", 0),
-    })
     return jsonify(report)

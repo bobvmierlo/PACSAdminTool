@@ -28,16 +28,29 @@ _CONFIG_SCHEMA = {
     "web":               dict,
     "log_level":         str,
     "language":          str,
-    "telemetry":         dict,
     "dicom_tls":         dict,
 }
 
 _LOG_LEVELS   = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+_MAX_ALLOWLIST = 256
 _MAX_AE_TITLE = 16
 
 # Keys in _CONFIG_SCHEMA that only admins may write
-_ADMIN_WRITE_KEYS = frozenset({"local_ae", "remote_aes", "dicomweb_presets", "hl7", "hl7_servers", "web", "telemetry", "dicom_tls"})
+_ADMIN_WRITE_KEYS = frozenset({"local_ae", "remote_aes", "dicomweb_presets", "hl7", "hl7_servers", "web", "dicom_tls"})
 _MAX_HOST_LEN = 253
+
+
+def _validate_host_allowlist(value, name: str) -> str | None:
+    from config.network import validate_host_entry
+    if not isinstance(value, list):
+        return f"{name} must be a list."
+    if len(value) > _MAX_ALLOWLIST:
+        return f"{name} may contain at most {_MAX_ALLOWLIST} entries."
+    for i, entry in enumerate(value):
+        err = validate_host_entry(entry)
+        if err:
+            return f"{name}[{i}] {err}."
+    return None
 
 
 def _validate_config_payload(data: dict) -> str | None:
@@ -62,6 +75,18 @@ def _validate_config_payload(data: dict) -> str | None:
             return "local_ae.port must be an integer."
         if "port" in ae and not (1 <= ae["port"] <= 65535):
             return "local_ae.port must be between 1 and 65535."
+        if "allowed_calling_aes" in ae:
+            aes = ae["allowed_calling_aes"]
+            if not isinstance(aes, list) or len(aes) > _MAX_ALLOWLIST:
+                return f"local_ae.allowed_calling_aes must be a list of at most {_MAX_ALLOWLIST} entries."
+            for i, t in enumerate(aes):
+                if not isinstance(t, str) or not t.strip() or len(t.strip()) > _MAX_AE_TITLE:
+                    return (f"local_ae.allowed_calling_aes[{i}] must be an AE title "
+                            f"of 1-{_MAX_AE_TITLE} characters.")
+        if "allowed_hosts" in ae:
+            err = _validate_host_allowlist(ae["allowed_hosts"], "local_ae.allowed_hosts")
+            if err:
+                return err
     if "remote_aes" in data:
         for i, ae in enumerate(data["remote_aes"]):
             if not isinstance(ae, dict):
@@ -101,6 +126,10 @@ def _validate_config_payload(data: dict) -> str | None:
             not isinstance(hl7["default_host"], str) or len(hl7["default_host"]) > _MAX_HOST_LEN
         ):
             return f"hl7.default_host must be a string of at most {_MAX_HOST_LEN} characters."
+        if "allowed_hosts" in hl7:
+            err = _validate_host_allowlist(hl7["allowed_hosts"], "hl7.allowed_hosts")
+            if err:
+                return err
     if "hl7_servers" in data:
         for i, srv in enumerate(data["hl7_servers"]):
             if not isinstance(srv, dict):
@@ -147,6 +176,10 @@ def save_config_route():
     data = request.get_json(silent=True)
     if data is None:
         return jsonify({"ok": False, "error": "Request body must be valid JSON."}), 400
+    if isinstance(data, dict):
+        # Usage telemetry was removed; ignore the key from older clients or
+        # restored config backups instead of rejecting the whole save.
+        data.pop("telemetry", None)
     error = _validate_config_payload(data)
     if error:
         logger.warning("Config update rejected: %s", error)
@@ -166,11 +199,6 @@ def save_config_route():
     if "language" in data:
         set_language(data["language"])
         logger.info("Language changed to %s", data["language"])
-    if "telemetry" in data:
-        from web.telemetry import init as _telemetry_init
-        _telemetry_init(ctx.config)
-        logger.info("Telemetry settings updated (enabled=%s)",
-                    ctx.config.get("telemetry", {}).get("enabled", True))
     _audit("config.save", ip=_req_ip(), user=_req_user(),
            detail={"keys": sorted(data.keys())})
     return jsonify({"ok": True})

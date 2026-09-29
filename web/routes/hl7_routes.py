@@ -12,7 +12,6 @@ import web.context as ctx
 from web.audit import log as _audit
 from web.auth import require_login
 from web.helpers import _bad_request, _client_room, _log, _req_ip, _req_user, _require_hl7_fields
-from web.telemetry import capture as _capture, capture_error as _capture_error
 
 logger = logging.getLogger(__name__)
 
@@ -150,11 +149,9 @@ def hl7_send():
         _audit("hl7.send", ip=_req_ip(), user=_req_user(),
                detail={"host": d["host"], "port": d["port"]},
                result="ok" if ok else "error", error=None if ok else response[:200])
-        _capture("feature_used", {"feature": "hl7_send", "result": "ok" if ok else "error"})
         return jsonify({"ok": ok, "response": response})
     except Exception as e:
         logger.exception("HL7 Send error")
-        _capture_error("hl7_send", e)
         _audit("hl7.send", ip=_req_ip(), user=_req_user(),
                detail={"host": d.get("host"), "port": d.get("port")},
                result="error", error=str(e))
@@ -197,18 +194,21 @@ def hl7_listener_start():
         debug_active = debug or logger.isEnabledFor(logging.DEBUG)
         dbg = (lambda m: _log("hl7_recv", m, "debug")) if debug_active else None
 
-        ctx._hl7_listener = HL7Listener(port=port, callback=on_message,
-                                        debug_callback=dbg, ack_code=ack_code)
+        def on_reject(host):
+            _log("hl7_recv", f"Rejected connection from {host} (not in allowed sender hosts)", "warn")
+
+        ctx._hl7_listener = HL7Listener(
+            port=port, callback=on_message, debug_callback=dbg, ack_code=ack_code,
+            allowed_hosts=ctx.config.get("hl7", {}).get("allowed_hosts"),
+            reject_callback=on_reject)
         try:
             ctx._hl7_listener.start()
             _audit("hl7.listener.start", ip=_req_ip(), user=_req_user(),
                    detail={"port": port, "ack_code": ack_code})
-            _capture("feature_used", {"feature": "hl7_listener_start"})
             ack_note = "" if ack_code == "AA" else f" (returning {ack_code} ACKs)"
             return jsonify({"ok": True, "message": f"HL7 listener started on port {port}{ack_note}"})
         except Exception as e:
             logger.exception("HL7 Listener start failed")
-            _capture_error("hl7_listener_start", e)
             _audit("hl7.listener.start", ip=_req_ip(), user=_req_user(),
                    detail={"port": port}, result="error", error=str(e))
             return jsonify({"ok": False, "message": str(e)}), 500

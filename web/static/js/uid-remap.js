@@ -50,7 +50,7 @@ function _renderUIDRemapPreview(mapping) {
       const tr = document.createElement("tr");
       tr.innerHTML =
         `<td style="font-size:12px">${i === 0 ? escapeHtml(entry.file) : ""}</td>` +
-        `<td style="font-size:11px;font-family:Consolas">${ch.tag} ${escapeHtml(ch.name)}</td>` +
+        `<td style="font-size:11px;font-family:Consolas">${escapeHtml(ch.tag)} ${escapeHtml(ch.name)}</td>` +
         `<td style="font-size:11px;font-family:Consolas;word-break:break-all;max-width:220px;color:#dc2626">${escapeHtml(ch.old)}</td>` +
         `<td style="font-size:11px;font-family:Consolas;word-break:break-all;max-width:220px;color:#16a34a">${escapeHtml(ch.new)}</td>`;
       tbody.appendChild(tr);

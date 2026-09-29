@@ -28,7 +28,7 @@ async function loadSCPStats() {
       modEl.innerHTML = `<div style="font-weight:600;font-size:12px;color:#888;margin-bottom:4px">By Modality</div>`
         + mods.map(([m, n]) =>
             `<div style="display:flex;justify-content:space-between;font-size:12px;padding:1px 0">
-               <span>${m}</span><span style="color:#555">${n}</span></div>`
+               <span>${escapeHtml(m)}</span><span style="color:#555">${escapeHtml(n)}</span></div>`
           ).join("");
     }
 
@@ -41,7 +41,7 @@ async function loadSCPStats() {
               ? `${d.substring(0,4)}-${d.substring(4,6)}-${d.substring(6,8)}`
               : d;
             return `<div style="display:flex;justify-content:space-between;font-size:12px;padding:1px 0">
-                      <span>${fmt}</span><span style="color:#555">${n}</span></div>`;
+                      <span>${escapeHtml(fmt)}</span><span style="color:#555">${escapeHtml(n)}</span></div>`;
           }).join("");
     }
   } catch (e) {

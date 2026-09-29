@@ -180,6 +180,68 @@ def _dataset_to_tag_list(dataset) -> list:
 
 # ── SCP storage helpers ───────────────────────────────────────────────────────
 
+DEFAULT_RECEIVE_DIR = "~/DICOM_Received"
+
+
+def _is_same_or_inside(path: str, parent: str) -> bool:
+    path, parent = os.path.normcase(path), os.path.normcase(parent)
+    return path == parent or path.startswith(parent.rstrip(os.sep) + os.sep)
+
+
+def _upload_path(tmp_dir: str, filename: str | None, index: int, default: str) -> str:
+    """Return a path in *tmp_dir* for an uploaded file.
+
+    The client-supplied filename is reduced to its base name (it may contain
+    "../" or a folder path), and each upload gets its own numbered subfolder
+    so files with the same name from different folders don't overwrite each
+    other while the original name is still what shows up in logs.
+    """
+    name = os.path.basename((filename or "").replace("\\", "/")) or default
+    if name in (".", ".."):
+        name = default
+    sub = os.path.join(tmp_dir, f"{index:05d}")
+    os.makedirs(sub, exist_ok=True)
+    return os.path.join(sub, name)
+
+
+def resolve_receive_dir(requested: str | None, is_admin: bool) -> tuple[str | None, str | None]:
+    """Validate a directory for received DICOM files (Storage SCP / C-GET).
+
+    Returns ``(path, None)`` on success or ``(None, error_message)``.
+
+    Received files are listed, served, and deleted by the web UI, and files
+    older than the retention period are cleaned up automatically — so the
+    directory must never overlap the application's own data (users, secret
+    key, config, logs) or be a system root. Non-admin users may only use the
+    default directory or a folder inside it.
+    """
+    from config.manager import APP_DIR, LOG_DIR
+
+    default = os.path.normpath(os.path.expanduser(DEFAULT_RECEIVE_DIR))
+    raw = (requested or "").strip() or DEFAULT_RECEIVE_DIR
+    path = os.path.normpath(os.path.expanduser(raw))
+    if not os.path.isabs(path):
+        return None, "The receive directory must be an absolute path."
+
+    real      = os.path.realpath(path)
+    real_app  = os.path.realpath(APP_DIR)
+    real_logs = os.path.realpath(LOG_DIR)
+    real_home = os.path.realpath(os.path.expanduser("~"))
+
+    if os.path.dirname(real) == real:          # "/", "C:\\"
+        return None, "The receive directory cannot be a filesystem root."
+    if os.path.normcase(real) == os.path.normcase(real_home):
+        return None, "The receive directory cannot be the home directory itself."
+    if _is_same_or_inside(real_app, real):     # the data dir or one of its parents
+        return None, "The receive directory cannot contain the application data directory."
+    if _is_same_or_inside(real, real_logs):
+        return None, "The receive directory cannot be inside the log directory."
+    if not is_admin and not _is_same_or_inside(real, os.path.realpath(default)):
+        return None, (f"Only administrators can choose a receive directory outside "
+                      f"{default}.")
+    return path, None
+
+
 def _scp_storage_dir() -> str | None:
     """Return the current SCP storage directory, or None if unavailable."""
     with ctx._listener_lock:
@@ -188,7 +250,7 @@ def _scp_storage_dir() -> str | None:
         return scp.storage_dir
     if ctx._last_scp_storage_dir and os.path.isdir(ctx._last_scp_storage_dir):
         return ctx._last_scp_storage_dir
-    default = os.path.normpath(os.path.expanduser("~/DICOM_Received"))
+    default = os.path.normpath(os.path.expanduser(DEFAULT_RECEIVE_DIR))
     return default if os.path.isdir(default) else None
 
 
@@ -206,6 +268,9 @@ def _cleanup_scp_storage(max_age_hours: int = ctx._SCP_RETENTION_HOURS) -> tuple
     try:
         for dirpath, dirnames, filenames in os.walk(root, topdown=False):
             for fname in filenames:
+                # Only ever touch files the receiver itself writes.
+                if not fname.lower().endswith(".dcm"):
+                    continue
                 fpath = os.path.join(dirpath, fname)
                 try:
                     if os.stat(fpath).st_mtime < cutoff:

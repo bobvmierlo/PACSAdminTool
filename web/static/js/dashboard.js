@@ -55,7 +55,7 @@ async function loadDashboard() {
           <td>${escapeHtml(ae.name || "")}${srcBadge}</td>
           <td>${escapeHtml(ae.ae_title)}</td>
           <td>${escapeHtml(ae.host)}</td>
-          <td>${ae.port}</td>
+          <td>${escapeHtml(ae.port)}</td>
           <td><span class="badge-pending" id="${badgeId}">–</span></td>
           <td id="${msgId}" style="font-size:12px; color:#888"></td>`;
         tbody.appendChild(tr);
@@ -99,11 +99,11 @@ async function loadDashboard() {
       const ts  = (entry.ts || "").replace("T", " ").substring(0, 19);
       const res = entry.result || "";
       tr.innerHTML = `
-        <td style="white-space:nowrap;font-size:11px">${ts}</td>
-        <td>${entry.user || "–"}</td>
-        <td style="font-size:11px">${entry.ip || ""}</td>
-        <td>${entry.event || ""}</td>
-        <td><span class="${res === "ok" ? "badge-ok" : "badge-err"}">${res}</span></td>`;
+        <td style="white-space:nowrap;font-size:11px">${escapeHtml(ts)}</td>
+        <td>${escapeHtml(entry.user || "–")}</td>
+        <td style="font-size:11px">${escapeHtml(entry.ip || "")}</td>
+        <td>${escapeHtml(entry.event || "")}</td>
+        <td><span class="${res === "ok" ? "badge-ok" : "badge-err"}">${escapeHtml(res)}</span></td>`;
       auditTbody.appendChild(tr);
     });
   } catch (e) {

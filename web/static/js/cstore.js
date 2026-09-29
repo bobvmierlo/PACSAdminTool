@@ -8,7 +8,7 @@ function updateFileList() {
   const input = document.getElementById("cstore-files");
   const list  = document.getElementById("cstore-filelist");
   const count = document.getElementById("cstore-count");
-  list.innerHTML = [...input.files].map(f => f.name).join("<br>");
+  list.innerHTML = [...input.files].map(f => escapeHtml(f.name)).join("<br>");
   count.textContent = `${input.files.length} file(s) selected`;
 }
 

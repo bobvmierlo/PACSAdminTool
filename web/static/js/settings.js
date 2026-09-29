@@ -1,4 +1,4 @@
-// settings.js — Config / Settings tab, user preferences, telemetry consent banner
+// settings.js — Config / Settings tab, user preferences
 // Extracted from index.html; loaded as a plain script (shared global scope, no modules).
 // ─────────────────────────────────────────────────────────────────
 // 3. Config / Settings
@@ -53,6 +53,8 @@ async function loadConfig() {
   const lae = appConfig.local_ae || {};
   document.getElementById("set-ae-title").value = lae.ae_title || "PACSADMIN";
   document.getElementById("set-ae-port").value  = lae.port     || 11112;
+  document.getElementById("set-ae-allowed-aes").value   = (lae.allowed_calling_aes || []).join(", ");
+  document.getElementById("set-ae-allowed-hosts").value = (lae.allowed_hosts || []).join(", ");
   const dtls = appConfig.dicom_tls || {};
   document.getElementById("set-dicom-tls-enabled").checked = dtls.enabled || false;
   document.getElementById("set-dicom-tls-cert").value      = dtls.cert_file || "";
@@ -62,6 +64,7 @@ async function loadConfig() {
   document.getElementById("set-hl7-port").value         = hl7.listen_port   || 2575;
   document.getElementById("set-hl7-default-host").value = hl7.default_host  || "127.0.0.1";
   document.getElementById("set-hl7-default-port").value = hl7.default_port  || 2575;
+  document.getElementById("set-hl7-allowed-hosts").value = (hl7.allowed_hosts || []).join(", ");
   // Pre-fill the HL7 send form with the configured defaults
   document.getElementById("hl7-host").value = hl7.default_host || "127.0.0.1";
   document.getElementById("hl7-port").value = hl7.default_port || 2575;
@@ -72,15 +75,6 @@ async function loadConfig() {
   if (appConfig.language) {
     document.getElementById("set-language").value = appConfig.language;
   }
-  const tel = appConfig.telemetry || {};
-  document.getElementById("set-telemetry-enabled").checked =
-    tel.enabled !== false;  // default true
-
-  // Show the consent banner once if the user hasn't seen it yet.
-  if (tel.consent_shown === false || tel.consent_shown === undefined) {
-    document.getElementById("telemetry-consent").classList.add("visible");
-  }
-
   // Set SCP / HL7 listener defaults from config
   document.getElementById("scp-ae").value          = lae.ae_title || "PACSADMIN";
   document.getElementById("scp-port").value         = lae.port     || 11112;
@@ -101,7 +95,7 @@ function renderPresetTable() {
   (appConfig.remote_aes || []).forEach((ae, i) => {
     const tr = document.createElement("tr");
     tr.innerHTML =
-      `<td>${ae.name}</td><td>${ae.ae_title}</td><td>${ae.host}</td><td>${ae.port}</td>` +
+      `<td>${escapeHtml(ae.name)}</td><td>${escapeHtml(ae.ae_title)}</td><td>${escapeHtml(ae.host)}</td><td>${escapeHtml(ae.port)}</td>` +
       `<td style="white-space:nowrap">` +
       `<button class="btn" style="padding:2px 8px; font-size:11px; margin-right:4px"
           onclick="testPreset(${i}, this)">Test</button>` +
@@ -217,7 +211,7 @@ function renderMyPreferences() {
     (userSettings.remote_aes || []).forEach((ae, i) => {
       const tr = document.createElement("tr");
       tr.innerHTML =
-        `<td>${ae.name}</td><td>${ae.ae_title}</td><td>${ae.host}</td><td>${ae.port}</td>` +
+        `<td>${escapeHtml(ae.name)}</td><td>${escapeHtml(ae.ae_title)}</td><td>${escapeHtml(ae.host)}</td><td>${escapeHtml(ae.port)}</td>` +
         `<td><button class="btn danger" style="padding:2px 8px; font-size:11px"
             onclick="deleteMyAEPreset(${i})">Delete</button></td>`;
       aeBody.appendChild(tr);
@@ -231,7 +225,7 @@ function renderMyPreferences() {
     (userSettings.dicomweb_presets || []).forEach((p, i) => {
       const tr = document.createElement("tr");
       tr.innerHTML =
-        `<td>${p.name}</td><td style="word-break:break-all;font-size:12px">${p.base_url || ""}</td>` +
+        `<td>${escapeHtml(p.name)}</td><td style="word-break:break-all;font-size:12px">${escapeHtml(p.base_url || "")}</td>` +
         `<td><button class="btn danger" style="padding:2px 8px; font-size:11px"
             onclick="deleteMyDWPreset(${i})">Delete</button></td>`;
       dwBody.appendChild(tr);
@@ -320,9 +314,9 @@ function renderSysDWPresetsTable() {
   (appConfig.dicomweb_presets || []).forEach((p, i) => {
     const tr = document.createElement("tr");
     tr.innerHTML =
-      `<td>${p.name}</td>` +
-      `<td style="word-break:break-all;font-size:12px">${p.base_url || ""}</td>` +
-      `<td>${p.auth_type || "none"}</td>` +
+      `<td>${escapeHtml(p.name)}</td>` +
+      `<td style="word-break:break-all;font-size:12px">${escapeHtml(p.base_url || "")}</td>` +
+      `<td>${escapeHtml(p.auth_type || "none")}</td>` +
       `<td><button class="btn danger" style="padding:2px 8px; font-size:11px"
           onclick="deleteSysDWPreset(${i})">Delete</button></td>`;
     tbody.appendChild(tr);
@@ -369,14 +363,22 @@ async function deleteSysDWPreset(i) {
 
 // ── System Settings ───────────────────────────────────────────────────────────
 
+// "a, b ,,c" → ["a", "b", "c"]  (commas only: AE titles may contain spaces)
+function _splitList(text) {
+  return text.split(",").map(s => s.trim()).filter(Boolean);
+}
+
 async function saveSettings() {
   const localPort = parsePort(document.getElementById("set-ae-port").value);
   if (localPort === null) { toast(i18n("common.invalid_port", {port: document.getElementById("set-ae-port").value.trim()}), "err"); return; }
   const hl7Port = parsePort(document.getElementById("set-hl7-port").value);
   if (hl7Port === null) { toast(i18n("common.invalid_port", {port: document.getElementById("set-hl7-port").value.trim()}), "err"); return; }
   appConfig.local_ae = {
+    ...appConfig.local_ae,
     ae_title: document.getElementById("set-ae-title").value.trim(),
     port:     localPort,
+    allowed_calling_aes: _splitList(document.getElementById("set-ae-allowed-aes").value),
+    allowed_hosts:       _splitList(document.getElementById("set-ae-allowed-hosts").value),
   };
   const hl7DefaultPort = parsePort(document.getElementById("set-hl7-default-port").value);
   if (hl7DefaultPort === null) { toast(i18n("common.invalid_port", {port: document.getElementById("set-hl7-default-port").value.trim()}), "err"); return; }
@@ -385,6 +387,7 @@ async function saveSettings() {
     listen_port:  hl7Port,
     default_host: document.getElementById("set-hl7-default-host").value.trim(),
     default_port: hl7DefaultPort,
+    allowed_hosts: _splitList(document.getElementById("set-hl7-allowed-hosts").value),
   };
   const webPort = parsePort(document.getElementById("set-web-port").value);
   if (webPort === null) { toast(i18n("common.invalid_port", {port: document.getElementById("set-web-port").value.trim()}), "err"); return; }
@@ -392,10 +395,6 @@ async function saveSettings() {
     ...appConfig.web,
     host: document.getElementById("set-web-host").value.trim(),
     port: webPort,
-  };
-  appConfig.telemetry = {
-    ...(appConfig.telemetry || {}),
-    enabled: document.getElementById("set-telemetry-enabled").checked,
   };
   appConfig.dicom_tls = {
     enabled:   document.getElementById("set-dicom-tls-enabled").checked,
@@ -407,7 +406,6 @@ async function saveSettings() {
     local_ae: appConfig.local_ae,
     hl7:      appConfig.hl7,
     web:      appConfig.web,
-    telemetry: appConfig.telemetry,
     dicom_tls: appConfig.dicom_tls,
   };
   const res = await fetch("/api/config", {
@@ -432,12 +430,6 @@ async function exportConfig() {
     const res = await fetch("/api/config");
     if (!res.ok) { toast("Could not fetch config.", "err"); return; }
     const cfg = await res.json();
-    // Strip the telemetry anonymous_id before exporting
-    if (cfg.telemetry && cfg.telemetry.anonymous_id !== undefined) {
-      const tel = { ...cfg.telemetry };
-      delete tel.anonymous_id;
-      cfg.telemetry = tel;
-    }
     const ts = new Date().toISOString().slice(0, 10);
     downloadText(`pacsadmin_config_${ts}.json`, JSON.stringify(cfg, null, 2), "application/json");
     const st = document.getElementById("config-backup-status");
@@ -499,33 +491,5 @@ async function saveUserPreferences() {
     .forEach(([c, p]) => buildAESelector(c, p));
   refreshAllPresetDropdowns();
   dwRefreshPresets();
-}
-
-// ─────────────────────────────────────────────────────────────────
-// 3b. Telemetry consent banner
-// ─────────────────────────────────────────────────────────────────
-
-async function _saveTelemetryConsent(enabled) {
-  const tel = { ...(appConfig.telemetry || {}), enabled, consent_shown: true };
-  appConfig.telemetry = tel;
-  document.getElementById("set-telemetry-enabled").checked = enabled;
-  document.getElementById("telemetry-consent").classList.remove("visible");
-  try {
-    await fetch("/api/config", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ telemetry: tel }),
-    });
-  } catch (e) {
-    console.warn("Could not save telemetry consent:", e);
-  }
-}
-
-function telemetryAccept() {
-  _saveTelemetryConsent(true);
-}
-
-function telemetryOptOut() {
-  _saveTelemetryConsent(false);
 }
 

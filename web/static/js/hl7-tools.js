@@ -400,7 +400,7 @@ function _hl7HistItemEl(item, dir) {
                  border-bottom:1px solid #e5e7eb; cursor:pointer"
          onclick="document.getElementById('${detailId}').style.display =
                   document.getElementById('${detailId}').style.display==='none'?'':'none'">
-       <div style="font-size:11px;color:#6b7280">${ts} · <strong>${who}</strong>
+       <div style="font-size:11px;color:#6b7280">${escapeHtml(ts)} · <strong>${escapeHtml(who)}</strong>
          <span style="margin-left:6px;color:${ok?'#16a34a':'#dc2626'}">${ok?'OK':'FAILED'}</span>
        </div>
        <span style="font-size:10px;color:#9ca3af">▼</span>

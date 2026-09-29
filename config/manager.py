@@ -22,7 +22,10 @@ LOG_DIR = os.path.join(APP_DIR, "logs")
 DEFAULT_CONFIG = {
     "local_ae": {
         "ae_title": "PACSADMIN",
-        "port": 11112
+        "port": 11112,
+        # Storage SCP sender restrictions; empty = accept everyone.
+        "allowed_calling_aes": [],
+        "allowed_hosts": [],   # IP addresses and/or CIDR networks
     },
     "remote_aes": [],
     "dicom_tls": {
@@ -38,7 +41,9 @@ DEFAULT_CONFIG = {
     "hl7": {
         "listen_port": 2575,
         "default_host": "127.0.0.1",
-        "default_port": 2575
+        "default_port": 2575,
+        # HL7 listener sender restriction; empty = accept everyone.
+        "allowed_hosts": [],   # IP addresses and/or CIDR networks
     },
     "hl7_servers": [],
     "orm_field_map": {
@@ -63,17 +68,6 @@ DEFAULT_CONFIG = {
     },
     "log_level": "INFO",
     "language": "en",
-    "telemetry": {
-        # enabled: true  = opt-out model (on by default, user may disable)
-        # Set to false to completely stop sending any telemetry events.
-        "enabled": True,
-        # anonymous_id: randomly-generated UUID, created on first run.
-        # Not tied to any user, machine, or patient data.
-        "anonymous_id": None,
-        # consent_shown: tracks whether the user has seen the telemetry notice.
-        # When false the UI shows a one-time consent banner.
-        "consent_shown": False,
-    }
 }
 
 
@@ -100,6 +94,14 @@ def load_config() -> dict:
         try:
             with open(CONFIG_PATH, "r") as f:
                 loaded = json.load(f)
+            # Usage telemetry was removed; drop the stored settings
+            # (including the anonymous installation ID) from older configs.
+            if isinstance(loaded, dict) and loaded.pop("telemetry", None) is not None:
+                try:
+                    save_config(loaded)
+                except OSError:
+                    logger.warning("Could not remove telemetry settings from %s",
+                                   CONFIG_PATH, exc_info=True)
             # Deep-merge: new default keys are picked up even for nested dicts.
             return _deep_merge(DEFAULT_CONFIG, loaded)
         except Exception:

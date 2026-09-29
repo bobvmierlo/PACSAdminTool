@@ -22,7 +22,7 @@ function renderAnonList() {
   const box = document.getElementById("anon-filelist");
   const cnt = document.getElementById("anon-count");
   cnt.textContent = `${_anonFiles.length} file(s) selected`;
-  box.innerHTML = _anonFiles.map(f => f.name).join("<br>");
+  box.innerHTML = _anonFiles.map(f => escapeHtml(f.name)).join("<br>");
 }
 
 // ── Anonymizer: Retrieve from PACS helpers ───────────────────────

@@ -91,3 +91,21 @@ class TestSaveConfig:
         save_config({"v": 2})
         with open(config_path) as f:
             assert json.load(f)["v"] == 2
+
+
+class TestTelemetryRemoved:
+    def test_load_strips_legacy_telemetry_block(self, tmp_path, monkeypatch):
+        config_path = str(tmp_path / "config.json")
+        monkeypatch.setattr("config.manager.CONFIG_PATH", config_path)
+        save_config({
+            "log_level": "DEBUG",
+            "telemetry": {"enabled": True, "anonymous_id": "abc-123"},
+        })
+        cfg = load_config()
+        assert "telemetry" not in cfg
+        assert cfg["log_level"] == "DEBUG"
+        # The anonymous installation ID is removed from disk as well.
+        with open(config_path) as f:
+            on_disk = json.load(f)
+        assert "telemetry" not in on_disk
+        assert on_disk["log_level"] == "DEBUG"

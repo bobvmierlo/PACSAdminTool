@@ -10,6 +10,8 @@ from collections import deque
 from datetime import datetime
 from typing import Callable, Optional
 
+from config.network import address_allowed, parse_host_allowlist
+
 logger = logging.getLogger(__name__)
 
 # MLLP framing characters
@@ -162,9 +164,15 @@ class HL7Listener:
 
     def __init__(self, port: int, callback: Optional[Callable] = None,
                  debug_callback: Optional[Callable] = None,
-                 ack_code: str = "AA"):
+                 ack_code: str = "AA",
+                 allowed_hosts: Optional[list] = None,
+                 reject_callback: Optional[Callable] = None):
         self.port = port
         self.callback = callback
+        # Empty = accept every sender. reject_callback(host) is told about
+        # connections that were dropped because the sender is not allowed.
+        self.allowed_networks = parse_host_allowlist(allowed_hosts)
+        self.reject_callback = reject_callback
         # debug_callback receives formatted raw-byte strings when enabled
         self.debug_callback = debug_callback
         self.ack_code = ack_code if ack_code in ACK_CODES else "AA"
@@ -255,6 +263,12 @@ class HL7Listener:
         while self.running:
             try:
                 conn, addr = self._sock.accept()
+                if not address_allowed(addr[0], self.allowed_networks):
+                    logger.warning("HL7 listener rejected connection from %s", addr[0])
+                    conn.close()
+                    if self.reject_callback:
+                        self.reject_callback(addr[0])
+                    continue
                 t = threading.Thread(target=self._handle_client,
                                      args=(conn, addr), daemon=True)
                 t.start()

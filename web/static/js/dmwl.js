@@ -35,8 +35,8 @@ async function doDMWL() {
   const tbody = document.getElementById("dmwl-tbody");
   dmwlResults.forEach((r, i) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${r.PatientID}</td><td>${r.PatientName}</td><td>${r.Accession}</td>
-      <td>${r.Modality}</td><td>${formatDicomDate(r.ScheduledDate)}</td><td>${r.StationAET}</td><td>${r.Procedure}</td>`;
+    tr.innerHTML = `<td>${escapeHtml(r.PatientID)}</td><td>${escapeHtml(r.PatientName)}</td><td>${escapeHtml(r.Accession)}</td>
+      <td>${escapeHtml(r.Modality)}</td><td>${escapeHtml(formatDicomDate(r.ScheduledDate))}</td><td>${escapeHtml(r.StationAET)}</td><td>${escapeHtml(r.Procedure)}</td>`;
     tr.onclick = () => showTagModal(`Worklist: ${r.PatientName} / ${r.PatientID}`, r.tags);
     tbody.appendChild(tr);
   });

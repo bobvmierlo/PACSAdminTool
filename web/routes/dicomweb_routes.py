@@ -21,7 +21,6 @@ from flask import Blueprint, jsonify, request, send_file
 
 from web.audit import log as _audit
 from web.helpers import _req_ip, _req_user
-from web.telemetry import capture as _capture, capture_error as _capture_error
 
 logger = logging.getLogger(__name__)
 bp = Blueprint("dicomweb", __name__)
@@ -176,14 +175,12 @@ def dicomweb_qido():
         _audit("dicomweb.qido", ip=_req_ip(), user=_req_user(),
                detail={"url": url, "level": level},
                result="ok")
-        _capture("feature_used", {"feature": "dicomweb_qido", "level": level})
         return jsonify({"ok": True, "results": results, "count": len(results)})
 
     except Exception as exc:
         status = getattr(getattr(exc, "response", None), "status_code", None)
         msg    = f"HTTP {status}: {exc}" if status else str(exc)
         logger.exception("QIDO-RS request failed: %s", url)
-        _capture_error("dicomweb_qido", exc)
         _audit("dicomweb.qido", ip=_req_ip(), user=_req_user(),
                detail={"url": url}, result="error", error=msg)
         return jsonify({"ok": False, "error": msg}), 500
@@ -239,15 +236,12 @@ def dicomweb_stow():
 
         _audit("dicomweb.stow", ip=_req_ip(), user=_req_user(),
                detail={"url": url, "files": len(files)}, result="ok")
-        _capture("feature_used", {"feature": "dicomweb_stow",
-                                  "files": len(files)})
         return jsonify({"ok": True, "result": result, "files_sent": len(files)})
 
     except Exception as exc:
         status = getattr(getattr(exc, "response", None), "status_code", None)
         msg    = f"HTTP {status}: {exc}" if status else str(exc)
         logger.exception("STOW-RS request failed: %s", url)
-        _capture_error("dicomweb_stow", exc)
         _audit("dicomweb.stow", ip=_req_ip(), user=_req_user(),
                detail={"url": url}, result="error", error=msg)
         return jsonify({"ok": False, "error": msg}), 500
@@ -302,7 +296,6 @@ def dicomweb_wado():
 
         _audit("dicomweb.wado", ip=_req_ip(), user=_req_user(),
                detail={"url": url}, result="ok")
-        _capture("feature_used", {"feature": "dicomweb_wado"})
 
         return send_file(
             io.BytesIO(zip_bytes),
@@ -315,7 +308,6 @@ def dicomweb_wado():
         status = getattr(getattr(exc, "response", None), "status_code", None)
         msg    = f"HTTP {status}: {exc}" if status else str(exc)
         logger.exception("WADO-RS request failed: %s", url)
-        _capture_error("dicomweb_wado", exc)
         _audit("dicomweb.wado", ip=_req_ip(), user=_req_user(),
                detail={"url": url}, result="error", error=msg)
         return jsonify({"ok": False, "error": msg}), 500

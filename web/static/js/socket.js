@@ -88,7 +88,7 @@ socket.on("hl7_message", data => {
   const block = document.createElement("div");
   block.style.cssText = "border:1px solid #e0e0e0; border-radius:3px; background:#fff; padding:10px; font-size:12px";
   block.innerHTML =
-    `<div style="color:#888; margin-bottom:4px; font-size:11px">[${data.ts}] From ${data.from}</div>` +
+    `<div style="color:#888; margin-bottom:4px; font-size:11px">[${escapeHtml(data.ts)}] From ${escapeHtml(data.from)}</div>` +
     `<pre style="font-family:Consolas; white-space:pre-wrap; color:#1a1a1a; margin:0">${escapeHtml(data.message)}</pre>`;
 
   // Add Inspect button — triggers the inline HL7 inspector for this message

@@ -11,8 +11,7 @@ import pydicom
 import web.context as ctx
 from dicom.video import is_video_transfer_syntax, video_for_playback
 from web.audit import log as _audit
-from web.auth import require_login
-from web.telemetry import capture as _capture, capture_error as _capture_error
+from web.auth import is_admin, require_login
 from web.helpers import (
     _bad_request,
     _cleanup_scp_storage,
@@ -24,6 +23,8 @@ from web.helpers import (
     _req_user,
     _safe_str,
     _scp_storage_dir,
+    DEFAULT_RECEIVE_DIR,
+    resolve_receive_dir,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,13 @@ def scp_start():
             raise ValueError
     except (ValueError, TypeError):
         return _bad_request(f"'port' must be an integer between 1 and 65535, got: {d.get('port')!r}.")
-    save_dir = os.path.normpath(os.path.expanduser(d.get("save_dir", "~/DICOM_Received")))
+    save_dir, dir_error = resolve_receive_dir(d.get("save_dir"), is_admin())
+    if dir_error:
+        _audit("scp.start", ip=_req_ip(), user=_req_user(),
+               detail={"ae_title": ae_title, "port": port, "save_dir": d.get("save_dir")},
+               result="error", error=dir_error)
+        return jsonify({"ok": False, "message": dir_error}), 400
+    local_cfg = ctx.config.get("local_ae", {})
 
     with ctx._listener_lock:
         if ctx._scp_listener and ctx._scp_listener.running:
@@ -58,17 +65,17 @@ def scp_start():
 
         ctx._scp_listener = SCPListener(ae_title=ae_title, port=port,
                                         storage_dir=save_dir, log_callback=on_log,
-                                        n_event_callback=on_commit, tls=_dicom_tls())
+                                        n_event_callback=on_commit, tls=_dicom_tls(),
+                                        allowed_calling_aes=local_cfg.get("allowed_calling_aes"),
+                                        allowed_hosts=local_cfg.get("allowed_hosts"))
         try:
             ctx._scp_listener.start()
             ctx._last_scp_storage_dir = save_dir
             _audit("scp.start", ip=_req_ip(), user=_req_user(),
                    detail={"ae_title": ae_title, "port": port, "save_dir": save_dir})
-            _capture("feature_used", {"feature": "scp_start"})
             return jsonify({"ok": True, "message": f"SCP started as {ae_title} on port {port}"})
         except Exception as e:
             logger.exception("SCP start failed")
-            _capture_error("scp_start", e)
             _audit("scp.start", ip=_req_ip(), user=_req_user(),
                    detail={"ae_title": ae_title, "port": port},
                    result="error", error=str(e))
@@ -97,13 +104,15 @@ def scp_status():
 @bp.route("/api/scp/default_dir", methods=["GET"])
 def scp_default_dir():
     """Return the real expanded default save directory for this server's OS."""
-    return jsonify({"path": os.path.normpath(os.path.expanduser("~/DICOM_Received"))})
+    return jsonify({"path": os.path.normpath(os.path.expanduser(DEFAULT_RECEIVE_DIR))})
 
 
 def _resolve_scp_path(storage_dir: str, rel: str):
     """Resolve a relative path within storage_dir safely.  Returns the
-    absolute path, or None if it would escape the storage root."""
-    if not rel:
+    absolute path, or None if it would escape the storage root or is not a
+    DICOM file written by the receiver (only *.dcm files are ever served or
+    deleted)."""
+    if not rel or not rel.lower().endswith(".dcm"):
         return None
     # Normalise separators (browser may send forward slashes on Windows)
     rel = rel.replace("\\", "/")
@@ -203,7 +212,7 @@ def scp_files():
     with ctx._listener_lock:
         scp = ctx._scp_listener
     storage_dir = scp.storage_dir if scp else os.path.normpath(
-        os.path.expanduser("~/DICOM_Received"))
+        os.path.expanduser(DEFAULT_RECEIVE_DIR))
     if not os.path.isdir(storage_dir):
         return jsonify({"ok": True, "dir": storage_dir, "files": []})
     try:
