@@ -175,7 +175,7 @@ function exportCFindCSV() {
 }
 
 // ── C-FIND: query history (LocalStorage) ────────────────────────
-const CFIND_HISTORY_KEY = "pacsadmin_cfind_history";
+const CFIND_HISTORY_KEY = "cfind_history";   // server-side user state (userstate.js)
 const CFIND_HISTORY_MAX = 10;
 
 function _cfindHistorySave() {
@@ -200,16 +200,13 @@ function _cfindHistorySave() {
   const key = q => `${q.host}:${q.port}|${q.patient_id}|${q.patient_name}|${q.accession}|${q.study_date_from||q.study_date||""}-${q.study_date_to||""}|${q.modality}|${q.study_uid}`;
   const deduped = existing.filter(q => key(q) !== key(query));
   deduped.unshift(query);
-  try {
-    localStorage.setItem(CFIND_HISTORY_KEY,
-      JSON.stringify(deduped.slice(0, CFIND_HISTORY_MAX)));
-  } catch { /* storage full – ignore */ }
+  userStateSet(CFIND_HISTORY_KEY, deduped.slice(0, CFIND_HISTORY_MAX));
   renderCFindHistory();
 }
 
 function _cfindHistoryLoad() {
-  try { return JSON.parse(localStorage.getItem(CFIND_HISTORY_KEY) || "[]"); }
-  catch { return []; }
+  const h = userStateGet(CFIND_HISTORY_KEY, []);
+  return Array.isArray(h) ? h : [];
 }
 
 function renderCFindHistory() {
@@ -260,7 +257,7 @@ function loadCFindHistory(i) {
 }
 
 function clearCFindHistory() {
-  localStorage.removeItem(CFIND_HISTORY_KEY);
+  userStateSet(CFIND_HISTORY_KEY, [], true);
   renderCFindHistory();
 }
 

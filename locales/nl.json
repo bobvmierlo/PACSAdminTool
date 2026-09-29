@@ -309,7 +309,7 @@
     "hl7_default_port": "Standaard bestemmingspoort",
     "logging": "Logboek",
     "log_level": "Logniveau",
-    "log_note": "Logs worden geschreven naar logs/pacs_admin.log en dagelijks geroteerd (7 dagen bewaard).",
+    "log_note": "Logs worden geschreven naar logs/pacs_admin.log en dagelijks geroteerd (7 dagen bewaard). De auditlog wordt langer bewaard (zie Beveiliging); de logmap wordt nooit groter dan 500 MB.",
     "save": "Instellingen opslaan",
     "save_preferences": "Voorkeuren opslaan",
     "saved": "Opgeslagen  {ts}",
@@ -354,7 +354,16 @@
     "scp_allowed_aes": "Toegestane aanroepende AE-titels (Storage SCP)",
     "scp_allowed_hosts": "Toegestane afzenders (Storage SCP)",
     "hl7_allowed_hosts": "Toegestane afzenders (HL7-listener)",
-    "allowlist_note": "Kommagescheiden. Leeg laten om elke afzender te accepteren. Afzenders zijn IP-adressen of CIDR-netwerken. Geldt vanaf de volgende keer dat de listener wordt gestart."
+    "allowlist_note": "Kommagescheiden. Leeg laten om elke afzender te accepteren. Afzenders zijn IP-adressen of CIDR-netwerken. Geldt vanaf de volgende keer dat de listener wordt gestart.",
+    "security": "Beveiliging",
+    "session_timeout": "Uitloggen na inactiviteit (minuten)",
+    "session_timeout_invalid": "De inactiviteits-time-out moet tussen 1 en 720 minuten liggen.",
+    "audit_retention": "Auditlog bewaren (dagen)",
+    "audit_retention_invalid": "De bewaartermijn van de auditlog moet tussen 1 en 3650 dagen liggen.",
+    "audit_retention_note": "De hele logmap is begrensd op 500 MB. Wordt die grens bereikt, dan worden de oudste logs eerst verwijderd; de auditlog kan dan korter bewaard blijven dan ingesteld.",
+    "behind_proxy": "Draait achter een HTTPS-reverse-proxy",
+    "behind_proxy_note": "Alleen inschakelen als elk verzoek via een reverse proxy binnenkomt die HTTPS afhandelt. De app gebruikt dan het clientadres uit X-Forwarded-For in de auditlog en stuurt de sessiecookie alleen via HTTPS. Werkt na herstarten van de applicatie.",
+    "dicom_tls_no_ca_note": "Zonder CA-bundel is de verbinding versleuteld, maar wordt de identiteit van de andere kant niet gecontroleerd. Voeg de CA toe die de certificaten van de tegenpartij heeft ondertekend voor volledige bescherming."
   },
   "help": {
     "topics": "Onderwerpen",
@@ -461,7 +470,8 @@
     "mgr_confirm_delete": "Profiel \"{name}\" verwijderen?",
     "retrieve_title": "Studie ophalen uit PACS…",
     "remove_private": "Privé-tags verwijderen (oneven groepen)",
-    "new_uids": "Nieuwe Study/Series/Instance UID's genereren"
+    "new_uids": "Nieuwe Study/Series/Instance UID's genereren",
+    "pseudonymisation_note": "Dit is pseudonimisering op tagniveau, geen gegarandeerde anonimisering: de geselecteerde attributen worden verwijderd (ook binnen sequences), maar patiëntgegevens die in de pixels zijn ingebrand blijven staan, en combinaties van overgebleven gegevens kunnen een patiënt nog steeds herleidbaar maken. Controleer het resultaat voordat je het buiten het ziekenhuis deelt."
   },
   "dicomdir": {
     "title": "DICOMDIR Lezer",

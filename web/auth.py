@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 USERS_PATH   = os.path.join(APP_DIR, "users.json")
 SECRET_KEY_PATH = os.path.join(APP_DIR, "secret_key")
+SETUP_CODE_PATH = os.path.join(APP_DIR, "setup_code.txt")
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +57,59 @@ def load_or_create_secret_key() -> str:
         pass
     logger.info("Generated new Flask secret key at %s", SECRET_KEY_PATH)
     return key
+
+
+# ---------------------------------------------------------------------------
+# First-run setup code
+#
+# Until the first admin exists, /setup is reachable without logging in. To
+# stop whoever happens to reach the server first from claiming it, setup
+# requires a one-time code that is only visible to someone with access to
+# the server: it is printed to the console/log and written to
+# $PACS_DATA_DIR/setup_code.txt. PACS_SETUP_CODE may preset it (automated
+# deployments). The file is removed once setup is complete.
+# ---------------------------------------------------------------------------
+
+def ensure_setup_code() -> str | None:
+    """Create (or reuse) the setup code while no users exist; else clean up."""
+    if has_users():
+        clear_setup_code()
+        return None
+    code = os.environ.get("PACS_SETUP_CODE", "").strip()
+    if not code and os.path.isfile(SETUP_CODE_PATH):
+        with open(SETUP_CODE_PATH, "r", encoding="utf-8") as f:
+            code = f.read().strip()
+    if not code:
+        raw = secrets.token_hex(6).upper()
+        code = f"{raw[:4]}-{raw[4:8]}-{raw[8:]}"
+    os.makedirs(APP_DIR, exist_ok=True)
+    with open(SETUP_CODE_PATH, "w", encoding="utf-8") as f:
+        f.write(code + "\n")
+    try:
+        os.chmod(SETUP_CODE_PATH, stat.S_IRUSR | stat.S_IWUSR)
+    except OSError:
+        pass
+    logger.warning("First-time setup: open the web UI and enter setup code %s "
+                   "(also stored in %s)", code, SETUP_CODE_PATH)
+    return code
+
+
+def verify_setup_code(code: str) -> bool:
+    expected = os.environ.get("PACS_SETUP_CODE", "").strip()
+    if not expected and os.path.isfile(SETUP_CODE_PATH):
+        with open(SETUP_CODE_PATH, "r", encoding="utf-8") as f:
+            expected = f.read().strip()
+    given = (code or "").strip().upper()
+    return bool(expected) and secrets.compare_digest(given, expected.upper())
+
+
+def clear_setup_code() -> None:
+    try:
+        os.remove(SETUP_CODE_PATH)
+    except FileNotFoundError:
+        pass
+    except OSError:
+        logger.warning("Could not remove %s", SETUP_CODE_PATH, exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +188,8 @@ def change_password(username: str, new_password: str) -> bool:
     for u in users:
         if u["username"] == username:
             u["password_hash"] = generate_password_hash(new_password)
+            # Invalidate every existing session of this user.
+            u["session_version"] = int(u.get("session_version", 0)) + 1
             _save(users)
             logger.info("Password changed for: %s", username)
             return True
@@ -207,7 +263,60 @@ def reset_login_failures(username: str, ip: str) -> None:
 
 # ---------------------------------------------------------------------------
 # Session helpers
+#
+# Sessions are signed cookies, so the server cannot delete them. Instead each
+# session carries the user's ``session_version``; changing the password bumps
+# it (and deleting the user removes it), which makes every older cookie
+# invalid on its next request. ``last_active`` implements the idle timeout.
 # ---------------------------------------------------------------------------
+
+DEFAULT_SESSION_TIMEOUT_MINUTES = 30
+
+
+def session_timeout_seconds(config: dict | None) -> int:
+    try:
+        minutes = int(((config or {}).get("web") or {}).get(
+            "session_timeout_minutes", DEFAULT_SESSION_TIMEOUT_MINUTES))
+    except (TypeError, ValueError):
+        minutes = DEFAULT_SESSION_TIMEOUT_MINUTES
+    return max(1, minutes) * 60
+
+
+def start_session(username: str) -> None:
+    """Log *username* in on the current (fresh) session."""
+    user = find_user(username) or {}
+    session.clear()
+    session["username"]    = username
+    session["sv"]          = int(user.get("session_version", 0))
+    session["last_active"] = int(time.time())
+    session.permanent      = True
+
+
+def check_session(config: dict | None, touch: bool = True) -> str | None:
+    """Validate the logged-in session.
+
+    Returns None when the session is valid (and, with *touch*, records the
+    request as activity), otherwise a reason string after clearing the
+    session: "expired" (idle timeout) or "revoked" (user deleted or password
+    changed since login).
+    """
+    username = session.get("username")
+    if not username:
+        return "missing"
+    user = find_user(username)
+    if not user or int(user.get("session_version", 0)) != int(session.get("sv", 0)):
+        session.clear()
+        return "revoked"
+    now = int(time.time())
+    last = int(session.get("last_active", 0))
+    if now - last > session_timeout_seconds(config):
+        session.clear()
+        return "expired"
+    # Rewrite the cookie at most every 30 s instead of on every API call.
+    if touch and now - last >= 30:
+        session["last_active"] = now
+    return None
+
 
 def current_user() -> dict | None:
     username = session.get("username")

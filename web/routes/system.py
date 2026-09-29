@@ -7,7 +7,7 @@ import sys
 from flask import Blueprint, jsonify, make_response, send_from_directory, current_app
 
 import web.context as ctx
-from web.auth import require_login, require_admin
+from web.auth import is_admin, require_login, require_admin
 from web.helpers import _client_room
 from __version__ import __version__ as APP_VERSION
 from config.manager import APP_DIR, LOG_DIR
@@ -79,11 +79,14 @@ def check_update():
             # instead of silently falling back to the manual instructions.
             "docker_update_reason": None if cap.get("available") else cap.get("reason"),
         }
+    if not is_admin():
+        # Installing updates is admin-only; others just see that one exists.
+        info = {**info, "can_auto_update": False, "can_docker_update": False}
     return jsonify(info)
 
 
 @bp.route("/api/apply-update", methods=["POST"])
-@require_login
+@require_admin
 def apply_update():
     """
     Trigger the auto-update sequence for frozen (PyInstaller) executables.
@@ -138,7 +141,8 @@ def apply_update():
             pass
 
     try:
-        apply_update_async(info["download_url"], on_ready=_notify_clients)
+        apply_update_async(info["download_url"], info.get("checksum_url"),
+                           on_ready=_notify_clients)
     except RuntimeError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
 

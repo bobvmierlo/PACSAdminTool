@@ -55,8 +55,16 @@
     <p class="subtitle">Initial setup</p>
     <div class="notice">
       No users exist yet. Create the first administrator account to secure this instance.
+      <br><br>
+      To prove you have access to the server, enter the <strong>setup code</strong>.
+      It is shown in the server console and log, and stored in
+      <code>setup_code.txt</code> in the data folder (for Docker:
+      <code>docker logs pacsadmintool</code>).
     </div>
     <form id="form">
+      <label for="setup_code">Setup code</label>
+      <input id="setup_code" name="setup_code" type="text" autocomplete="off"
+             required placeholder="XXXX-XXXX-XXXX">
       <label for="username">Username</label>
       <input id="username" name="username" type="text" autocomplete="username"
              pattern="[A-Za-z0-9_\-]+" title="Letters, numbers, _ and - only"
@@ -80,6 +88,7 @@
       const username = document.getElementById("username").value.trim();
       const password = document.getElementById("password").value;
       const password2 = document.getElementById("password2").value;
+      const setup_code = document.getElementById("setup_code").value.trim();
 
       err.style.display = "none";
 
@@ -95,7 +104,7 @@
         const res = await fetch("/setup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password }),
+          body: JSON.stringify({ username, password, setup_code }),
         });
         const data = await res.json();
         if (data.ok) {

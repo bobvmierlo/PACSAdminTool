@@ -92,6 +92,9 @@ async function loadDashboard() {
     }
 
     // Recent audit
+    // The audit trail is admin-only (the server returns nothing for others)
+    document.getElementById("dash-audit-card").style.display =
+      (_currentUser && _currentUser.role !== "admin") ? "none" : "";
     const auditTbody = document.getElementById("dash-audit-tbody");
     auditTbody.innerHTML = "";
     (data.recent_audit || []).forEach(entry => {

@@ -29,3 +29,9 @@ def _reset_login_rate_limiter():
     yield
     for store in stores:
         store.clear()
+
+
+@pytest.fixture(autouse=True)
+def _setup_code(monkeypatch):
+    """First-run setup requires a code; tests use a fixed one."""
+    monkeypatch.setenv("PACS_SETUP_CODE", "TESTCODE")

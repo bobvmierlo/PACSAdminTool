@@ -140,9 +140,19 @@ openssl req -x509 -newkey rsa:4096 -nodes -days 825 \
 ```
 When TLS is enabled the session cookie is automatically marked `Secure`.
 
-**Reverse proxy (recommended for Docker / production)** — run the container on
-localhost only and terminate TLS in nginx, Caddy, or Traefik. Remember to proxy
-WebSocket upgrades (`/socket.io/`) as well, e.g. for nginx:
+**Reverse proxy (recommended for Docker / production)** — let nginx, Caddy or
+Traefik terminate HTTPS and make the app reachable **only** through the proxy
+(bind it to `127.0.0.1`, or publish the Docker port on `127.0.0.1` only).
+Then enable **Settings → Security → Running behind an HTTPS reverse proxy**
+(or set `PACS_BEHIND_HTTPS_PROXY=1`) and restart. In that mode the app:
+
+- records the real client address from `X-Forwarded-For` in the audit log;
+- marks the session cookie `Secure`, so it is only sent over HTTPS.
+
+Only enable it when the proxy is the sole way in — otherwise a client could
+send its own `X-Forwarded-For` header.
+
+nginx (remember to proxy the WebSocket upgrade for `/socket.io/`):
 ```nginx
 location / {
     proxy_pass http://127.0.0.1:5000;
@@ -150,8 +160,47 @@ location / {
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
     proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
 }
 ```
+
+Caddy (sets the forwarding headers and handles WebSockets automatically):
+```
+pacsadmin.hospital.local {
+    reverse_proxy 127.0.0.1:5000
+}
+```
+
+Docker Compose, reachable only from the proxy on the same host:
+```yaml
+    ports:
+      - "127.0.0.1:5000:5000"
+    environment:
+      - PACS_BEHIND_HTTPS_PROXY=1
+```
+
+### First-time setup code
+
+Until the first administrator exists, `/setup` asks for a one-time **setup
+code**, so whoever reaches the server first cannot claim it. The code is
+printed to the console and the log at startup and stored in `setup_code.txt`
+in the data folder (Docker: `docker logs pacsadmintool`). The file is removed
+once the administrator account has been created. For automated deployments
+you can preset the code with the `PACS_SETUP_CODE` environment variable.
+
+### Sessions and logging
+
+- Users are logged out after **30 minutes** without activity (configurable in
+  Settings → Security). Changing a password or deleting a user ends that
+  user's other sessions immediately.
+- The **audit log** (`logs/audit.log`) records logins, configuration changes
+  and every access to patient data: queries with their search criteria and
+  the patient IDs returned, and opening received images, series and HL7
+  history. It is kept for 365 days by default and is only visible to admins.
+- The whole log folder is capped at **500 MB**; when that is reached the
+  oldest logs are removed first (application logs before audit logs).
 
 ---
 

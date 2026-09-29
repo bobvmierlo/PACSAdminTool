@@ -8,13 +8,17 @@ from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
 
 from config.manager import LOG_DIR
-from web.auth import require_login
+from web.auth import is_admin, require_login
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint("logs", __name__)
 
 _LOG_FILE_PATTERNS = ("pacs_admin*.log*", "audit.log*")
+
+
+def _is_audit_file(name: str) -> bool:
+    return name.startswith("audit.log")
 
 
 @bp.route("/api/logs/files", methods=["GET"])
@@ -25,6 +29,9 @@ def logs_list_files():
     for pattern in _LOG_FILE_PATTERNS:
         for path in sorted(glob.glob(os.path.join(LOG_DIR, pattern))):
             fname = os.path.basename(path)
+            # The audit trail records what users did; only admins may read it.
+            if _is_audit_file(fname) and not is_admin():
+                continue
             try:
                 size  = os.path.getsize(path)
                 mtime = datetime.fromtimestamp(
@@ -47,6 +54,8 @@ def logs_get_content():
     filename = request.args.get("file", "")
     if not filename or os.sep in filename or "/" in filename or ".." in filename:
         return jsonify({"ok": False, "error": "Invalid filename."}), 400
+    if _is_audit_file(filename) and not is_admin():
+        return jsonify({"ok": False, "error": "Admin access required."}), 403
 
     path = os.path.join(LOG_DIR, filename)
     if not os.path.realpath(path).startswith(os.path.realpath(LOG_DIR) + os.sep) and \

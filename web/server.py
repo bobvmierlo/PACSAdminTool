@@ -13,24 +13,23 @@ Run with:
   Then open http://localhost:5000 in a browser.
 """
 
-import glob
 import logging
 import os
 import sys
-import threading
-import time
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from logging.handlers import TimedRotatingFileHandler
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
 
-from flask import Flask, jsonify, redirect, request, session
+from flask import Flask, jsonify, redirect, request
 
 import web.context as ctx
 from config.manager import load_config, save_config, APP_DIR, LOG_DIR
 from locales import set_language
-from web.auth import has_users, load_or_create_secret_key
+from web.auth import (
+    check_session, ensure_setup_code, has_users, load_or_create_secret_key,
+)
 from web.helpers import _client_room
 from web.routes import register_all
 
@@ -39,20 +38,6 @@ from web.routes import register_all
 # ===========================================================================
 
 os.makedirs(LOG_DIR, exist_ok=True)
-
-
-def _cleanup_old_logs():
-    """Delete log files older than 7 days."""
-    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
-    patterns = ["pacs_admin*.log*", "audit.log.*"]
-    for path in (p for pat in patterns for p in glob.glob(os.path.join(LOG_DIR, pat))):
-        try:
-            mtime = datetime.fromtimestamp(os.path.getmtime(path), tz=timezone.utc)
-            if mtime < cutoff:
-                os.remove(path)
-                print(f"[log-cleanup] Removed old log: {os.path.basename(path)}")
-        except OSError:
-            pass
 
 
 def _setup_logging():
@@ -79,8 +64,6 @@ def _setup_logging():
     root.handlers.clear()
     root.addHandler(console_h)
     root.addHandler(file_h)
-
-    _cleanup_old_logs()
     return file_h
 
 
@@ -95,20 +78,6 @@ def _apply_log_level(level_name: str):
         _file_handler.setLevel(level)
 
 
-def _cleanup_scheduler():
-    """Background daemon: clean old logs daily at 02:00 UTC."""
-    while True:
-        now      = datetime.now(timezone.utc)
-        next_run = now.replace(hour=2, minute=0, second=0, microsecond=0)
-        if next_run <= now:
-            next_run += timedelta(days=1)
-        time.sleep((next_run - now).total_seconds())
-        logger.info("[log-cleanup] Running scheduled log cleanup")
-        _cleanup_old_logs()
-
-
-threading.Thread(target=_cleanup_scheduler, daemon=True, name="log-cleanup").start()
-
 # ===========================================================================
 # Flask app
 # ===========================================================================
@@ -119,8 +88,10 @@ app = Flask(
     static_url_path="/static",
 )
 
-# Attach SocketIO to this app (reuses the same SocketIO object on reload)
-ctx.socketio.init_app(app, cors_allowed_origins="*", async_mode="threading")
+# Attach SocketIO to this app (reuses the same SocketIO object on reload).
+# cors_allowed_origins=None: only pages served by this app (same origin, also
+# via a reverse proxy that sets Host or X-Forwarded-Host) may connect.
+ctx.socketio.init_app(app, cors_allowed_origins=None, async_mode="threading")
 
 # Re-export socketio so webmain.py can import it from here
 socketio = ctx.socketio
@@ -143,6 +114,25 @@ ctx.config.update(load_config())
 _apply_log_level(ctx.config.get("log_level", "INFO"))
 set_language(ctx.config.get("language", "en"))
 
+# Reverse proxy: when HTTPS is terminated by a proxy in front of the app, trust
+# one hop of X-Forwarded-For/-Proto/-Host (so the audit log records the real
+# client address) and only send the session cookie over HTTPS.
+_behind_proxy = bool((ctx.config.get("web") or {}).get("behind_https_proxy")) or \
+    os.environ.get("PACS_BEHIND_HTTPS_PROXY", "").strip().lower() in ("1", "true", "yes")
+if _behind_proxy:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    app.config["SESSION_COOKIE_SECURE"] = True
+    logger.info("Reverse-proxy mode: trusting X-Forwarded-* headers from one proxy hop")
+
+# First-run protection: /setup requires a code only visible on the server
+ensure_setup_code()
+
+# Log retention: age rules plus the hard 500 MB cap on the log directory
+from web.logmaint import cleanup_logs as _cleanup_logs, start_scheduler as _start_log_cleanup
+_cleanup_logs(ctx.config)
+_start_log_cleanup(lambda: ctx.config)
+
 
 # ===========================================================================
 # Middleware
@@ -150,6 +140,16 @@ set_language(ctx.config.get("language", "en"))
 
 _PUBLIC_PREFIXES = ("/static/", "/login", "/setup", "/favicon.ico")
 _PUBLIC_PATHS    = {"/api/health"}
+
+# Requests the browser makes on its own (status polling, WebSocket
+# transport). They are still authenticated, but do not count as user
+# activity for the idle timeout.
+_PASSIVE_PREFIXES = ("/socket.io", "/api/jobs/", "/api/docker-update-state",
+                     "/api/scp/status", "/api/hl7/listener/status")
+
+
+def _is_passive_request(path: str) -> bool:
+    return path.startswith(_PASSIVE_PREFIXES)
 
 
 @app.before_request
@@ -166,10 +166,15 @@ def _auth_guard():
         if path.startswith("/api/"):
             return jsonify({"ok": False, "error": "Server not configured yet."}), 503
         return redirect("/setup")
-    if not session.get("username"):
-        if path.startswith("/api/"):
-            return jsonify({"ok": False, "error": "Authentication required."}), 401
-        return redirect(f"/login?next={request.path}")
+    problem = check_session(ctx.config, touch=not _is_passive_request(path))
+    if problem:
+        if path.startswith("/api/") or path.startswith("/socket.io"):
+            msg = {"expired": "Session expired due to inactivity.",
+                   "revoked": "Session is no longer valid. Please log in again."
+                   }.get(problem, "Authentication required.")
+            return jsonify({"ok": False, "error": msg, "reason": problem}), 401
+        suffix = "&expired=1" if problem == "expired" else ""
+        return redirect(f"/login?next={request.path}{suffix}")
 
 
 @app.after_request
@@ -207,7 +212,7 @@ def _log_outgoing_response(response):
 
 @ctx.socketio.on("connect")
 def on_connect():
-    if has_users() and not session.get("username"):
+    if has_users() and check_session(ctx.config, touch=False):
         logger.warning("Rejected unauthenticated WebSocket connection from %s",
                        request.remote_addr)
         return False

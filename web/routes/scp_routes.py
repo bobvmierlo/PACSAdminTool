@@ -10,7 +10,7 @@ import pydicom
 
 import web.context as ctx
 from dicom.video import is_video_transfer_syntax, video_for_playback
-from web.audit import log as _audit
+from web.audit import log as _audit, log_view as _audit_view, patient_ids
 from web.auth import is_admin, require_login
 from web.helpers import (
     _bad_request,
@@ -105,6 +105,41 @@ def scp_status():
 def scp_default_dir():
     """Return the real expanded default save directory for this server's OS."""
     return jsonify({"path": os.path.normpath(os.path.expanduser(DEFAULT_RECEIVE_DIR))})
+
+
+def _file_patient_id(fpath: str) -> str:
+    try:
+        ds = pydicom.dcmread(fpath, stop_before_pixels=True, specific_tags=["PatientID"])
+        return _safe_str(getattr(ds, "PatientID", ""))
+    except Exception:
+        return ""
+
+
+def _audit_file_view(action: str, storage_dir: str, fpath: str) -> None:
+    """Record that the current user opened a received file (NEN 7513).
+
+    De-duplicated per study, so paging through a series or seeking in a
+    video produces one record rather than one per request.
+    """
+    rel = os.path.relpath(fpath, storage_dir).replace(os.sep, "/")
+    parts = rel.split("/")
+    study = parts[0] if len(parts) >= 3 else ""
+    _audit_view(f"scp.view.{action}", study or rel, ip=_req_ip(), user=_req_user(),
+                detail={"file": rel, "study_uid": study,
+                        "patient_id": _file_patient_id(fpath)})
+
+
+def _audit_series_view(action: str, series_path: str, study: str, series: str) -> None:
+    pid = ""
+    try:
+        first = next((f for f in sorted(os.listdir(series_path))
+                      if f.lower().endswith(".dcm")), None)
+        if first:
+            pid = _file_patient_id(os.path.join(series_path, first))
+    except OSError:
+        pass
+    _audit_view(f"scp.view.{action}", f"{study}/{series}", ip=_req_ip(), user=_req_user(),
+                detail={"study_uid": study, "series_uid": series, "patient_id": pid})
 
 
 def _resolve_scp_path(storage_dir: str, rel: str):
@@ -348,6 +383,9 @@ def _scp_studies_impl():
                 "series": series_list,
             })
 
+    _audit_view("scp.view.studies", "overview", ip=_req_ip(), user=_req_user(),
+                detail={"studies": len(studies),
+                        "patient_ids": patient_ids([st.get("meta") or {} for st in studies])})
     return jsonify({"ok": True, "studies": studies, "legacy": legacy})
 
 
@@ -390,6 +428,7 @@ def scp_series_frame():
 
     if not files:
         return jsonify({"ok": False, "error": "No DICOM files in this series."}), 404
+    _audit_series_view("frame", series_path, study, series)
 
     total_instances = len(files)
     idx = max(0, min(idx, total_instances - 1))
@@ -439,6 +478,7 @@ def scp_files_inspect():
     fpath = _resolve_scp_path(storage_dir, rel)
     if not fpath or not os.path.isfile(fpath):
         return jsonify({"ok": False, "error": "File not found."}), 404
+    _audit_file_view("inspect", storage_dir, fpath)
     try:
         ds   = pydicom.dcmread(fpath)
         meta = {
@@ -477,6 +517,7 @@ def scp_files_preview():
     fpath = _resolve_scp_path(storage_dir, rel)
     if not fpath or not os.path.isfile(fpath):
         return jsonify({"ok": False, "error": "File not found."}), 404
+    _audit_file_view("preview", storage_dir, fpath)
 
     if info:
         try:
@@ -524,6 +565,7 @@ def scp_files_raw():
     fpath = _resolve_scp_path(storage_dir, rel)
     if not fpath or not os.path.isfile(fpath):
         return jsonify({"ok": False, "error": "File not found."}), 404
+    _audit_file_view("raw", storage_dir, fpath)
     return _send(fpath, mimetype="application/dicom",
                  as_attachment=False,
                  download_name=os.path.basename(fpath))
@@ -599,6 +641,7 @@ def scp_files_video():
     if not fpath or not os.path.isfile(fpath):
         return jsonify({"ok": False, "error": "File not found."}), 404
 
+    _audit_file_view("video", storage_dir, fpath)
     try:
         data, mimetype = _cached_playback(fpath)
     except _NotVideo:
@@ -639,6 +682,7 @@ def scp_series_list():
     if not os.path.isdir(series_path):
         return jsonify({"ok": False, "error": "Series not found."}), 404
 
+    _audit_series_view("series", series_path, study, series)
     try:
         raw   = [f for f in os.listdir(series_path) if f.lower().endswith(".dcm")]
         files = _sort_series_files(series_path, raw)
@@ -790,7 +834,8 @@ def dashboard():
 
     recent_audit: list[dict] = []
     audit_path = os.path.join(LOG_DIR, "audit.log")
-    if os.path.isfile(audit_path):
+    # The audit trail is admin-only; other users get an empty list.
+    if is_admin() and os.path.isfile(audit_path):
         try:
             with open(audit_path, "r", encoding="utf-8", errors="replace") as fh:
                 lines = fh.readlines()

@@ -9,7 +9,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 import web.context as ctx
-from web.audit import log as _audit
+from web.audit import log as _audit, log_view as _audit_view
 from web.auth import require_login
 from web.helpers import _bad_request, _client_room, _log, _req_ip, _req_user, _require_hl7_fields
 
@@ -236,7 +236,27 @@ def hl7_listener_status():
 @bp.route("/api/hl7/history", methods=["GET"])
 def hl7_history():
     """Return the persisted inbound HL7 message history (newest first)."""
-    return jsonify({"ok": True, "messages": _history_load()})
+    messages = _history_load()
+    _audit_view("hl7.history.view", "history", ip=_req_ip(), user=_req_user(),
+                detail={"messages": len(messages),
+                        "patient_ids": _pid3_list(messages)})
+    return jsonify({"ok": True, "messages": messages})
+
+
+def _pid3_list(entries, limit: int = 50) -> list[str]:
+    """Patient identifiers (PID-3, first component) from stored HL7 messages."""
+    ids: list[str] = []
+    for entry in entries:
+        for seg in str(entry.get("message", "")).replace("\r", "\n").split("\n"):
+            if seg.startswith("PID|"):
+                fields = seg.split("|")
+                pid = fields[3].split("~")[0].split("^")[0].strip() if len(fields) > 3 else ""
+                if pid and pid not in ids:
+                    ids.append(pid)
+                break
+        if len(ids) >= limit:
+            break
+    return ids
 
 
 @bp.route("/api/hl7/history/clear", methods=["POST"])

@@ -64,9 +64,16 @@ DEFAULT_CONFIG = {
     },
     "web": {
         "host": "0.0.0.0",
-        "port": 5000
+        "port": 5000,
+        # Log out after this many minutes without activity.
+        "session_timeout_minutes": 30,
+        # Set when the app is only reachable through an HTTPS reverse proxy.
+        "behind_https_proxy": False,
     },
     "log_level": "INFO",
+    # Rotated audit logs are kept this long, but the whole log directory is
+    # capped at 500 MB — when that limit is hit the oldest logs go first.
+    "audit_retention_days": 365,
     "language": "en",
 }
 

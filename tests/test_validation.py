@@ -34,7 +34,7 @@ class TestWebValidationHelpers:
             # Create first admin so the server is past the "not configured" gate
             c.post(
                 "/setup",
-                data=json.dumps({"username": "admin", "password": "testpass1"}),
+                data=json.dumps({"username": "admin", "password": "testpass1", "setup_code": "TESTCODE"}),
                 content_type="application/json",
             )
             yield c

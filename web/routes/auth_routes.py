@@ -7,6 +7,7 @@ from web.auth import (
     create_user,
     current_user as _current_user,
     delete_user,
+    find_user,
     get_user_settings,
     has_users,
     list_users,
@@ -16,6 +17,9 @@ from web.auth import (
     require_login,
     reset_login_failures,
     save_user_settings,
+    start_session,
+    clear_setup_code,
+    verify_setup_code,
     verify_password,
 )
 from web.audit import log as _audit
@@ -60,9 +64,7 @@ def login_post():
         return resp, 429
     if verify_password(username, password):
         reset_login_failures(username, _req_ip())
-        session.clear()
-        session["username"] = username
-        session.permanent   = True
+        start_session(username)
         _audit("auth.login", ip=_req_ip(), user=username)
         return jsonify({"ok": True})
     record_login_failure(username, _req_ip())
@@ -86,15 +88,23 @@ def setup_post():
     d        = request.get_json(silent=True) or {}
     username = (d.get("username") or "").strip()
     password = d.get("password") or ""
+    wait = login_lockout_remaining("#setup", _req_ip())
+    if wait:
+        return jsonify({"ok": False, "error": f"Too many attempts. Try again in {wait} second(s)."}), 429
+    if not verify_setup_code(d.get("setup_code") or ""):
+        record_login_failure("#setup", _req_ip())
+        _audit("auth.setup", ip=_req_ip(), user=username or "-", result="error",
+               error="Invalid setup code")
+        return jsonify({"ok": False, "error": "Invalid setup code. It is shown in the "
+                        "server console/log and stored in setup_code.txt in the data folder."}), 403
     if not username or not password:
         return jsonify({"ok": False, "error": "Username and password are required."}), 400
     if len(password) < 8:
         return jsonify({"ok": False, "error": "Password must be at least 8 characters."}), 400
     try:
         user = create_user(username, password, role="admin")
-        session.clear()
-        session["username"] = username
-        session.permanent   = True
+        clear_setup_code()
+        start_session(username)
         _audit("auth.setup", ip=_req_ip(), user=username,
                detail={"username": username})
         return jsonify({"ok": True, "user": user})
@@ -110,11 +120,21 @@ def me():
     user = _current_user()
     if not user:
         return jsonify({"ok": False, "error": "Not authenticated."}), 401
+    import web.context as ctx
+    from web.auth import session_timeout_seconds
     return jsonify({
         "ok":       True,
         "username": user["username"],
         "role":     user.get("role", "user"),
+        "session_timeout_minutes": session_timeout_seconds(ctx.config) // 60,
     })
+
+
+@bp.route("/api/session/ping", methods=["POST"])
+@require_login
+def session_ping():
+    """Keep-alive sent by the browser while the user is typing/clicking."""
+    return jsonify({"ok": True})
 
 
 @bp.route("/api/users", methods=["GET"])
@@ -150,6 +170,10 @@ def users_create():
 def users_delete(username):
     if username == session.get("username"):
         return jsonify({"ok": False, "error": "Cannot delete your own account."}), 400
+    target = find_user(username)
+    if target:
+        from web import user_state
+        user_state.delete(target.get("id") or target["username"])
     if not delete_user(username):
         return jsonify({"ok": False, "error": f"User '{username}' not found."}), 404
     _audit("user.delete", ip=_req_ip(), user=_req_user(),
@@ -179,6 +203,9 @@ def users_change_password(username):
             return jsonify({"ok": False, "error": "Current password is incorrect."}), 403
     if not change_password(username, new_password):
         return jsonify({"ok": False, "error": f"User '{username}' not found."}), 404
+    if username == session.get("username"):
+        # Other sessions of this user are now invalid; keep this one.
+        session["sv"] = int((find_user(username) or {}).get("session_version", 0))
     _audit("user.change_password", ip=_req_ip(), user=_req_user(),
            detail={"username": username})
     return jsonify({"ok": True})
@@ -216,4 +243,33 @@ def user_settings_save():
     save_user_settings(username, patch)
     _audit("user.settings.save", ip=_req_ip(), user=_req_user(),
            detail={"keys": sorted(patch.keys())})
+    return jsonify({"ok": True})
+
+
+# ── Per-user UI state (query history, remembered search fields) ───────────────
+
+@bp.route("/api/user/state", methods=["GET"])
+@require_login
+def user_state_get():
+    from web import user_state
+    user = _current_user()
+    if not user:
+        return jsonify({"ok": False, "error": "Not authenticated."}), 401
+    return jsonify({"ok": True, "state": user_state.load(user.get("id") or user["username"])})
+
+
+@bp.route("/api/user/state/<key>", methods=["PUT"])
+@require_login
+def user_state_put(key):
+    from web import user_state
+    user = _current_user()
+    if not user:
+        return jsonify({"ok": False, "error": "Not authenticated."}), 401
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or "value" not in body:
+        return jsonify({"ok": False, "error": "Body must be {\"value\": ...}."}), 400
+    try:
+        user_state.save_key(user.get("id") or user["username"], key, body["value"])
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
     return jsonify({"ok": True})

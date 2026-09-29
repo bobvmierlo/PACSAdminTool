@@ -8,6 +8,9 @@
   // Load translations first so all UI strings are available
   await loadTranslations();
 
+  // Per-user state (query history, remembered search fields) from the server
+  await userStateLoad();
+
   // Load language options for the settings dropdown
   await loadLanguageOptions();
 
@@ -165,8 +168,8 @@
     }
   });
 
-  // ── Persist key form fields ──────────────────────────────────────────
-  const _FORM_FIELDS_KEY = "pacsadmin_form_fields";
+  // ── Persist key form fields (server-side user state, see userstate.js) ──
+  const _FORM_FIELDS_KEY = "form_fields";
   const _PERSIST_IDS = [
     "cfind-pid","cfind-pname","cfind-acc","cfind-mod",
     "cfind-date-from","cfind-date-to","cfind-suid","cfind-extra-tags",
@@ -174,7 +177,7 @@
   ];
   // Restore
   try {
-    const saved = JSON.parse(localStorage.getItem(_FORM_FIELDS_KEY) || "{}");
+    const saved = userStateGet(_FORM_FIELDS_KEY, {}) || {};
     _PERSIST_IDS.forEach(id => {
       const el = document.getElementById(id);
       if (el && saved[id] !== undefined) el.value = saved[id];
@@ -187,7 +190,7 @@
       const el = document.getElementById(id);
       if (el) snap[id] = el.value;
     });
-    try { localStorage.setItem(_FORM_FIELDS_KEY, JSON.stringify(snap)); } catch { /* ignore */ }
+    userStateSet(_FORM_FIELDS_KEY, snap);
   }
   _PERSIST_IDS.forEach(id => {
     const el = document.getElementById(id);

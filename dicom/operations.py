@@ -161,6 +161,8 @@ def _tls_client_context(tls_cfg: dict) -> ssl.SSLContext:
     ca_file = tls_cfg.get("ca_file") or None
     ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_file)
     if not ca_file:
+        logger.warning("DICOM TLS without a CA bundle: the connection is encrypted "
+                       "but the peer's certificate is not verified")
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
     if tls_cfg.get("cert_file") and tls_cfg.get("key_file"):
