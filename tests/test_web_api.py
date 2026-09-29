@@ -69,7 +69,7 @@ def authed_client(app):
     c = app.test_client()
     resp = c.post(
         "/setup",
-        data=json.dumps({"username": "admin", "password": "testpass1"}),
+        data=json.dumps({"username": "admin", "password": "testpass1", "setup_code": "TESTCODE"}),
         content_type="application/json",
     )
     assert resp.status_code == 200, f"Setup failed: {resp.data}"
@@ -118,7 +118,7 @@ class TestSetup:
     def test_setup_post_creates_admin_and_logs_in(self, client):
         resp = client.post(
             "/setup",
-            data=json.dumps({"username": "admin", "password": "mypassword1"}),
+            data=json.dumps({"username": "admin", "password": "mypassword1", "setup_code": "TESTCODE"}),
             content_type="application/json",
         )
         assert resp.status_code == 200
@@ -130,7 +130,7 @@ class TestSetup:
     def test_setup_rejects_short_password(self, client):
         resp = client.post(
             "/setup",
-            data=json.dumps({"username": "admin", "password": "short"}),
+            data=json.dumps({"username": "admin", "password": "short", "setup_code": "TESTCODE"}),
             content_type="application/json",
         )
         assert resp.status_code == 400
@@ -138,7 +138,7 @@ class TestSetup:
     def test_setup_blocked_after_first_admin(self, authed_client):
         resp = authed_client.post(
             "/setup",
-            data=json.dumps({"username": "hacker", "password": "hackpass123"}),
+            data=json.dumps({"username": "hacker", "password": "hackpass123", "setup_code": "TESTCODE"}),
             content_type="application/json",
         )
         assert resp.status_code == 403
@@ -153,7 +153,7 @@ class TestAuth:
         # Create admin first
         client.post(
             "/setup",
-            data=json.dumps({"username": "admin", "password": "testpass1"}),
+            data=json.dumps({"username": "admin", "password": "testpass1", "setup_code": "TESTCODE"}),
             content_type="application/json",
         )
         resp = client.post(
@@ -168,7 +168,7 @@ class TestAuth:
     def test_login_wrong_password(self, client):
         client.post(
             "/setup",
-            data=json.dumps({"username": "admin", "password": "testpass1"}),
+            data=json.dumps({"username": "admin", "password": "testpass1", "setup_code": "TESTCODE"}),
             content_type="application/json",
         )
         resp = client.post(

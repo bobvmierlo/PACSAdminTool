@@ -35,6 +35,10 @@ services:
       # PACS_DATA_DIR is already set to /data inside the image.
       # Override here only if you need a custom path.
       # - PACS_DATA_DIR=/data
+      # Behind an HTTPS reverse proxy: trust X-Forwarded-* and send the
+      # session cookie over HTTPS only. Then also publish the port on
+      # 127.0.0.1 only ("127.0.0.1:5000:5000") so the proxy is the only way in.
+      # - PACS_BEHIND_HTTPS_PROXY=1
 
 volumes:
   pacs_data:

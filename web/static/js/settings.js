@@ -72,6 +72,9 @@ async function loadConfig() {
   document.getElementById("set-web-host").value  = web.host || "0.0.0.0";
   document.getElementById("set-web-port").value  = web.port || 5000;
   document.getElementById("set-log-level").value = appConfig.log_level || "INFO";
+  document.getElementById("set-session-timeout").value = web.session_timeout_minutes || 30;
+  document.getElementById("set-behind-proxy").checked  = !!web.behind_https_proxy;
+  document.getElementById("set-audit-retention").value = appConfig.audit_retention_days || 365;
   if (appConfig.language) {
     document.getElementById("set-language").value = appConfig.language;
   }
@@ -391,11 +394,18 @@ async function saveSettings() {
   };
   const webPort = parsePort(document.getElementById("set-web-port").value);
   if (webPort === null) { toast(i18n("common.invalid_port", {port: document.getElementById("set-web-port").value.trim()}), "err"); return; }
+  const sessionTimeout = parseInt(document.getElementById("set-session-timeout").value, 10);
+  if (!(sessionTimeout >= 1 && sessionTimeout <= 720)) { toast(i18n("settings.session_timeout_invalid"), "err"); return; }
+  const auditDays = parseInt(document.getElementById("set-audit-retention").value, 10);
+  if (!(auditDays >= 1 && auditDays <= 3650)) { toast(i18n("settings.audit_retention_invalid"), "err"); return; }
   appConfig.web = {
     ...appConfig.web,
     host: document.getElementById("set-web-host").value.trim(),
     port: webPort,
+    session_timeout_minutes: sessionTimeout,
+    behind_https_proxy: document.getElementById("set-behind-proxy").checked,
   };
+  appConfig.audit_retention_days = auditDays;
   appConfig.dicom_tls = {
     enabled:   document.getElementById("set-dicom-tls-enabled").checked,
     cert_file: document.getElementById("set-dicom-tls-cert").value.trim(),
@@ -407,6 +417,7 @@ async function saveSettings() {
     hl7:      appConfig.hl7,
     web:      appConfig.web,
     dicom_tls: appConfig.dicom_tls,
+    audit_retention_days: appConfig.audit_retention_days,
   };
   const res = await fetch("/api/config", {
     method:  "POST",

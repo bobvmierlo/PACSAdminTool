@@ -934,7 +934,7 @@
       </div>
     </div>
     <!-- Recent activity -->
-    <div class="card">
+    <div class="card" id="dash-audit-card">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
         <h3 data-i18n="dashboard.recent_activity">Recent Activity</h3>
         <button class="btn" style="font-size:12px; padding:3px 10px"
@@ -1998,6 +1998,9 @@
       <p style="font-size:12px; color:#888; margin-top:8px" data-i18n="anonymizer.note">
         Result is downloaded as a ZIP archive. Original files are not modified.
       </p>
+      <p style="font-size:12px; color:#b45309; margin-top:4px" data-i18n="anonymizer.pseudonymisation_note">
+        This is pseudonymisation at tag level, not guaranteed anonymisation: it removes the selected attributes (also inside sequences) but cannot remove patient data burned into the pixels, and combinations of remaining data may still identify a patient. Check the result before sharing it outside the hospital.
+      </p>
     </div>
     <div class="card">
       <div class="btn-row" style="flex-wrap:wrap; gap:8px; align-items:flex-end">
@@ -2274,6 +2277,9 @@
         <div class="field"><label data-i18n="settings.dicom_tls_key">Private Key File</label><input id="set-dicom-tls-key" placeholder="/path/to/key.pem"></div>
         <div class="field"><label data-i18n="settings.dicom_tls_ca">CA Bundle File</label><input id="set-dicom-tls-ca" placeholder="/path/to/ca.pem (optional)"></div>
       </div>
+      <p style="font-size:12px; color:#b45309; margin:6px 0 0" data-i18n="settings.dicom_tls_no_ca_note">
+        Without a CA bundle the connection is encrypted, but the identity of the other side is not checked. Add the CA that signed the remote certificates for full protection.
+      </p>
     </div>
     <div class="card">
       <h3 data-i18n="settings.remote_presets">Saved Remote AE Presets</h3>
@@ -2343,6 +2349,23 @@
       </p>
     </div>
     <div class="card">
+      <h3 data-i18n="settings.security">Security</h3>
+      <div class="field-grid">
+        <div class="field" style="max-width:220px"><label data-i18n="settings.session_timeout">Log out after inactivity (minutes)</label><input id="set-session-timeout" type="number" min="1" max="720" value="30"></div>
+        <div class="field" style="max-width:220px"><label data-i18n="settings.audit_retention">Keep audit log (days)</label><input id="set-audit-retention" type="number" min="1" max="3650" value="365"></div>
+      </div>
+      <p style="font-size:12px; color:#888; margin:6px 0 10px" data-i18n="settings.audit_retention_note">
+        The whole log folder is limited to 500 MB. When that limit is reached the oldest logs are deleted first, so the audit log may be kept for less time than configured.
+      </p>
+      <div class="field" style="flex-direction:row; align-items:center; gap:10px; flex-wrap:nowrap">
+        <input type="checkbox" id="set-behind-proxy" style="width:16px; height:16px; flex-shrink:0; cursor:pointer">
+        <label for="set-behind-proxy" style="margin:0; cursor:pointer" data-i18n="settings.behind_proxy">Running behind an HTTPS reverse proxy</label>
+      </div>
+      <p style="font-size:12px; color:#888; margin:6px 0 0" data-i18n="settings.behind_proxy_note">
+        Enable only when every request reaches the app through a reverse proxy that terminates HTTPS. The app then uses the client address from X-Forwarded-For in the audit log and only sends the session cookie over HTTPS. Takes effect after restarting the application.
+      </p>
+    </div>
+    <div class="card">
       <h3 data-i18n="settings.config_backup">Configuration Backup</h3>
       <p style="font-size:12px; color:#888; margin:0 0 10px" data-i18n="settings.config_backup_note">Export or restore the system configuration (AE settings, HL7, web server, presets). User settings are not included.</p>
       <div class="btn-row">
@@ -2392,7 +2415,7 @@
         </div>
       </div>
       <p style="font-size:12px; color:#888; margin:6px 0 0" data-i18n="settings.log_note">
-        Logs are written to logs/pacs_admin.log and rotated daily (7-day retention).
+        Logs are written to logs/pacs_admin.log and rotated daily (7-day retention). The audit log is kept longer (see Security); the log folder never grows beyond 500 MB.
       </p>
     </div>
     <div class="btn-row" style="margin-top:4px; padding:0 0 20px 0">
@@ -3846,6 +3869,8 @@
 <!-- Application JS, split per domain. Load order matters only for
      init.js, which bootstraps the page and must come last. -->
 <script src="/static/js/core.js"></script>
+<script src="/static/js/session.js"></script>
+<script src="/static/js/userstate.js"></script>
 <script src="/static/js/socket.js"></script>
 <script src="/static/js/tabs.js"></script>
 <script src="/static/js/settings.js"></script>

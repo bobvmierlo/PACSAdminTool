@@ -172,8 +172,15 @@ def dicomweb_qido():
         if not isinstance(results, list):
             results = [results]
 
+        pids = []
+        for item in results:
+            val = ((item or {}).get("00100020") or {}).get("Value") if isinstance(item, dict) else None
+            if val and str(val[0]) not in pids and len(pids) < 50:
+                pids.append(str(val[0]))
         _audit("dicomweb.qido", ip=_req_ip(), user=_req_user(),
-               detail={"url": url, "level": level},
+               detail={"url": url, "level": level,
+                       "criteria": params if isinstance(params, dict) else {},
+                       "results": len(results), "patient_ids": pids},
                result="ok")
         return jsonify({"ok": True, "results": results, "count": len(results)})
 

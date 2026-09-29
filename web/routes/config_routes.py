@@ -28,6 +28,7 @@ _CONFIG_SCHEMA = {
     "web":               dict,
     "log_level":         str,
     "language":          str,
+    "audit_retention_days": int,
     "dicom_tls":         dict,
 }
 
@@ -36,7 +37,7 @@ _MAX_ALLOWLIST = 256
 _MAX_AE_TITLE = 16
 
 # Keys in _CONFIG_SCHEMA that only admins may write
-_ADMIN_WRITE_KEYS = frozenset({"local_ae", "remote_aes", "dicomweb_presets", "hl7", "hl7_servers", "web", "dicom_tls"})
+_ADMIN_WRITE_KEYS = frozenset({"local_ae", "remote_aes", "dicomweb_presets", "hl7", "hl7_servers", "web", "dicom_tls", "audit_retention_days"})
 _MAX_HOST_LEN = 253
 
 
@@ -64,6 +65,10 @@ def _validate_config_payload(data: dict) -> str | None:
         expected = _CONFIG_SCHEMA[key]
         if not isinstance(value, expected):
             return f"'{key}' must be {expected.__name__}, got {type(value).__name__}."
+    if "audit_retention_days" in data:
+        days = data["audit_retention_days"]
+        if isinstance(days, bool) or not (1 <= days <= 3650):
+            return "audit_retention_days must be an integer between 1 and 3650."
     if "log_level" in data:
         if data["log_level"].upper() not in _LOG_LEVELS:
             return f"Invalid log_level '{data['log_level']}'. Must be one of {sorted(_LOG_LEVELS)}."
@@ -150,6 +155,12 @@ def _validate_config_payload(data: dict) -> str | None:
             not isinstance(web["host"], str) or len(web["host"]) > _MAX_HOST_LEN
         ):
             return f"web.host must be a string of at most {_MAX_HOST_LEN} characters."
+        if "session_timeout_minutes" in web:
+            t = web["session_timeout_minutes"]
+            if isinstance(t, bool) or not isinstance(t, int) or not (1 <= t <= 720):
+                return "web.session_timeout_minutes must be an integer between 1 and 720."
+        if "behind_https_proxy" in web and not isinstance(web["behind_https_proxy"], bool):
+            return "web.behind_https_proxy must be a boolean."
     if "dicom_tls" in data:
         tls = data["dicom_tls"]
         if "enabled" in tls and not isinstance(tls["enabled"], bool):

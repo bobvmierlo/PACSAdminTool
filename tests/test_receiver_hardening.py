@@ -258,7 +258,7 @@ def app(tmp_path, monkeypatch):
 @pytest.fixture()
 def admin(app):
     c = app.test_client()
-    r = c.post("/setup", json={"username": "admin", "password": "testpass1"})
+    r = c.post("/setup", json={"username": "admin", "password": "testpass1", "setup_code": "TESTCODE"})
     assert r.status_code == 200
     return c
 

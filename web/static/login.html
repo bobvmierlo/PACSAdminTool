@@ -60,8 +60,17 @@
   </div>
 
   <script>
-    // Read ?next= from the URL so we can redirect back after login
-    const next = new URLSearchParams(location.search).get("next") || "/";
+    // Read ?next= from the URL so we can redirect back after login.
+    // Only same-site paths: no "//host", "/\\host" or "javascript:" targets.
+    const params = new URLSearchParams(location.search);
+    const rawNext = params.get("next") || "/";
+    const next = /^\/(?![\/\\])/.test(rawNext) ? rawNext : "/";
+
+    if (params.get("expired") === "1") {
+      const err = document.getElementById("error");
+      err.textContent = "Your session expired due to inactivity. Please sign in again.";
+      err.style.display = "block";
+    }
 
     document.getElementById("form").addEventListener("submit", async e => {
       e.preventDefault();

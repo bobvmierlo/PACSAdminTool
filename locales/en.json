@@ -309,7 +309,7 @@
     "hl7_default_port": "Default Destination Port",
     "logging": "Logging",
     "log_level": "Log Level",
-    "log_note": "Logs are written to logs/pacs_admin.log and rotated daily (7-day retention).",
+    "log_note": "Logs are written to logs/pacs_admin.log and rotated daily (7-day retention). The audit log is kept longer (see Security); the log folder never grows beyond 500 MB.",
     "save": "Save Settings",
     "save_preferences": "Save Preferences",
     "saved": "Saved  {ts}",
@@ -354,7 +354,16 @@
     "scp_allowed_aes": "Allowed calling AE titles (Storage SCP)",
     "scp_allowed_hosts": "Allowed sender hosts (Storage SCP)",
     "hl7_allowed_hosts": "Allowed sender hosts (HL7 listener)",
-    "allowlist_note": "Comma-separated. Leave empty to accept every sender. Hosts are IP addresses or CIDR networks. Applies the next time the listener is started."
+    "allowlist_note": "Comma-separated. Leave empty to accept every sender. Hosts are IP addresses or CIDR networks. Applies the next time the listener is started.",
+    "security": "Security",
+    "session_timeout": "Log out after inactivity (minutes)",
+    "session_timeout_invalid": "Inactivity timeout must be between 1 and 720 minutes.",
+    "audit_retention": "Keep audit log (days)",
+    "audit_retention_invalid": "Audit log retention must be between 1 and 3650 days.",
+    "audit_retention_note": "The whole log folder is limited to 500 MB. When that limit is reached the oldest logs are deleted first, so the audit log may be kept for less time than configured.",
+    "behind_proxy": "Running behind an HTTPS reverse proxy",
+    "behind_proxy_note": "Enable only when every request reaches the app through a reverse proxy that terminates HTTPS. The app then uses the client address from X-Forwarded-For in the audit log and only sends the session cookie over HTTPS. Takes effect after restarting the application.",
+    "dicom_tls_no_ca_note": "Without a CA bundle the connection is encrypted, but the identity of the other side is not checked. Add the CA that signed the remote certificates for full protection."
   },
   "help": {
     "topics": "Topics",
@@ -461,7 +470,8 @@
     "mgr_confirm_delete": "Delete profile \"{name}\"?",
     "retrieve_title": "Retrieve study from PACS…",
     "remove_private": "Remove private tags (odd groups)",
-    "new_uids": "Generate new Study/Series/Instance UIDs"
+    "new_uids": "Generate new Study/Series/Instance UIDs",
+    "pseudonymisation_note": "This is pseudonymisation at tag level, not guaranteed anonymisation: it removes the selected attributes (also inside sequences) but cannot remove patient data burned into the pixels, and combinations of remaining data may still identify a patient. Check the result before sharing it outside the hospital."
   },
   "dicomdir": {
     "title": "DICOMDIR Reader",

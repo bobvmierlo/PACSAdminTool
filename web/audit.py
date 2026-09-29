@@ -2,8 +2,9 @@
 Audit logging for PACS Admin Tool.
 
 Every significant operation is written as a JSON line to
-$PACS_DATA_DIR/logs/audit.log so that administrators have a tamper-evident
-trail of who did what and when.
+$PACS_DATA_DIR/logs/audit.log so that administrators have a trail of who
+did what and when. Retention (default 365 days, within the 500 MB log
+directory cap) is handled by web.logmaint.
 
 Each entry contains:
   ts       – ISO-8601 timestamp (UTC)
@@ -46,7 +47,7 @@ def _get_audit_logger() -> logging.Logger:
         os.path.join(LOG_DIR, "audit.log"),
         when="midnight",
         utc=True,
-        backupCount=7,                # keep 7 days of audit history
+        backupCount=0,                # retention is handled by web.logmaint
         encoding="utf-8",
     )
     handler.setFormatter(logging.Formatter("%(message)s"))
@@ -86,3 +87,50 @@ def log(
     if error:
         entry["error"] = error
     _get_audit_logger().info(json.dumps(entry, default=str))
+
+
+# ---------------------------------------------------------------------------
+# Access logging helpers (NEN 7513: who looked at which patient's data)
+# ---------------------------------------------------------------------------
+
+_MAX_PATIENT_IDS = 50
+
+
+def patient_ids(rows, key: str = "PatientID") -> list[str]:
+    """Distinct, non-empty patient IDs from query result rows (capped at 50)."""
+    seen: list[str] = []
+    for row in rows or []:
+        pid = str((row.get(key) if isinstance(row, dict) else getattr(row, key, "")) or "").strip()
+        if pid and pid not in seen:
+            seen.append(pid)
+            if len(seen) >= _MAX_PATIENT_IDS:
+                break
+    return seen
+
+
+def query_criteria(d: dict, fields) -> dict:
+    """The non-empty search criteria of a query request, for the audit record."""
+    return {f: d[f] for f in fields if d.get(f) not in (None, "", [])}
+
+
+_recent_views: dict = {}
+_VIEW_DEDUPE_SECONDS = 300
+
+
+def log_view(event: str, key: str, **kwargs) -> None:
+    """Audit a read of patient data, at most once per user/event/key per 5 min.
+
+    Viewers fetch a series image by image (and a video in many range
+    requests); without de-duplication one look at a study would write
+    hundreds of identical records.
+    """
+    import time as _time
+    now = _time.monotonic()
+    ident = (kwargs.get("user", "-"), event, key)
+    last = _recent_views.get(ident)
+    if last is not None and now - last < _VIEW_DEDUPE_SECONDS:
+        return
+    if len(_recent_views) > 10000:
+        _recent_views.clear()
+    _recent_views[ident] = now
+    log(event, **kwargs)

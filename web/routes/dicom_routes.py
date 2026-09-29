@@ -16,7 +16,7 @@ from config.manager import APP_DIR
 from dicom import save_dataset
 
 import web.context as ctx
-from web.audit import log as _audit
+from web.audit import log as _audit, patient_ids, query_criteria
 from web.auth import is_admin, require_login
 from web.helpers import (
     _bad_request,
@@ -113,6 +113,22 @@ def _new_anon_uid() -> str:
 _BURNED_IN_MODALITIES = {"US", "SC", "OT", "XC", "ES"}
 
 
+def _delete_tags_recursive(ds, tags: set) -> None:
+    """Delete *tags* from *ds* and from every nested sequence item.
+
+    Identifying attributes are not only at the top level — e.g. the
+    Referenced/Other Patient ID sequences, Request Attributes, or a
+    performing physician inside a procedure-step sequence.
+    """
+    for tag in tags:
+        if tag in ds:
+            del ds[tag]
+    for elem in list(ds):
+        if elem.VR == "SQ" and elem.value:
+            for item in elem.value:
+                _delete_tags_recursive(item, tags)
+
+
 def _anonymize_dataset(ds, phi_tags, repl_name: str, repl_id: str,
                        remove_private: bool = False,
                        uid_maps: dict | None = None) -> list[str]:
@@ -127,10 +143,8 @@ def _anonymize_dataset(ds, phi_tags, repl_name: str, repl_id: str,
     warnings: list[str] = []
     ds.PatientName = repl_name
     ds.PatientID   = repl_id
-    for group, elem in phi_tags:
-        tag = pydicom.tag.Tag(group, elem)
-        if tag in ds:
-            del ds[tag]
+    tags = {pydicom.tag.Tag(group, elem) for group, elem in phi_tags}
+    _delete_tags_recursive(ds, tags)
 
     if remove_private:
         try:
@@ -321,7 +335,9 @@ def dicom_find():
 
         _audit("dicom.c_find", ip=_req_ip(), user=_req_user(),
                detail={"ae_title": d["ae_title"], "host": d["host"], "port": d["port"],
-                       "level": d.get("query_level"), "results": len(rows)},
+                       "level": d.get("query_level"),
+                       "criteria": query_criteria(d, (*_CFIND_FILTER_KEYS, "modality")),
+                       "results": len(rows), "patient_ids": patient_ids(rows)},
                result="ok" if ok else "error", error=None if ok else msg)
         return jsonify({"ok": ok, "message": msg, "results": rows})
     except Exception as e:
@@ -351,6 +367,8 @@ def dicom_move():
 
         to = _client_room()
         job_id = create_job("cmove")
+        ip, user = _req_ip(), _req_user()     # captured before leaving the request
+        move_dest = d.get("move_dest", _local_ae())
 
         def on_progress(m):
             _log("cfind", m, to=to)
@@ -359,9 +377,12 @@ def dicom_move():
         def run():
             ok, msg = c_move(
                 _local_ae(), d["host"], int(d["port"]), d["ae_title"],
-                ds, d.get("move_dest", _local_ae()),
-                d.get("query_model", "STUDY"),
+                ds, move_dest, d.get("query_model", "STUDY"),
                 callback=on_progress, tls=_dicom_tls())
+            _audit("dicom.c_move", ip=ip, user=user,
+                   detail={"ae_title": d["ae_title"], "host": d["host"],
+                           "study_uid": d.get("study_uid"), "move_dest": move_dest},
+                   result="ok" if ok else "error", error=None if ok else msg)
             _log("cfind", msg, "ok" if ok else "err", to=to)
             update_job(job_id, state="completed" if ok else "error", message=msg)
 
@@ -540,9 +561,18 @@ def dicom_dmwl():
                 "Procedure":          _safe_str(getattr(r, "RequestedProcedureDescription", "")),
                 "tags":               _dataset_to_tag_list(r),
             })
+        _audit("dicom.dmwl", ip=_req_ip(), user=_req_user(),
+               detail={"ae_title": d["ae_title"], "host": d["host"], "port": d["port"],
+                       "criteria": query_criteria(d, ("patient_id", "patient_name", "accession",
+                                                      "modality", "station_aet", "study_date")),
+                       "results": len(rows), "patient_ids": patient_ids(rows)},
+               result="ok" if ok else "error", error=None if ok else msg)
         return jsonify({"ok": ok, "message": msg, "results": rows})
     except Exception as e:
         logger.exception("DMWL error")
+        _audit("dicom.dmwl", ip=_req_ip(), user=_req_user(),
+               detail={"ae_title": d.get("ae_title"), "host": d.get("host")},
+               result="error", error=str(e))
         return jsonify({"ok": False, "message": str(e), "results": []}), 500
 
 
@@ -806,8 +836,10 @@ def dicom_anonymize():
     repl_name      = request.form.get("patient_name", "Anonymous")
     repl_id        = request.form.get("patient_id",   "ANON")
     phi_tags       = _phi_tags_from_form(request.form)
-    remove_private = _anon_flag(request.form, "remove_private")
-    new_uids       = _anon_flag(request.form, "new_uids")
+    # Both default to on: private tags often carry identifiers, and original
+    # UIDs link the result back to the source study.
+    remove_private = _anon_flag(request.form, "remove_private", default=True)
+    new_uids       = _anon_flag(request.form, "new_uids", default=True)
     uid_maps = {"study": {}, "series": {}, "instance": {}} if new_uids else None
 
     zip_buf = io.BytesIO(); count = 0
@@ -984,8 +1016,8 @@ def dicom_anonymize_and_store():
     repl_name      = request.form.get("patient_name", "Anonymous")
     repl_id        = request.form.get("patient_id",   "ANON")
     phi_tags       = _phi_tags_from_form(request.form)
-    remove_private = _anon_flag(request.form, "remove_private")
-    new_uids       = _anon_flag(request.form, "new_uids")
+    remove_private = _anon_flag(request.form, "remove_private", default=True)
+    new_uids       = _anon_flag(request.form, "new_uids", default=True)
     uid_maps = {"study": {}, "series": {}, "instance": {}} if new_uids else None
 
     from dicom.operations import c_store

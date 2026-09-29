@@ -196,6 +196,7 @@ async function initAuthUI() {
     if (meRes.ok) {
       const me = await meRes.json();
       _currentUser = me;
+      if (typeof startIdleLogout === "function") startIdleLogout(me.session_timeout_minutes);
       const el = document.getElementById("header-user");
       el.textContent = me.username;
       el.style.display = "";

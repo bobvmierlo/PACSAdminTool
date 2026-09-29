@@ -352,23 +352,21 @@ async function doHL7Send() {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// HL7 Message History (localStorage)
+// HL7 Message History (sent: server-side user state; received: server history)
 // ─────────────────────────────────────────────────────────────────
 
-const HL7_HIST_OUT_KEY = "pacsadmin_hl7_hist_out";
-const HL7_HIST_IN_KEY  = "pacsadmin_hl7_hist_in";
+const HL7_HIST_OUT_KEY = "hl7_out_history";   // server-side user state (userstate.js)
 const HL7_HIST_MAX     = 10;
 
 function _hl7HistLoad(key) {
-  try { return JSON.parse(localStorage.getItem(key) || "[]"); }
-  catch { return []; }
+  const arr = userStateGet(key, []);
+  return Array.isArray(arr) ? arr : [];
 }
 
 function _hl7HistSave(key, entry) {
-  const arr = _hl7HistLoad(key);
+  const arr = _hl7HistLoad(key).slice();
   arr.unshift(entry);
-  try { localStorage.setItem(key, JSON.stringify(arr.slice(0, HL7_HIST_MAX))); }
-  catch { /* storage full */ }
+  userStateSet(key, arr.slice(0, HL7_HIST_MAX));
 }
 
 function _hl7OutHistorySave(entry) {
@@ -446,12 +444,11 @@ async function renderHL7InHistory() {
 }
 
 function clearHL7OutHistory() {
-  localStorage.removeItem(HL7_HIST_OUT_KEY);
+  userStateSet(HL7_HIST_OUT_KEY, [], true);
   renderHL7OutHistory();
 }
 
 async function clearHL7InHistory() {
-  localStorage.removeItem(HL7_HIST_IN_KEY);  // clean up pre-server-history data
   await fetch("/api/hl7/history/clear", { method: "POST" }).catch(() => {});
   renderHL7InHistory();
 }

@@ -174,7 +174,7 @@ def app(tmp_path):
 def authed_client(app):
     c = app.test_client()
     resp = c.post("/setup",
-                  data=json.dumps({"username": "admin", "password": "testpass1"}),
+                  data=json.dumps({"username": "admin", "password": "testpass1", "setup_code": "TESTCODE"}),
                   content_type="application/json")
     assert resp.status_code == 200, resp.data
     return c
