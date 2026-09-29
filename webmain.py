@@ -22,7 +22,11 @@ Requirements (install once):
 import sys
 import os
 import argparse
+import json
 import logging
+import socket
+import ssl
+import urllib.request
 import webbrowser
 
 # ── Put our project folder on Python's search path so imports work
@@ -50,6 +54,56 @@ def _open_browser(url):
     def _handler(icon, item):
         webbrowser.open(url)
     return _handler
+
+
+def _detect_running_instance(host, port, timeout=1.0):
+    """Return what is already listening on *host*:*port*.
+
+    None    – the port is free
+    "pacs"  – another PACS Admin Tool instance answers /api/health
+    "other" – some other program holds the port
+
+    On Windows the server socket is bound with SO_REUSEADDR, so a second
+    instance does not fail to start: both processes share the port and
+    requests land on either one at random. Checking up front is the only
+    way to notice.
+    """
+    probe_host = "127.0.0.1" if host in ("0.0.0.0", "::", "") else host
+    try:
+        with socket.create_connection((probe_host, port), timeout=timeout):
+            pass
+    except OSError:
+        return None
+
+    # Bypass any configured HTTP proxy: this is a local probe.
+    # The running instance may use a self-signed certificate, so don't verify it.
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}),
+        urllib.request.HTTPSHandler(context=ssl._create_unverified_context()),
+    )
+    for scheme in ("http", "https"):
+        try:
+            with opener.open(f"{scheme}://{probe_host}:{port}/api/health",
+                             timeout=timeout * 2) as resp:
+                data = json.load(resp)
+            if data.get("status") == "ok" and "scp_running" in data:
+                return "pacs"
+        except Exception:
+            continue
+    return "other"
+
+
+def _notify(title, message, error=False):
+    """Tell the user something even when there is no console window."""
+    (logger.error if error else logger.warning)(message)
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            MB_ICONERROR, MB_ICONINFORMATION, MB_SETFOREGROUND = 0x10, 0x40, 0x10000
+            icon = MB_ICONERROR if error else MB_ICONINFORMATION
+            ctypes.windll.user32.MessageBoxW(None, message, title, icon | MB_SETFOREGROUND)
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
@@ -90,6 +144,24 @@ if __name__ == "__main__":
     url = f"{scheme}://{args.host}:{args.port}"
     display_url = f"{scheme}://{display_host}:{args.port}"
     logger.info("PACS Admin Tool v%s (Web) starting on %s", APP_VERSION, url)
+
+    # ── Refuse to start a second copy on the same port
+    existing = _detect_running_instance(args.host, args.port)
+    if existing == "pacs":
+        _notify("PACS Admin Tool",
+                f"PACS Admin Tool is already running at {display_url}.\n\n"
+                "Opening it in your browser. To restart it, first choose "
+                "Exit from its tray icon (or end PacsAdminToolWeb.exe in "
+                "Task Manager).")
+        webbrowser.open(display_url)
+        sys.exit(0)
+    if existing == "other":
+        _notify("PACS Admin Tool",
+                f"Port {args.port} is already in use by another program.\n\n"
+                "Close that program, or start PACS Admin Tool on a different "
+                "port (--port, or web.port in config.json).",
+                error=True)
+        sys.exit(1)
 
     print(f"""
   +--------------------------------------------------+
