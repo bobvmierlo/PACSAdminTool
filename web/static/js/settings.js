@@ -53,6 +53,8 @@ async function loadConfig() {
   const lae = appConfig.local_ae || {};
   document.getElementById("set-ae-title").value = lae.ae_title || "PACSADMIN";
   document.getElementById("set-ae-port").value  = lae.port     || 11112;
+  document.getElementById("set-ae-allowed-aes").value   = (lae.allowed_calling_aes || []).join(", ");
+  document.getElementById("set-ae-allowed-hosts").value = (lae.allowed_hosts || []).join(", ");
   const dtls = appConfig.dicom_tls || {};
   document.getElementById("set-dicom-tls-enabled").checked = dtls.enabled || false;
   document.getElementById("set-dicom-tls-cert").value      = dtls.cert_file || "";
@@ -62,6 +64,7 @@ async function loadConfig() {
   document.getElementById("set-hl7-port").value         = hl7.listen_port   || 2575;
   document.getElementById("set-hl7-default-host").value = hl7.default_host  || "127.0.0.1";
   document.getElementById("set-hl7-default-port").value = hl7.default_port  || 2575;
+  document.getElementById("set-hl7-allowed-hosts").value = (hl7.allowed_hosts || []).join(", ");
   // Pre-fill the HL7 send form with the configured defaults
   document.getElementById("hl7-host").value = hl7.default_host || "127.0.0.1";
   document.getElementById("hl7-port").value = hl7.default_port || 2575;
@@ -360,14 +363,22 @@ async function deleteSysDWPreset(i) {
 
 // ── System Settings ───────────────────────────────────────────────────────────
 
+// "a, b ,,c" → ["a", "b", "c"]  (commas only: AE titles may contain spaces)
+function _splitList(text) {
+  return text.split(",").map(s => s.trim()).filter(Boolean);
+}
+
 async function saveSettings() {
   const localPort = parsePort(document.getElementById("set-ae-port").value);
   if (localPort === null) { toast(i18n("common.invalid_port", {port: document.getElementById("set-ae-port").value.trim()}), "err"); return; }
   const hl7Port = parsePort(document.getElementById("set-hl7-port").value);
   if (hl7Port === null) { toast(i18n("common.invalid_port", {port: document.getElementById("set-hl7-port").value.trim()}), "err"); return; }
   appConfig.local_ae = {
+    ...appConfig.local_ae,
     ae_title: document.getElementById("set-ae-title").value.trim(),
     port:     localPort,
+    allowed_calling_aes: _splitList(document.getElementById("set-ae-allowed-aes").value),
+    allowed_hosts:       _splitList(document.getElementById("set-ae-allowed-hosts").value),
   };
   const hl7DefaultPort = parsePort(document.getElementById("set-hl7-default-port").value);
   if (hl7DefaultPort === null) { toast(i18n("common.invalid_port", {port: document.getElementById("set-hl7-default-port").value.trim()}), "err"); return; }
@@ -376,6 +387,7 @@ async function saveSettings() {
     listen_port:  hl7Port,
     default_host: document.getElementById("set-hl7-default-host").value.trim(),
     default_port: hl7DefaultPort,
+    allowed_hosts: _splitList(document.getElementById("set-hl7-allowed-hosts").value),
   };
   const webPort = parsePort(document.getElementById("set-web-port").value);
   if (webPort === null) { toast(i18n("common.invalid_port", {port: document.getElementById("set-web-port").value.trim()}), "err"); return; }

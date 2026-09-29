@@ -350,7 +350,11 @@
     "save_to_system": "System (all users)",
     "system_presets": "System Presets",
     "user_presets": "My Presets",
-    "preset_save_choice": "Save to:"
+    "preset_save_choice": "Save to:",
+    "scp_allowed_aes": "Allowed calling AE titles (Storage SCP)",
+    "scp_allowed_hosts": "Allowed sender hosts (Storage SCP)",
+    "hl7_allowed_hosts": "Allowed sender hosts (HL7 listener)",
+    "allowlist_note": "Comma-separated. Leave empty to accept every sender. Hosts are IP addresses or CIDR networks. Applies the next time the listener is started."
   },
   "help": {
     "topics": "Topics",

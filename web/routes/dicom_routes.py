@@ -17,7 +17,7 @@ from dicom import save_dataset
 
 import web.context as ctx
 from web.audit import log as _audit
-from web.auth import require_login
+from web.auth import is_admin, require_login
 from web.helpers import (
     _bad_request,
     _client_room,
@@ -29,6 +29,8 @@ from web.helpers import (
     _req_user,
     _require_dicom_fields,
     _safe_str,
+    _upload_path,
+    resolve_receive_dir,
 )
 from web.jobs import create_job, get_job, update_job
 
@@ -380,7 +382,9 @@ def dicom_get():
     err = _require_dicom_fields(d)
     if err:
         return err
-    save_dir = os.path.normpath(os.path.expanduser(d.get("save_dir", "~/DICOM_Received")))
+    save_dir, dir_error = resolve_receive_dir(d.get("save_dir"), is_admin())
+    if dir_error:
+        return jsonify({"ok": False, "message": dir_error}), 400
     try:
         from dicom.operations import c_get
         from pydicom.dataset import Dataset
@@ -436,8 +440,8 @@ def dicom_store():
     tmp_dir_obj = tempfile.TemporaryDirectory(prefix="pacsadmin_store_")
     tmp_dir     = tmp_dir_obj.name
     paths = []
-    for f in files:
-        path = os.path.join(tmp_dir, f.filename or "upload.dcm")
+    for i, f in enumerate(files):
+        path = _upload_path(tmp_dir, f.filename, i, "upload.dcm")
         f.save(path)
         paths.append(path)
 
@@ -997,7 +1001,7 @@ def dicom_anonymize_and_store():
                     ds, phi_tags, repl_name, repl_id,
                     remove_private=remove_private, uid_maps=uid_maps)
                 warnings.extend(f"{f.filename or '?'}: {w}" for w in file_warnings)
-                fpath = os.path.join(tmpdir, f.filename or f"anon_{len(paths)}.dcm")
+                fpath = _upload_path(tmpdir, f.filename, len(paths), f"anon_{len(paths)}.dcm")
                 save_dataset(ds, fpath)
                 paths.append(fpath)
             except Exception as exc:
@@ -1089,7 +1093,7 @@ def dicom_edit_and_store():
         ds = pydicom.dcmread(io.BytesIO(f.read()))
         _apply_tag_edits(ds, edits)
         with tempfile.TemporaryDirectory() as tmpdir:
-            fpath = os.path.join(tmpdir, f.filename or "edited.dcm")
+            fpath = _upload_path(tmpdir, f.filename, 0, "edited.dcm")
             save_dataset(ds, fpath)
             from dicom.operations import c_store
             ok, msg = c_store(

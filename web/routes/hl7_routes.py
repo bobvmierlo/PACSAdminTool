@@ -194,8 +194,13 @@ def hl7_listener_start():
         debug_active = debug or logger.isEnabledFor(logging.DEBUG)
         dbg = (lambda m: _log("hl7_recv", m, "debug")) if debug_active else None
 
-        ctx._hl7_listener = HL7Listener(port=port, callback=on_message,
-                                        debug_callback=dbg, ack_code=ack_code)
+        def on_reject(host):
+            _log("hl7_recv", f"Rejected connection from {host} (not in allowed sender hosts)", "warn")
+
+        ctx._hl7_listener = HL7Listener(
+            port=port, callback=on_message, debug_callback=dbg, ack_code=ack_code,
+            allowed_hosts=ctx.config.get("hl7", {}).get("allowed_hosts"),
+            reject_callback=on_reject)
         try:
             ctx._hl7_listener.start()
             _audit("hl7.listener.start", ip=_req_ip(), user=_req_user(),

@@ -350,7 +350,11 @@
     "save_to_system": "Systeem (alle gebruikers)",
     "system_presets": "Systeempresets",
     "user_presets": "Mijn presets",
-    "preset_save_choice": "Opslaan in:"
+    "preset_save_choice": "Opslaan in:",
+    "scp_allowed_aes": "Toegestane aanroepende AE-titels (Storage SCP)",
+    "scp_allowed_hosts": "Toegestane afzenders (Storage SCP)",
+    "hl7_allowed_hosts": "Toegestane afzenders (HL7-listener)",
+    "allowlist_note": "Kommagescheiden. Leeg laten om elke afzender te accepteren. Afzenders zijn IP-adressen of CIDR-netwerken. Geldt vanaf de volgende keer dat de listener wordt gestart."
   },
   "help": {
     "topics": "Onderwerpen",

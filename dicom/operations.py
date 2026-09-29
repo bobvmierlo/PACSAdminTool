@@ -5,6 +5,7 @@ Covers: C-FIND, C-STORE, C-MOVE, C-GET, DMWL, Storage Commitment, IOCM,
 """
 
 import os
+import re
 import ssl
 import threading
 import logging
@@ -48,6 +49,29 @@ except ImportError:
     PYNETDICOM_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
+
+# A DICOM UID is dot-separated digits (PS3.5 §9). Received UIDs are used as
+# directory and file names, so anything else must never reach os.path.join —
+# a sender could otherwise write outside the storage directory ("../..", "/x").
+# Up to 128 characters: the standard says 64, but some devices send longer
+# ones and those are still harmless as path components.
+_UID_PATH_RE = re.compile(r"^[0-9]+(\.[0-9]+)*$")
+
+
+def _uid_path_component(value, fallback: str) -> str:
+    """Return *value* if it is a well-formed UID, otherwise *fallback*."""
+    uid = str(value or "").strip().rstrip("\x00").strip()
+    if uid and len(uid) <= 128 and _UID_PATH_RE.match(uid):
+        return uid
+    if uid:
+        logger.warning("Received malformed UID %r; storing as %r", uid[:80], fallback)
+    return fallback
+
+
+def _path_inside(root: str, path: str) -> bool:
+    """True when *path* resolves to a location inside *root*."""
+    root = os.path.realpath(root)
+    return os.path.realpath(path).startswith(root + os.sep)
 
 # All common storage SOPs for SCP listener
 STORAGE_SOPS = [
@@ -374,9 +398,12 @@ def c_get(local_ae_title: str, remote_host: str, remote_port: int,
     def handle_store(event):
         ds = event.dataset
         ds.file_meta = event.file_meta
-        sop_uid = getattr(ds, "SOPInstanceUID",
-                          datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
+        sop_uid = _uid_path_component(
+            getattr(ds, "SOPInstanceUID", ""),
+            datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
         fname = os.path.join(storage_dir, f"{sop_uid}.dcm")
+        if not _path_inside(storage_dir, fname):
+            return 0xA700   # Out of resources — refuse rather than escape the dir
         save_dataset(ds, fname)
         received.append(fname)
         if callback:
@@ -758,10 +785,16 @@ class SCPListener:
                  storage_dir: str = None,
                  log_callback: Optional[Callable] = None,
                  n_event_callback: Optional[Callable] = None,
-                 tls: Optional[dict] = None):
+                 tls: Optional[dict] = None,
+                 allowed_calling_aes: Optional[list] = None,
+                 allowed_hosts: Optional[list] = None):
         self.ae_title = ae_title
         self.port = port
         self.tls = tls
+        # Empty/None = accept any calling AE title / sender address.
+        self.allowed_calling_aes = [a.strip() for a in (allowed_calling_aes or [])
+                                    if str(a).strip()]
+        self.allowed_hosts = list(allowed_hosts or [])
         self.storage_dir = storage_dir or os.path.normpath(
             os.path.join(os.path.expanduser("~"), "pacs_received")
         )
@@ -788,6 +821,9 @@ class SCPListener:
 
         ae = AE(ae_title=self.ae_title)
         ae.add_supported_context(Verification)
+        if self.allowed_calling_aes:
+            # pynetdicom rejects associations from any other calling AE title.
+            ae.require_calling_aet = self.allowed_calling_aes
 
         # Broad transfer-syntax list so we accept any encoding a sender offers:
         # uncompressed (implicit/explicit), all JPEG variants, JPEG-LS, JPEG 2000,
@@ -881,13 +917,16 @@ class SCPListener:
             ds = event.dataset
             ds.file_meta = event.file_meta
             ts      = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            sop_uid = str(getattr(ds, "SOPInstanceUID",     ts)).strip() or ts
-            stu_uid = str(getattr(ds, "StudyInstanceUID",  "unknown_study")).strip()  or "unknown_study"
-            ser_uid = str(getattr(ds, "SeriesInstanceUID", "unknown_series")).strip() or "unknown_series"
+            sop_uid = _uid_path_component(getattr(ds, "SOPInstanceUID", ""), ts)
+            stu_uid = _uid_path_component(getattr(ds, "StudyInstanceUID", ""), "unknown_study")
+            ser_uid = _uid_path_component(getattr(ds, "SeriesInstanceUID", ""), "unknown_series")
             # Organise into Study/Series subdirectories so stacks land together.
             series_dir = os.path.join(storage_dir, stu_uid, ser_uid)
-            os.makedirs(series_dir, exist_ok=True)
             fname = os.path.join(series_dir, f"{sop_uid}.dcm")
+            if not _path_inside(storage_dir, fname):
+                log_fn(f"Store refused: unsafe path for SOP instance {sop_uid}")
+                return 0xA700
+            os.makedirs(series_dir, exist_ok=True)
             try:
                 save_dataset(ds, fname)
                 log_fn(f"Stored: {fname}")
@@ -955,19 +994,44 @@ class SCPListener:
 
         ssl_context = _tls_server_context(self.tls) if self.tls else None
 
+        from config.network import address_allowed, parse_host_allowlist
+        from pynetdicom.transport import ThreadedAssociationServer
+
+        networks = parse_host_allowlist(self.allowed_hosts)
+
+        def verify_request(_request, client_address):
+            host = client_address[0]
+            if address_allowed(host, networks):
+                return True
+            self._log(f"Rejected connection from {host} (not in allowed sender hosts)")
+            return False
+
+        # Equivalent to ae.start_server(block=False), but the sender check is
+        # installed before the server thread starts accepting connections.
         self._ae = ae
-        self._server = ae.start_server(
+        self._server = ae.make_server(
             ("", self.port),
-            block=False,
             evt_handlers=handlers,
             ssl_context=ssl_context,
+            server_class=ThreadedAssociationServer,
         )
+        self._server.verify_request = verify_request
+        ae._servers.append(self._server)   # server.shutdown() removes it again
+        threading.Thread(target=self._server.serve_forever, daemon=True,
+                         name=f"SCP@{self.port}").start()
         self.running = True
-        self._log(f"SCP listening on port {self.port} as '{self.ae_title}'")
+        restrictions = []
+        if self.allowed_calling_aes:
+            restrictions.append(f"calling AEs: {', '.join(self.allowed_calling_aes)}")
+        if networks:
+            restrictions.append(f"hosts: {', '.join(str(n) for n in networks)}")
+        suffix = f" — accepting only {'; '.join(restrictions)}" if restrictions else ""
+        self._log(f"SCP listening on port {self.port} as '{self.ae_title}'{suffix}")
 
     def stop(self):
         if self._server:
             self._server.shutdown()
+            self._server = None
         self.running = False
         self._log("SCP stopped.")
 

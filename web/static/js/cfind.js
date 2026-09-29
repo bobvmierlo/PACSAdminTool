@@ -152,7 +152,10 @@ async function doRetrieve() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...ae, study_uid: uid, save_dir: saveDir, query_model: model }),
-      }).then(r => r.json()).then(r => trackJob(r.job_id, "log-cfind"));
+      }).then(r => r.json()).then(r => {
+        if (r.ok) trackJob(r.job_id, "log-cfind");
+        else appendLog("log-cfind", now(), r.message || r.error || "C-GET failed", "err");
+      });
     }
   }
 }

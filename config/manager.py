@@ -22,7 +22,10 @@ LOG_DIR = os.path.join(APP_DIR, "logs")
 DEFAULT_CONFIG = {
     "local_ae": {
         "ae_title": "PACSADMIN",
-        "port": 11112
+        "port": 11112,
+        # Storage SCP sender restrictions; empty = accept everyone.
+        "allowed_calling_aes": [],
+        "allowed_hosts": [],   # IP addresses and/or CIDR networks
     },
     "remote_aes": [],
     "dicom_tls": {
@@ -38,7 +41,9 @@ DEFAULT_CONFIG = {
     "hl7": {
         "listen_port": 2575,
         "default_host": "127.0.0.1",
-        "default_port": 2575
+        "default_port": 2575,
+        # HL7 listener sender restriction; empty = accept everyone.
+        "allowed_hosts": [],   # IP addresses and/or CIDR networks
     },
     "hl7_servers": [],
     "orm_field_map": {

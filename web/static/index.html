@@ -2251,6 +2251,13 @@
         <div class="field"><label data-i18n="settings.ae_title_web">Local AE Title</label><input id="set-ae-title" value="PACSADMIN"></div>
         <div class="field" style="max-width:120px"><label data-i18n="settings.port_web">Default Port</label><input id="set-ae-port" type="number" min="1" max="65535" value="11112"></div>
       </div>
+      <div class="field-grid">
+        <div class="field"><label data-i18n="settings.scp_allowed_aes">Allowed calling AE titles (Storage SCP)</label><input id="set-ae-allowed-aes" placeholder="MODALITY1, PACS_MAIN"></div>
+        <div class="field"><label data-i18n="settings.scp_allowed_hosts">Allowed sender hosts (Storage SCP)</label><input id="set-ae-allowed-hosts" placeholder="10.1.2.3, 10.20.0.0/16"></div>
+      </div>
+      <p style="font-size:12px; color:#888; margin:6px 0 0" data-i18n="settings.allowlist_note">
+        Comma-separated. Leave empty to accept every sender. Hosts are IP addresses or CIDR networks. Applies the next time the listener is started.
+      </p>
     </div>
     <div class="card">
       <h3 data-i18n="settings.dicom_tls">DICOM TLS</h3>
@@ -2318,6 +2325,12 @@
         <div class="field"><label data-i18n="settings.hl7_default_host">Default Destination Host</label><input id="set-hl7-default-host" value="127.0.0.1"></div>
         <div class="field" style="max-width:150px"><label data-i18n="settings.hl7_default_port">Default Destination Port</label><input id="set-hl7-default-port" type="number" min="1" max="65535" value="2575"></div>
       </div>
+      <div class="field-grid">
+        <div class="field"><label data-i18n="settings.hl7_allowed_hosts">Allowed sender hosts (HL7 listener)</label><input id="set-hl7-allowed-hosts" placeholder="10.1.2.3, 10.20.0.0/16"></div>
+      </div>
+      <p style="font-size:12px; color:#888; margin:6px 0 0" data-i18n="settings.allowlist_note">
+        Comma-separated. Leave empty to accept every sender. Hosts are IP addresses or CIDR networks. Applies the next time the listener is started.
+      </p>
     </div>
     <div class="card">
       <h3 data-i18n="settings.web_server">Web Server</h3>
