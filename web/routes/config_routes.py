@@ -28,7 +28,6 @@ _CONFIG_SCHEMA = {
     "web":               dict,
     "log_level":         str,
     "language":          str,
-    "telemetry":         dict,
     "dicom_tls":         dict,
 }
 
@@ -36,7 +35,7 @@ _LOG_LEVELS   = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 _MAX_AE_TITLE = 16
 
 # Keys in _CONFIG_SCHEMA that only admins may write
-_ADMIN_WRITE_KEYS = frozenset({"local_ae", "remote_aes", "dicomweb_presets", "hl7", "hl7_servers", "web", "telemetry", "dicom_tls"})
+_ADMIN_WRITE_KEYS = frozenset({"local_ae", "remote_aes", "dicomweb_presets", "hl7", "hl7_servers", "web", "dicom_tls"})
 _MAX_HOST_LEN = 253
 
 
@@ -147,6 +146,10 @@ def save_config_route():
     data = request.get_json(silent=True)
     if data is None:
         return jsonify({"ok": False, "error": "Request body must be valid JSON."}), 400
+    if isinstance(data, dict):
+        # Usage telemetry was removed; ignore the key from older clients or
+        # restored config backups instead of rejecting the whole save.
+        data.pop("telemetry", None)
     error = _validate_config_payload(data)
     if error:
         logger.warning("Config update rejected: %s", error)
@@ -166,11 +169,6 @@ def save_config_route():
     if "language" in data:
         set_language(data["language"])
         logger.info("Language changed to %s", data["language"])
-    if "telemetry" in data:
-        from web.telemetry import init as _telemetry_init
-        _telemetry_init(ctx.config)
-        logger.info("Telemetry settings updated (enabled=%s)",
-                    ctx.config.get("telemetry", {}).get("enabled", True))
     _audit("config.save", ip=_req_ip(), user=_req_user(),
            detail={"keys": sorted(data.keys())})
     return jsonify({"ok": True})

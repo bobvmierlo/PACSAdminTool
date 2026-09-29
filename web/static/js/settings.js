@@ -1,4 +1,4 @@
-// settings.js — Config / Settings tab, user preferences, telemetry consent banner
+// settings.js — Config / Settings tab, user preferences
 // Extracted from index.html; loaded as a plain script (shared global scope, no modules).
 // ─────────────────────────────────────────────────────────────────
 // 3. Config / Settings
@@ -72,15 +72,6 @@ async function loadConfig() {
   if (appConfig.language) {
     document.getElementById("set-language").value = appConfig.language;
   }
-  const tel = appConfig.telemetry || {};
-  document.getElementById("set-telemetry-enabled").checked =
-    tel.enabled !== false;  // default true
-
-  // Show the consent banner once if the user hasn't seen it yet.
-  if (tel.consent_shown === false || tel.consent_shown === undefined) {
-    document.getElementById("telemetry-consent").classList.add("visible");
-  }
-
   // Set SCP / HL7 listener defaults from config
   document.getElementById("scp-ae").value          = lae.ae_title || "PACSADMIN";
   document.getElementById("scp-port").value         = lae.port     || 11112;
@@ -393,10 +384,6 @@ async function saveSettings() {
     host: document.getElementById("set-web-host").value.trim(),
     port: webPort,
   };
-  appConfig.telemetry = {
-    ...(appConfig.telemetry || {}),
-    enabled: document.getElementById("set-telemetry-enabled").checked,
-  };
   appConfig.dicom_tls = {
     enabled:   document.getElementById("set-dicom-tls-enabled").checked,
     cert_file: document.getElementById("set-dicom-tls-cert").value.trim(),
@@ -407,7 +394,6 @@ async function saveSettings() {
     local_ae: appConfig.local_ae,
     hl7:      appConfig.hl7,
     web:      appConfig.web,
-    telemetry: appConfig.telemetry,
     dicom_tls: appConfig.dicom_tls,
   };
   const res = await fetch("/api/config", {
@@ -432,12 +418,6 @@ async function exportConfig() {
     const res = await fetch("/api/config");
     if (!res.ok) { toast("Could not fetch config.", "err"); return; }
     const cfg = await res.json();
-    // Strip the telemetry anonymous_id before exporting
-    if (cfg.telemetry && cfg.telemetry.anonymous_id !== undefined) {
-      const tel = { ...cfg.telemetry };
-      delete tel.anonymous_id;
-      cfg.telemetry = tel;
-    }
     const ts = new Date().toISOString().slice(0, 10);
     downloadText(`pacsadmin_config_${ts}.json`, JSON.stringify(cfg, null, 2), "application/json");
     const st = document.getElementById("config-backup-status");
@@ -499,33 +479,5 @@ async function saveUserPreferences() {
     .forEach(([c, p]) => buildAESelector(c, p));
   refreshAllPresetDropdowns();
   dwRefreshPresets();
-}
-
-// ─────────────────────────────────────────────────────────────────
-// 3b. Telemetry consent banner
-// ─────────────────────────────────────────────────────────────────
-
-async function _saveTelemetryConsent(enabled) {
-  const tel = { ...(appConfig.telemetry || {}), enabled, consent_shown: true };
-  appConfig.telemetry = tel;
-  document.getElementById("set-telemetry-enabled").checked = enabled;
-  document.getElementById("telemetry-consent").classList.remove("visible");
-  try {
-    await fetch("/api/config", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ telemetry: tel }),
-    });
-  } catch (e) {
-    console.warn("Could not save telemetry consent:", e);
-  }
-}
-
-function telemetryAccept() {
-  _saveTelemetryConsent(true);
-}
-
-function telemetryOptOut() {
-  _saveTelemetryConsent(false);
 }
 

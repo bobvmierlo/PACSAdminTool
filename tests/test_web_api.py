@@ -251,6 +251,16 @@ class TestConfig:
         data = json.loads(resp.data)
         assert not data["ok"]
 
+    def test_save_config_ignores_legacy_telemetry_key(self, authed_client):
+        resp = authed_client.post(
+            "/api/config",
+            data=json.dumps({"log_level": "INFO",
+                             "telemetry": {"enabled": True}}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        assert "telemetry" not in json.loads(authed_client.get("/api/config").data)
+
     def test_save_config_invalid_log_level(self, authed_client):
         resp = authed_client.post(
             "/api/config",

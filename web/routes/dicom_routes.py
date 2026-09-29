@@ -18,7 +18,6 @@ from dicom import save_dataset
 import web.context as ctx
 from web.audit import log as _audit
 from web.auth import require_login
-from web.telemetry import capture as _capture, capture_error as _capture_error
 from web.helpers import (
     _bad_request,
     _client_room,
@@ -179,11 +178,9 @@ def dicom_echo():
         _audit("dicom.c_echo", ip=_req_ip(), user=_req_user(),
                detail={"ae_title": d["ae_title"], "host": d["host"], "port": d["port"]},
                result="ok" if ok else "error", error=None if ok else msg)
-        _capture("feature_used", {"feature": "dicom_echo", "result": "ok" if ok else "error"})
         return jsonify({"ok": ok, "message": msg})
     except Exception as e:
         logger.exception("C-ECHO exception")
-        _capture_error("dicom_echo", e)
         _audit("dicom.c_echo", ip=_req_ip(), user=_req_user(),
                detail={"ae_title": d.get("ae_title"), "host": d.get("host"), "port": d.get("port")},
                result="error", error=str(e))
@@ -324,13 +321,9 @@ def dicom_find():
                detail={"ae_title": d["ae_title"], "host": d["host"], "port": d["port"],
                        "level": d.get("query_level"), "results": len(rows)},
                result="ok" if ok else "error", error=None if ok else msg)
-        _capture("feature_used", {"feature": "dicom_find",
-                                  "query_level": d.get("query_level", "STUDY"),
-                                  "result": "ok" if ok else "error"})
         return jsonify({"ok": ok, "message": msg, "results": rows})
     except Exception as e:
         logger.exception("C-FIND error")
-        _capture_error("dicom_find", e)
         _audit("dicom.c_find", ip=_req_ip(), user=_req_user(),
                detail={"ae_title": d.get("ae_title"), "host": d.get("host"), "port": d.get("port")},
                result="error", error=str(e))
@@ -371,11 +364,9 @@ def dicom_move():
             update_job(job_id, state="completed" if ok else "error", message=msg)
 
         threading.Thread(target=run, daemon=True).start()
-        _capture("feature_used", {"feature": "dicom_move"})
         return jsonify({"ok": True, "message": "C-MOVE started", "job_id": job_id})
     except Exception as e:
         logger.exception("C-MOVE setup error")
-        _capture_error("dicom_move", e)
         return jsonify({"ok": False, "message": str(e)}), 500
 
 
@@ -466,14 +457,12 @@ def dicom_store():
             update_job(job_id, state="completed" if ok else "error", message=msg)
         except Exception as e:
             logger.exception("C-STORE background error")
-            _capture_error("dicom_store", e)
             _log("cstore", f"Error: {e}", "err", to=to)
             update_job(job_id, state="error", message=str(e))
         finally:
             tmp_dir_obj.cleanup()
 
     threading.Thread(target=run, daemon=True).start()
-    _capture("feature_used", {"feature": "dicom_store", "file_count": len(paths)})
     return jsonify({"ok": True, "message": f"Sending {len(paths)} file(s)…", "job_id": job_id})
 
 
@@ -547,11 +536,9 @@ def dicom_dmwl():
                 "Procedure":          _safe_str(getattr(r, "RequestedProcedureDescription", "")),
                 "tags":               _dataset_to_tag_list(r),
             })
-        _capture("feature_used", {"feature": "dicom_dmwl", "result": "ok" if ok else "error"})
         return jsonify({"ok": ok, "message": msg, "results": rows})
     except Exception as e:
         logger.exception("DMWL error")
-        _capture_error("dicom_dmwl", e)
         return jsonify({"ok": False, "message": str(e), "results": []}), 500
 
 

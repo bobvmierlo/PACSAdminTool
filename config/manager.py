@@ -63,17 +63,6 @@ DEFAULT_CONFIG = {
     },
     "log_level": "INFO",
     "language": "en",
-    "telemetry": {
-        # enabled: true  = opt-out model (on by default, user may disable)
-        # Set to false to completely stop sending any telemetry events.
-        "enabled": True,
-        # anonymous_id: randomly-generated UUID, created on first run.
-        # Not tied to any user, machine, or patient data.
-        "anonymous_id": None,
-        # consent_shown: tracks whether the user has seen the telemetry notice.
-        # When false the UI shows a one-time consent banner.
-        "consent_shown": False,
-    }
 }
 
 
@@ -100,6 +89,14 @@ def load_config() -> dict:
         try:
             with open(CONFIG_PATH, "r") as f:
                 loaded = json.load(f)
+            # Usage telemetry was removed; drop the stored settings
+            # (including the anonymous installation ID) from older configs.
+            if isinstance(loaded, dict) and loaded.pop("telemetry", None) is not None:
+                try:
+                    save_config(loaded)
+                except OSError:
+                    logger.warning("Could not remove telemetry settings from %s",
+                                   CONFIG_PATH, exc_info=True)
             # Deep-merge: new default keys are picked up even for nested dicts.
             return _deep_merge(DEFAULT_CONFIG, loaded)
         except Exception:

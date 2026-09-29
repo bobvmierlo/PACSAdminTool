@@ -23,5 +23,3 @@ simple-websocket~=1.1
 # DICOMweb (QIDO-RS / STOW-RS / WADO-RS) HTTP client
 requests~=2.34
 
-# Telemetry (anonymous usage statistics — PostHog EU)
-posthog~=7.53
