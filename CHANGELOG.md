@@ -1,5 +1,49 @@
 # Changelog
 
+## v3.6.0 — 2026-09-29
+
+### Fixed — [#170](https://github.com/bobvmierlo/PACSAdminTool/pull/170)
+
+- Starting the app a second time no longer launches a duplicate on the same port, which on Windows could send requests randomly to either copy. If the app is already running, your browser opens the existing one instead. If a different program is using the port, the app stops and tells you so.
+
+### Fixed — [#171](https://github.com/bobvmierlo/PACSAdminTool/pull/171)
+
+- The storage receiver no longer lets a sender use badly formed study or series identifiers to write files outside the receive folder.
+- A receive folder can no longer point at the app's own data, such as user accounts, settings or logs. Only admins can choose a folder other than the default.
+
+### New — [#171](https://github.com/bobvmierlo/PACSAdminTool/pull/171)
+
+- **Sender allowlists** — you can limit which AE titles and which IP addresses or networks may send files to the storage receiver, and which addresses may send messages to the HL7 listener. Leave a list empty to keep accepting every sender, as before.
+
+### Improved — [#171](https://github.com/bobvmierlo/PACSAdminTool/pull/171)
+
+- **Telemetry removed** — the app no longer collects usage statistics, and the consent banner is gone. Any leftover telemetry setting is cleaned up automatically.
+
+### Fixed — [#172](https://github.com/bobvmierlo/PACSAdminTool/pull/172)
+
+- After signing in, the app now only redirects you to pages within the app. A crafted login link can no longer run script or send you to another site.
+
+### New — [#172](https://github.com/bobvmierlo/PACSAdminTool/pull/172)
+
+- **Idle timeout** — you are signed out after a period without activity, 30 minutes by default and adjustable in Settings → Security. The login page tells you when your session expired.
+- **Session revocation** — changing a password or deleting a user signs that user out everywhere else straight away.
+- **Audit log of patient data access** — searches, retrievals, opening received files and studies, and viewing HL7 history are now recorded, including who did it and which patients were involved. Audit logs are kept for 365 days by default and only admins can view them.
+- **Log folder size limit** — the log folder is capped at 500 MB. Older app logs are cleaned up first, and the current audit log is never removed.
+- **First-run setup code** — creating the first admin now requires a one-time code, which is shown in the console and log and saved in the data folder. Automated deployments can set it in advance.
+- **Reverse proxy support** — a new setting tells the app it is running behind an HTTPS reverse proxy, so the audit log records the real client address and the sign-in cookie is secured. The README includes example setups.
+- **Verified updates** — one-click updates of the Windows version are admin-only and are installed only when the download matches the checksum published with the release. Otherwise you are pointed to a manual update.
+
+### Improved — [#172](https://github.com/bobvmierlo/PACSAdminTool/pull/172)
+
+- **No patient data kept in the browser** — search history, sent HL7 history and remembered search fields are now stored per user on the server. Your existing history is moved over automatically.
+- **More thorough pseudonymisation** — selected tags are now removed inside nested sequences as well. Removing private tags and generating new UIDs is now also the default when you use the API. The screen now states clearly that this is pseudonymisation, not guaranteed anonymisation.
+- **Clearer DICOM TLS warning** — when no certificate authority is configured, the settings page notes that the other system's identity is not being verified.
+
+### Breaking — [#172](https://github.com/bobvmierlo/PACSAdminTool/pull/172)
+
+- A fresh install needs the setup code from the console, log or data folder before you can create the first admin.
+- Everyone has to sign in again once after upgrading, because sessions from older versions are treated as expired.
+
 ## v3.5.1 — 2026-09-09
 
 ### Fixed — [#167](https://github.com/bobvmierlo/PACSAdminTool/pull/167)
