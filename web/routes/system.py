@@ -141,7 +141,7 @@ def apply_update():
             pass
 
     try:
-        apply_update_async(info["download_url"], info.get("checksum_url"),
+        apply_update_async(info["download_url"], info.get("sha256"),
                            on_ready=_notify_clients)
     except RuntimeError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400

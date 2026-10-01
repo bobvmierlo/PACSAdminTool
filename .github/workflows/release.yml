@@ -174,24 +174,12 @@ jobs:
       - name: Build Web Server executable
         run: pyinstaller pacs_web.spec
 
-      # The in-app updater only installs a download whose SHA-256 matches
-      # the <exe>.sha256 file published next to it.
-      - name: Generate SHA-256 checksums
-        shell: pwsh
-        run: |
-          foreach ($name in "PacsAdminTool.exe", "PacsAdminToolWeb.exe") {
-            $hash = (Get-FileHash -Algorithm SHA256 "dist/$name").Hash.ToLower()
-            Set-Content -Path "dist/$name.sha256" -Value "$hash  $name" -NoNewline -Encoding ascii
-          }
-
       - name: Upload executables to release
         uses: softprops/action-gh-release@v3.0.3
         with:
           files: |
             dist/PacsAdminTool.exe
             dist/PacsAdminToolWeb.exe
-            dist/PacsAdminTool.exe.sha256
-            dist/PacsAdminToolWeb.exe.sha256
 
 
   # ── 4. Changelog draft ────────────────────────────────────────────

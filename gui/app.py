@@ -127,7 +127,7 @@ class _UpdateBanner(tk.Frame):
             font=("Segoe UI", 8),
         )
         self._lbl_status.pack(side="left", padx=4)
-        apply_update_async(info["download_url"], info.get("checksum_url"), on_ready=_on_ready)
+        apply_update_async(info["download_url"], info.get("sha256"), on_ready=_on_ready)
 
     def _on_download_ready(self):
         from web.updater import apply_update_and_restart
