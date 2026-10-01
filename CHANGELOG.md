@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.6.2 — 2026-10-01
+
+### Fixed — [#174](https://github.com/bobvmierlo/PACSAdminTool/pull/174)
+
+- The Docker container no longer stops right after starting with the error "No module named 'admin_cli'". This affected every start of the v3.6.1 Docker image.
+
 ## v3.6.0 — 2026-09-29
 
 ### Fixed — [#170](https://github.com/bobvmierlo/PACSAdminTool/pull/170)
