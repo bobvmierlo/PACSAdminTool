@@ -13,9 +13,9 @@ check_for_update(force=False) -> dict
 get_update_state() -> dict
     Returns the current download / staging state.
 
-apply_update_async(download_url, checksum_url, on_ready=None)
+apply_update_async(download_url, expected_sha256, on_ready=None)
     Starts a background thread that downloads the new executable and
-    verifies it against the release's published SHA-256 checksum.
+    verifies it against the SHA-256 digest GitHub reports for the asset.
     Calls on_ready() when staging is complete.
 
 apply_update_and_restart()
@@ -163,7 +163,7 @@ def _build_update_info() -> dict:
         "has_update":      False,
         "release_url":     GITHUB_RELEASE_URL,
         "download_url":    None,
-        "checksum_url":    None,
+        "sha256":          None,
         "release_notes":   "",
         "can_auto_update": False,
         "deployment":      deployment,
@@ -186,20 +186,19 @@ def _build_update_info() -> dict:
     # Try to find the right asset download URL
     asset_name   = _detect_asset_name()
     download_url = None
-    checksum_url = None
+    sha256       = None
     if asset_name:
         for asset in data.get("assets", []):
-            name = asset.get("name", "").lower()
-            if name == asset_name.lower():
+            if asset.get("name", "").lower() == asset_name.lower():
                 download_url = asset.get("browser_download_url")
-            elif name == asset_name.lower() + ".sha256":
-                checksum_url = asset.get("browser_download_url")
+                sha256       = _asset_sha256(asset)
+                break
 
     has_update = _parse_semver(latest) > _parse_semver(current)
-    # A one-click update is only offered when the release also publishes a
-    # SHA-256 checksum for the executable, so the download can be verified.
+    # A one-click update is only offered when GitHub reports a SHA-256 digest
+    # for the executable, so the download can be verified before installing.
     can_auto_update = (has_update and _is_frozen()
-                       and download_url is not None and checksum_url is not None)
+                       and download_url is not None and sha256 is not None)
 
     return {
         "current_version": current,
@@ -207,7 +206,7 @@ def _build_update_info() -> dict:
         "has_update":      has_update,
         "release_url":     release_url,
         "download_url":    download_url,
-        "checksum_url":    checksum_url,
+        "sha256":          sha256,
         "release_notes":   notes[:500],
         "can_auto_update": can_auto_update,
         "deployment":      deployment,
@@ -238,17 +237,18 @@ def _set_update_state(**kwargs) -> None:
         _update_state.update(kwargs)
 
 
-def apply_update_async(download_url: str, checksum_url: str | None, on_ready=None) -> None:
+def apply_update_async(download_url: str, expected_sha256: str | None, on_ready=None) -> None:
     """
     Kick off a background download of the new executable.
-    The download is verified against the SHA-256 published at *checksum_url*
-    before it is staged; without a checksum nothing is downloaded.
+    The download is verified against *expected_sha256* (the digest GitHub
+    reports for the release asset) before it is staged; without a digest
+    nothing is downloaded.
     ``on_ready`` is called (no arguments) once the file is fully staged.
     Raises RuntimeError when not running as a frozen executable.
     """
     if not _is_frozen():
         raise RuntimeError("Auto-update is only supported for frozen (PyInstaller) executables.")
-    if not checksum_url:
+    if not expected_sha256:
         raise RuntimeError("This release has no published checksum; update manually.")
 
     state = get_update_state()
@@ -259,30 +259,28 @@ def apply_update_async(download_url: str, checksum_url: str | None, on_ready=Non
     _set_update_state(status="downloading", progress=0, staged_path=None, error=None)
     threading.Thread(
         target=_download_worker,
-        args=(download_url, checksum_url, on_ready),
+        args=(download_url, expected_sha256.lower(), on_ready),
         daemon=True,
         name="pacs-update-dl",
     ).start()
 
 
-def _fetch_expected_sha256(checksum_url: str, user_agent: str) -> str:
-    """Download a ``sha256sum``-style file and return the 64-char hex digest."""
-    req = Request(checksum_url, headers={"User-Agent": user_agent})
-    with urlopen(req, timeout=30) as resp:
-        text = resp.read(4096).decode("utf-8", errors="replace")
-    match = re.search(r"\b([0-9a-fA-F]{64})\b", text)
-    if not match:
-        raise RuntimeError("Checksum file does not contain a SHA-256 digest.")
-    return match.group(1).lower()
+def _asset_sha256(asset: dict) -> str | None:
+    """The hex SHA-256 of a release asset from GitHub's ``digest`` field.
+
+    GitHub computes it when the asset is uploaded and returns it as
+    ``"sha256:<64 hex chars>"``. Older releases have no digest (None).
+    """
+    match = re.fullmatch(r"sha256:([0-9a-fA-F]{64})", str(asset.get("digest") or ""))
+    return match.group(1).lower() if match else None
 
 
-def _download_worker(download_url: str, checksum_url: str, on_ready) -> None:
+def _download_worker(download_url: str, expected: str, on_ready) -> None:
     current_exe  = sys.executable
     staged_path  = current_exe + ".update"
 
     try:
         current = _current_version()
-        expected = _fetch_expected_sha256(checksum_url, f"PacsAdminTool/{current}")
         digest = hashlib.sha256()
         req = Request(
             download_url,

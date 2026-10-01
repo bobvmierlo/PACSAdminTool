@@ -351,22 +351,14 @@ class _FakeResp(io.BytesIO):
 
 
 class TestUpdaterChecksum:
-    def _run(self, tmp_path, monkeypatch, payload, published):
+    def _run(self, tmp_path, monkeypatch, payload, expected):
         import web.updater as up
         exe = tmp_path / "PacsAdminToolWeb.exe"
         exe.write_bytes(b"old")
         monkeypatch.setattr(up.sys, "executable", str(exe))
-
-        def fake_urlopen(req, timeout=0):
-            url = req.full_url
-            if url.endswith(".sha256"):
-                return _FakeResp(f"{published}  PacsAdminToolWeb.exe".encode())
-            return _FakeResp(payload)
-
-        monkeypatch.setattr(up, "urlopen", fake_urlopen)
+        monkeypatch.setattr(up, "urlopen", lambda req, timeout=0: _FakeResp(payload))
         up._set_update_state(status="downloading", progress=0, staged_path=None, error=None)
-        up._download_worker("https://x/PacsAdminToolWeb.exe",
-                            "https://x/PacsAdminToolWeb.exe.sha256", None)
+        up._download_worker("https://x/PacsAdminToolWeb.exe", expected, None)
         return up.get_update_state(), tmp_path / "PacsAdminToolWeb.exe.update"
 
     def test_matching_checksum_is_staged(self, tmp_path, monkeypatch):
@@ -386,6 +378,38 @@ class TestUpdaterChecksum:
         monkeypatch.setattr(up, "_is_frozen", lambda: True)
         with pytest.raises(RuntimeError):
             up.apply_update_async("https://x/a.exe", None)
+
+    def test_digest_from_github_release(self, monkeypatch):
+        import web.updater as up
+        good = "B597418EA9A2BD03D63C017D119572E37F5A66DD7A001B7F2C1FF02AACC3FDAC"
+        release = {
+            "tag_name": "v99.0.0",
+            "assets": [
+                {"name": "PacsAdminTool.exe", "digest": "sha256:" + "1" * 64,
+                 "browser_download_url": "https://x/PacsAdminTool.exe"},
+                {"name": "PacsAdminToolWeb.exe", "digest": "sha256:" + good,
+                 "browser_download_url": "https://x/PacsAdminToolWeb.exe"},
+            ],
+        }
+        monkeypatch.setattr(up, "_fetch_latest_release", lambda: release)
+        monkeypatch.setattr(up, "_is_frozen", lambda: True)
+        monkeypatch.setattr(up, "_detect_asset_name", lambda: "PacsAdminToolWeb.exe")
+        info = up._build_update_info()
+        assert info["sha256"] == good.lower()
+        assert info["download_url"] == "https://x/PacsAdminToolWeb.exe"
+        assert info["can_auto_update"] is True
+
+    @pytest.mark.parametrize("digest", [None, "", "md5:abc", "sha256:xyz", "sha256:" + "a" * 63])
+    def test_missing_or_bad_digest_disables_auto_update(self, monkeypatch, digest):
+        import web.updater as up
+        release = {"tag_name": "v99.0.0", "assets": [
+            {"name": "PacsAdminToolWeb.exe", "digest": digest,
+             "browser_download_url": "https://x/PacsAdminToolWeb.exe"}]}
+        monkeypatch.setattr(up, "_fetch_latest_release", lambda: release)
+        monkeypatch.setattr(up, "_is_frozen", lambda: True)
+        monkeypatch.setattr(up, "_detect_asset_name", lambda: "PacsAdminToolWeb.exe")
+        info = up._build_update_info()
+        assert info["sha256"] is None and info["can_auto_update"] is False
 
     def test_regular_user_cannot_apply_update(self, regular):
         assert regular.post("/api/apply-update").status_code == 403
