@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request
 
-from config.manager import LOG_DIR
+import config.manager as config_manager
 from web.auth import is_admin, require_login
 
 logger = logging.getLogger(__name__)
@@ -25,6 +25,7 @@ def _is_audit_file(name: str) -> bool:
 @require_login
 def logs_list_files():
     """Return a sorted list of log files available in the log directory."""
+    LOG_DIR = config_manager.LOG_DIR
     files = []
     for pattern in _LOG_FILE_PATTERNS:
         for path in sorted(glob.glob(os.path.join(LOG_DIR, pattern))):
@@ -51,6 +52,7 @@ def logs_get_content():
 
     Query params: file (required), lines (default 200, max 5000), filter (optional).
     """
+    LOG_DIR = config_manager.LOG_DIR
     filename = request.args.get("file", "")
     if not filename or os.sep in filename or "/" in filename or ".." in filename:
         return jsonify({"ok": False, "error": "Invalid filename."}), 400

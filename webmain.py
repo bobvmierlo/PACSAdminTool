@@ -34,9 +34,6 @@ import webbrowser
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
 
-# ── Import our Flask app and the SocketIO instance from server.py
-from web.server import app, socketio
-
 # ── Single source of truth for the version number (see __version__.py)
 from __version__ import __version__ as APP_VERSION
 
@@ -107,6 +104,14 @@ def _notify(title, message, error=False):
 
 
 if __name__ == "__main__":
+    import admin_cli
+
+    # The Windows .exe has no console window; attach one when the user asked
+    # for help or an account-recovery command so the output can be seen.
+    _needs_console, _interactive = admin_cli.wants_console(sys.argv[1:])
+    if _needs_console:
+        admin_cli.ensure_console(_interactive)
+
     # ── Load config so we can use web.host / web.port as defaults
     from config.manager import load_config
     _cfg_web = load_config().get("web", {})
@@ -124,7 +129,21 @@ if __name__ == "__main__":
         help="Path to a TLS certificate (PEM). Enables HTTPS; requires --key.")
     parser.add_argument("--key", default=None,
         help="Path to the TLS private key (PEM) matching --cert.")
-    args = parser.parse_args()
+    admin_cli.add_arguments(parser)
+    try:
+        args = parser.parse_args()
+    except SystemExit as exc:          # --help, or invalid arguments
+        admin_cli.finish(exc.code or 0)
+
+    # ── Account recovery commands run instead of the server
+    _cli_result = admin_cli.run(args)
+    if _cli_result is not None:
+        admin_cli.finish(_cli_result)
+
+    # ── Import our Flask app and the SocketIO instance from server.py.
+    #    Done here, not at the top, so the commands above never start the
+    #    server's background services (log cleanup, SCP cleanup, …).
+    from web.server import app, socketio
 
     # ── Optional TLS: --cert and --key must be given together
     ssl_context = None
