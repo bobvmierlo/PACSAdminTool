@@ -17,7 +17,7 @@ COPY hl7_module/   hl7_module/
 COPY hl7_templates/ hl7_templates/
 COPY locales/      locales/
 COPY web/          web/
-COPY __version__.py webmain.py ./
+COPY __version__.py webmain.py admin_cli.py ./
 
 # Config and logs are stored under PACS_DATA_DIR.
 # Mount a volume here so data persists across container restarts.
