@@ -265,9 +265,14 @@ class HL7Listener:
                 conn, addr = self._sock.accept()
                 if not address_allowed(addr[0], self.allowed_networks):
                     logger.warning("HL7 listener rejected connection from %s", addr[0])
-                    conn.close()
+                    # Report before closing, so the rejection is recorded by
+                    # the time the sender sees the connection drop.
                     if self.reject_callback:
-                        self.reject_callback(addr[0])
+                        try:
+                            self.reject_callback(addr[0])
+                        except Exception:
+                            logger.exception("HL7 reject callback failed")
+                    conn.close()
                     continue
                 t = threading.Thread(target=self._handle_client,
                                      args=(conn, addr), daemon=True)
