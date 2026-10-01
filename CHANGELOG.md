@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.6.3 — 2026-10-01
+
+### Fixed — [#175](https://github.com/bobvmierlo/PACSAdminTool/pull/175)
+
+- When the HL7 listener turns away a sender that is not on the allowlist, the rejection is now always recorded before the connection is closed. An error while recording a rejection can no longer stop the listener from accepting new connections.
+
+### Improved — [#175](https://github.com/bobvmierlo/PACSAdminTool/pull/175)
+
+- **Verified updates** — one-click updates of the Windows version now check the download against the checksum GitHub publishes for each release file. Releases no longer include separate `.sha256` files. If no valid checksum is available, you are still pointed to a manual update.
+
 ## v3.6.2 — 2026-10-01
 
 ### Fixed — [#174](https://github.com/bobvmierlo/PACSAdminTool/pull/174)
