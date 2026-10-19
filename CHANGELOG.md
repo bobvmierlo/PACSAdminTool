@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.6.4 — 2026-10-19
+
+### Improved — [#177](https://github.com/bobvmierlo/PACSAdminTool/pull/177)
+
+- **Character set details in worklist logs** — when debug logging is on, worklist query results now show each patient name as received and after decoding, along with the character set the worklist server declared. The log also warns when a response contains special characters but declares no character set, which helps track down garbled patient names.
+
 ## v3.6.3 — 2026-10-01
 
 ### Fixed — [#175](https://github.com/bobvmierlo/PACSAdminTool/pull/175)
