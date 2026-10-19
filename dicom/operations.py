@@ -634,6 +634,12 @@ def dmwl_find(local_ae_title: str, remote_host: str, remote_port: int,
             if identifier:
                 _dbg(f"  Response status={status_hex}  → got identifier with "
                      f"PatientID={getattr(identifier, 'PatientID', '?')!r}")
+                # Raw PatientName as received (before charset decoding) plus the
+                # declared character set, to help diagnose encoding issues.
+                pname = getattr(identifier, "PatientName", None)
+                _dbg(f"    PatientName={str(pname)!r}  "
+                     f"original_string={getattr(pname, 'original_string', None)!r}  "
+                     f"SpecificCharacterSet={getattr(identifier, 'SpecificCharacterSet', None)!r}")
                 results.append(identifier)
             else:
                 _dbg(f"  Response status={status_hex}  → no identifier"
