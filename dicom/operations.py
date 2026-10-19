@@ -577,6 +577,31 @@ def c_store(local_ae_title: str, remote_host: str, remote_port: int,
 # DMWL (Modality Worklist)
 # ---------------------------------------------------------------------------
 
+def _describe_charset(ds: "Dataset", raw_name=None) -> str:
+    """Summarise the character set of a received dataset for debug logging.
+
+    Reports the declared SpecificCharacterSet (0008,0005), the Python codec(s)
+    pydicom uses to decode it, and warns when the raw name contains non-ASCII
+    bytes although no character set was declared (a common source of mojibake).
+    """
+    declared = ds.get("SpecificCharacterSet", None)
+    if declared in (None, "", []):
+        text = "SpecificCharacterSet not declared → default ISO_IR 6 (ASCII)"
+        if isinstance(raw_name, (bytes, bytearray)) and any(b > 0x7F for b in raw_name):
+            text += "  ⚠ non-ASCII bytes in PatientName without a declared character set"
+        return text
+    values = [str(declared)] if isinstance(declared, str) else [str(v) for v in declared]
+    try:
+        from pydicom.charset import convert_encodings
+        codecs = convert_encodings(declared)
+        if isinstance(codecs, str):
+            codecs = [codecs]
+        codec_text = ", ".join(codecs)
+    except Exception as e:
+        codec_text = f"unknown ({e})"
+    return f"SpecificCharacterSet={values!r} → Python codec(s): {codec_text}"
+
+
 def dmwl_find(local_ae_title: str, remote_host: str, remote_port: int,
               remote_ae_title: str, query_dataset: "Dataset",
               log_callback=None, tls: Optional[dict] = None) -> tuple[bool, list, str]:
@@ -634,6 +659,12 @@ def dmwl_find(local_ae_title: str, remote_host: str, remote_port: int,
             if identifier:
                 _dbg(f"  Response status={status_hex}  → got identifier with "
                      f"PatientID={getattr(identifier, 'PatientID', '?')!r}")
+                # Raw PatientName as received (before charset decoding) plus the
+                # declared character set, to help diagnose encoding issues.
+                pname = getattr(identifier, "PatientName", None)
+                raw_name = getattr(pname, "original_string", None)
+                _dbg(f"    PatientName={str(pname)!r}  original_string={raw_name!r}")
+                _dbg(f"    Charset: {_describe_charset(identifier, raw_name)}")
                 results.append(identifier)
             else:
                 _dbg(f"  Response status={status_hex}  → no identifier"
