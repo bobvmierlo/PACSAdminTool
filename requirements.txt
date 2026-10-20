@@ -15,7 +15,7 @@ hl7~=0.4
 
 # Web server (web version only)
 flask~=3.1
-flask-socketio~=5.6
+flask-socketio~=5.7
 simple-websocket~=1.1
 
 # DICOMweb (QIDO-RS / STOW-RS / WADO-RS) HTTP client
@@ -24,7 +24,7 @@ requests~=2.34
 
 # System tray icon
 pystray~=0.19
-Pillow~=12.3
+Pillow~=13.0
 
 # Build desktop .exe (optional, Windows only)
 pyinstaller~=6.22
